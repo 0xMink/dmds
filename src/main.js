@@ -325,6 +325,31 @@
     });
   }
 
+  /* ═══ Dossiers: click a work row to open the evidence ═══ */
+  $$(".work__row").forEach(function (row) {
+    var dossier = $(".dossier", row);
+    if (!dossier) return;
+    row.setAttribute("aria-expanded", "false");
+    function toggle() {
+      var open = row.classList.toggle("open");
+      dossier.hidden = !open;
+      row.setAttribute("aria-expanded", String(open));
+      sfx("blip");
+      measure();               // dossier changes page height — virtual scroll must know
+      setTimeout(measure, 400);
+    }
+    row.addEventListener("click", function (e) {
+      if (e.target.closest("a") || e.target.closest(".dossier")) return;
+      toggle();
+    });
+    row.addEventListener("keydown", function (e) {
+      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  });
+
   /* ═══ Work rows drive the engine ═══ */
   $$(".work__row[data-particles]").forEach(function (row) {
     if (TOUCH || REDUCED) return;

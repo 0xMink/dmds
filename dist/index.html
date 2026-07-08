@@ -401,6 +401,60 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .stat__label { color: var(--bone-dim); font-size: 0.625rem; }
 @media (max-width: 860px) { .proof__stats { grid-template-columns: repeat(2, 1fr); } }
 
+/* ═══ Operator ═══ */
+.operator { padding-top: 9rem; padding-bottom: 9rem; border-top: 1px solid var(--line); }
+.operator__body { max-width: 44rem; }
+.operator__kicker { color: var(--signal); margin-bottom: 2rem; }
+.operator__name {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(3.4rem, 11vw, 11rem); line-height: 0.92;
+  margin-bottom: 1.6rem;
+}
+.operator__handle { color: var(--bone-dim); margin-bottom: 2rem; }
+.operator__bio { color: var(--bone-dim); font-size: clamp(1rem, 1.35vw, 1.15rem); max-width: 36rem; }
+.operator__stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line);
+  margin-top: 3.5rem;
+}
+@media (max-width: 860px) { .operator__stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* ═══ Dossiers ═══ */
+.dossier {
+  position: relative; z-index: 1;
+  margin: 0 0.8rem 2.4rem;
+  border: 1px solid var(--line);
+  background: rgba(19, 19, 21, 0.88);
+  padding: 2rem;
+}
+.dossier__head { color: var(--signal); margin-bottom: 1.6rem; }
+.dossier__stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line);
+  margin-bottom: 1.6rem;
+}
+.dstat { background: var(--ink-2); padding: 1.1rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.dstat b { font-size: clamp(1.4rem, 2.4vw, 2.1rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+.dstat span { color: var(--bone-dim); font-size: 0.56rem; }
+.dossier__sum { color: var(--bone-dim); max-width: 44rem; margin-bottom: 1.6rem; }
+.dossier__log { list-style: none; border-top: 1px solid var(--line); margin-bottom: 1.8rem; }
+.dossier__log li {
+  display: flex; gap: 1.2rem; align-items: baseline;
+  padding: 0.55rem 0; border-bottom: 1px solid var(--line);
+  color: var(--bone-dim); font-size: 0.625rem;
+}
+.dossier__log i { font-style: normal; color: var(--signal); flex: 0 0 5.2rem; }
+.dossier__links { display: flex; gap: 1.6rem; }
+.dossier__links a { color: var(--bone); text-decoration: none; border-bottom: 1px solid var(--signal); padding-bottom: 2px; }
+.dossier__links a:hover { color: var(--signal); }
+@media (max-width: 860px) { .dossier__stats { grid-template-columns: repeat(2, 1fr); } .dossier { padding: 1.2rem; margin: 0 0 2rem; } }
+
+/* an open row stays readable: kill the orange flood while the dossier is out */
+.work__row.open::before { transform: translateY(101%); }
+.work__row.open .work__line > *, .work__row.open .work__detail p { color: inherit; }
+.work__row.open .work__idx { color: var(--signal); }
+.work__row.open .work__arrow { transform: rotate(45deg); opacity: 1; color: var(--signal); }
+
 /* ═══ Work ═══ */
 .work { padding-top: 8rem; padding-bottom: 10rem; }
 .work__list { border-top: 1px solid var(--line); }
@@ -536,7 +590,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 <!-- HUD -->
 <div class="hud mono" aria-hidden="true">
   <div class="hud__track"><div class="hud__fill" id="hud-fill"></div></div>
-  <div class="hud__index"><span id="hud-current">001</span><span class="hud__sep">/</span><span>006</span></div>
+  <div class="hud__index"><span id="hud-current">001</span><span class="hud__sep">/</span><span>007</span></div>
 </div>
 
 <!-- ══════════ NAV ══════════ -->
@@ -697,9 +751,31 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     </div>
   </section>
 
-  <!-- 04 · WORK -->
-  <section class="work section" id="work" data-formation="ambient" data-dim="0.32" data-index="005">
-    <div class="section-head mono"><span>[ SEC.04 / SELECTED WORK ]</span><span class="section-head__rule"></span></div>
+  <!-- 04 · OPERATOR -->
+  <section class="operator section" id="operator" data-formation="text:0xMINK" data-dim="0.8" data-index="005">
+    <div class="section-head mono"><span>[ SEC.04 / OPERATOR ]</span><span class="section-head__rule"></span></div>
+    <div class="operator__body">
+      <p class="operator__kicker mono reveal">THE STUDIO IS THE ENGINEER<span class="sig">.</span></p>
+      <h2 class="operator__name reveal-lines"><span class="line">DENNIS</span><span class="line">MINK</span></h2>
+      <p class="operator__handle mono reveal">@0xMINK&nbsp;·&nbsp;CORE&nbsp;MAINTAINER,&nbsp;ZOO&nbsp;CODE&nbsp;·&nbsp;LONG&nbsp;ISLAND,&nbsp;NY</p>
+      <p class="operator__bio reveal">
+        Every line on this page ships through the same hands — a core maintainer
+        of Zoo Code, with fixes merged upstream into Roo Code, the tooling this
+        industry codes with. No account managers, no handoffs, no telephone game
+        between the person you brief and the person who builds.
+      </p>
+      <div class="operator__stats mono">
+        <div class="stat reveal"><span class="stat__num" data-count="34">0</span><span class="stat__label">PULL REQUESTS AUTHORED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="12">0</span><span class="stat__label">MERGED INTO PUBLIC AI TOOLING</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="38">0</span><span class="stat__label">ISSUES FILED &amp; TRIAGED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="1">0</span><span class="stat__label">PERSON. ZERO HANDOFFS.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 · WORK -->
+  <section class="work section" id="work" data-formation="ambient" data-dim="0.32" data-index="006">
+    <div class="section-head mono"><span>[ SEC.05 / SELECTED WORK — EVIDENCE ON FILE ]</span><span class="section-head__rule"></span></div>
     <div class="work__list">
       <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE" tabindex="0">
         <div class="work__line">
@@ -710,6 +786,35 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           <span class="work__arrow" aria-hidden="true">↗</span>
         </div>
         <div class="work__detail"><p>Credit-based AI gateway routing 20+ model providers — VS Code extension auth, fraud detection, usage analytics, Stripe billing.</p></div>
+        <div class="dossier" hidden>
+          <div class="dossier__head mono">[ DOSSIER W-01 · FACTS VERIFIABLE VIA GITHUB ]</div>
+          <div class="dossier__stats">
+            <div class="dstat"><b>1,266</b><span class="mono">GITHUB STARS</span></div>
+            <div class="dstat"><b>7</b><span class="mono">PRS MERGED</span></div>
+            <div class="dstat"><b>7</b><span class="mono">PRS REVIEWED</span></div>
+            <div class="dstat"><b>85,900</b><span class="mono">LOC AUDITED — POWER OF TEN</span></div>
+          </div>
+          <p class="dossier__sum">
+            Core maintainer of the community-maintained VS Code AI coding extension
+            built on Roo Code. Shipped fixes across ripgrep integration, provider
+            compatibility and lint enforcement, and ran a NASA Power-of-Ten audit
+            over all 396 production source files. Five fixes merged upstream into
+            Roo Code itself.
+          </p>
+          <ul class="dossier__log mono">
+            <li><i>MERGED</i>feat(ripgrep): add Show Ripgrep Diagnostic command</li>
+            <li><i>MERGED</i>fix: resolve ripgrep from @vscode/ripgrep-universal and the system PATH</li>
+            <li><i>MERGED</i>fix(vertex): warn when credentials field receives a file path</li>
+            <li><i>UPSTREAM</i>fix(reliability): prevent webview postMessage crashes, idempotent dispose</li>
+            <li><i>UPSTREAM</i>fix(checkpoints): canonicalize core.worktree comparison on Windows</li>
+            <li><i>UPSTREAM</i>fix: provider 400s — strip reasoning_details from messages</li>
+          </ul>
+          <div class="dossier__links mono">
+            <a href="https://github.com/Zoo-Code-Org/Zoo-Code" target="_blank" rel="noopener" data-cursor>REPO&nbsp;↗</a>
+            <a href="https://github.com/RooCodeInc/Roo-Code" target="_blank" rel="noopener" data-cursor>UPSTREAM&nbsp;↗</a>
+            <a href="https://github.com/0xMink" target="_blank" rel="noopener" data-cursor>@0xMINK&nbsp;↗</a>
+          </div>
+        </div>
       </article>
       <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK" tabindex="0">
         <div class="work__line">
@@ -720,6 +825,30 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           <span class="work__arrow" aria-hidden="true">↗</span>
         </div>
         <div class="work__detail"><p>Brand, site, lead API and an AI-assisted content engine for a licensed insurance practice — compliance-reviewed at every step.</p></div>
+        <div class="dossier" hidden>
+          <div class="dossier__head mono">[ DOSSIER W-02 · GROWTH SYSTEM ]</div>
+          <div class="dossier__stats">
+            <div class="dstat"><b>1</b><span class="mono">BRAND SYSTEM</span></div>
+            <div class="dstat"><b>4</b><span class="mono">CHANNELS INSTRUMENTED</span></div>
+            <div class="dstat"><b>100%</b><span class="mono">COMPLIANCE-GATED CONTENT</span></div>
+            <div class="dstat"><b>T-65</b><span class="mono">CAMPAIGN OPS SPEC</span></div>
+          </div>
+          <p class="dossier__sum">
+            Full growth system for a licensed insurance practice: brand, website,
+            lead-capture API, and an AI-assisted content engine where every asset
+            passes a human compliance gate before it ships — because regulated
+            industries don't get to move fast and break things.
+          </p>
+          <ul class="dossier__log mono">
+            <li><i>SHIPPED</i>Brand system — identity, cards, print collateral</li>
+            <li><i>SHIPPED</i>insurewithmink.com — site + lead API</li>
+            <li><i>RUNNING</i>AI content calendar with human compliance review</li>
+            <li><i>SPEC'D</i>T-65 campaign operations — full designer + ops briefs</li>
+          </ul>
+          <div class="dossier__links mono">
+            <a href="https://insurewithmink.com" target="_blank" rel="noopener" data-cursor>LIVE&nbsp;SITE&nbsp;↗</a>
+          </div>
+        </div>
       </article>
       <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ" tabindex="0">
         <div class="work__line">
@@ -730,14 +859,38 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           <span class="work__arrow" aria-hidden="true">↗</span>
         </div>
         <div class="work__detail"><p>React Native customer app and a zero-trust backend — mutual-TLS service mesh, formally reviewed critical paths.</p></div>
+        <div class="dossier" hidden>
+          <div class="dossier__head mono">[ DOSSIER W-03 · PRIVATE ENGAGEMENT — REFERENCES ON REQUEST ]</div>
+          <div class="dossier__stats">
+            <div class="dstat"><b>412</b><span class="mono">COMMITS, SOLE ENGINEER</span></div>
+            <div class="dstat"><b>4</b><span class="mono">PROVERIF MODELS</span></div>
+            <div class="dstat"><b>3</b><span class="mono">TLA+ SPECS, MODEL-CHECKED</span></div>
+            <div class="dstat"><b>2</b><span class="mono">PLATFORMS — RUST + REACT NATIVE</span></div>
+          </div>
+          <p class="dossier__sum">
+            Field-service platform for an HVAC operation: a Rust backend with a
+            zero-trust internal layer — mutual TLS between services and a
+            forward-secret ratchet whose secrecy properties are proven in
+            ProVerif — plus migration and coordination flows model-checked in
+            TLA+, and a React Native customer app with PII-scrubbed crash
+            reporting.
+          </p>
+          <ul class="dossier__log mono">
+            <li><i>PROVEN</i>ratchet_forward_secrecy.pv — forward secrecy under key compromise</li>
+            <li><i>PROVEN</i>capability_chain.pv — verified against an explicit attack model</li>
+            <li><i>CHECKED</i>ForwardSecretRatchet.tla — TLC traces on file</li>
+            <li><i>CHECKED</i>CellMigration.tla · SchemaCoordinator.tla</li>
+            <li><i>SHIPPED</i>Customer app — offline-aware, crash reports scrub PII</li>
+          </ul>
+        </div>
       </article>
     </div>
   </section>
 
-  <!-- 05 · CONTACT -->
-  <section class="contact section" id="contact" data-formation="logo" data-dim="0.55" data-index="006">
+  <!-- 06 · CONTACT -->
+  <section class="contact section" id="contact" data-formation="logo" data-dim="0.55" data-index="007">
     <div class="contact__body">
-      <p class="contact__kicker mono reveal">[ SEC.05 / TRANSMIT ]</p>
+      <p class="contact__kicker mono reveal">[ SEC.06 / TRANSMIT ]</p>
       <h2 class="contact__title reveal-lines">
         <span class="line">HAVE A SYSTEM</span>
         <span class="line">WORTH BUILDING<span class="sig">?</span></span>
@@ -1874,6 +2027,31 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       typeIdleTimer = setTimeout(exitType, 9000);
     });
   }
+
+  /* ═══ Dossiers: click a work row to open the evidence ═══ */
+  $$(".work__row").forEach(function (row) {
+    var dossier = $(".dossier", row);
+    if (!dossier) return;
+    row.setAttribute("aria-expanded", "false");
+    function toggle() {
+      var open = row.classList.toggle("open");
+      dossier.hidden = !open;
+      row.setAttribute("aria-expanded", String(open));
+      sfx("blip");
+      measure();               // dossier changes page height — virtual scroll must know
+      setTimeout(measure, 400);
+    }
+    row.addEventListener("click", function (e) {
+      if (e.target.closest("a") || e.target.closest(".dossier")) return;
+      toggle();
+    });
+    row.addEventListener("keydown", function (e) {
+      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  });
 
   /* ═══ Work rows drive the engine ═══ */
   $$(".work__row[data-particles]").forEach(function (row) {
