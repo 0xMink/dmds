@@ -86,6 +86,7 @@
     gl: null, canvas: null, program: null, loc: {},
     bufA: null, bufB: null, bufR: null,
     formations: {}, currentName: null,
+    pairA: null, pairB: null, mode: "tween", tweenDur: 1.5,
     curA: null, curB: null, mix: 1, mixTarget: 1, morphStart: 0, morphDur: REDUCED ? 0.01 : 1.5,
     time: 0, lastT: 0, turb: 0, turbTarget: 0,
     mouse: { x: 0, y: 0, wx: 0, wy: 0, str: 0, strTarget: 0 },
@@ -265,19 +266,26 @@
     return a;
   }
 
-  // ── sample "DMDS" from an offscreen canvas ──
-  function sampleLogo() {
-    var cw = 1280, ch = 360;
+  // ── sample arbitrary text from an offscreen canvas (normalized, cached) ──
+  var textCache = {};
+  function sampleText(str) {
+    if (textCache[str]) return textCache[str];
+    var ch = 360, fontSpec = "600 250px 'Clash Display', Arial";
+    var probe = document.createElement("canvas").getContext("2d");
+    probe.font = fontSpec;
+    var cw = Math.max(200, Math.ceil(probe.measureText(str).width) + 100);
     var c = document.createElement("canvas");
     c.width = cw; c.height = ch;
     var ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.fillStyle = "#fff";
-    ctx.font = "600 250px 'Clash Display', Arial";
+    ctx.font = fontSpec;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("DMDS", cw / 2, ch / 2 + 14);
+    ctx.fillText(str, cw / 2, ch / 2 + 14);
     var img = ctx.getImageData(0, 0, cw, ch).data;
-    var xy = [], step = 3;
+    // adaptive step: aim for a healthy sample pool on any text length
+    var step = Math.max(2, Math.round(Math.sqrt((cw * ch) / 55000)));
+    var xy = [];
     var minX = cw, maxX = 0, minY = ch, maxY = 0;
     for (var y = 0; y < ch; y += step) {
       for (var x = 0; x < cw; x += step) {
@@ -295,7 +303,9 @@
         }
       }
     }
-    return { xy: xy, aspect: bw / bh };
+    var out = { xy: xy, aspect: bw / bh };
+    if (xy.length) textCache[str] = out;
+    return out;
   }
 
   // ═══ GL setup ═══
@@ -316,37 +326,80 @@
     worldExtents();
   }
 
-  function rebuildFormations(logoPts) {
+  function rebuildFormations() {
     state.formations = {
-      logo: genLogo(logoPts),
+      logo: genLogo(sampleText("DMDS")),
       ambient: genAmbient(),
       grid: genGrid(),
       device: genDevice(),
       neural: genNeural(),
       curve: genCurve()
     };
+    state.pairA = null; state.pairB = null; // force scrub rebuffer
   }
 
-  function setFormation(name, instant) {
-    if (!state.ready || !state.formations[name] || name === state.currentName) return;
+  // resolve a formation by name; "text:STR" typesets STR on demand
+  function formationFor(name) {
+    if (state.formations[name]) return state.formations[name];
+    if (name && name.indexOf("text:") === 0) {
+      var str = name.slice(5);
+      var pts = sampleText(str);
+      if (!pts.xy.length) return null;
+      var f = genLogo(pts);
+      state.formations[name] = f;
+      return f;
+    }
+    return null;
+  }
+
+  function setFormation(name, instant, dur) {
+    if (!state.ready || name === state.currentName) return;
+    var target = formationFor(name);
+    if (!target) return;
     var gl = state.gl;
     // freeze current interpolated positions into A
     if (state.mix < 1 && state.curA && state.curB) {
-      var t = easeCubic(state.mix), a = state.curA, b = state.curB;
+      var t = state.mode === "scrub" ? smooth01(state.mix) : easeCubic(state.mix);
+      var a = state.curA, b = state.curB;
       var frozen = new Float32Array(COUNT * 3);
       for (var i = 0; i < COUNT * 3; i++) frozen[i] = a[i] + (b[i] - a[i]) * t;
       state.curA = frozen;
     } else {
-      state.curA = state.curB || state.formations[name];
+      state.curA = state.curB || target;
     }
-    state.curB = state.formations[name];
+    state.curB = target;
     state.currentName = name;
+    state.pairA = null; state.pairB = null;
     gl.bindBuffer(gl.ARRAY_BUFFER, state.bufA);
     gl.bufferData(gl.ARRAY_BUFFER, state.curA, gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, state.bufB);
     gl.bufferData(gl.ARRAY_BUFFER, state.curB, gl.DYNAMIC_DRAW);
+    state.mode = "tween";
+    state.tweenDur = REDUCED ? 0.01 : (dur || state.morphDur);
     state.mix = instant ? 1 : 0;
     state.morphStart = state.time;
+  }
+
+  function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
+
+  // scroll-scrubbed morphing: pin the pair, drive mix directly
+  function setMorphPair(a, b, t) {
+    if (!state.ready) return;
+    if (state.pairA !== a || state.pairB !== b) {
+      var fa = formationFor(a), fb = formationFor(b);
+      if (!fa || !fb) return;
+      var gl = state.gl;
+      state.curA = fa; state.curB = fb;
+      state.pairA = a; state.pairB = b;
+      state.currentName = t >= 0.5 ? b : a;
+      gl.bindBuffer(gl.ARRAY_BUFFER, state.bufA);
+      gl.bufferData(gl.ARRAY_BUFFER, state.curA, gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, state.bufB);
+      gl.bufferData(gl.ARRAY_BUFFER, state.curB, gl.DYNAMIC_DRAW);
+    }
+    state.mode = "scrub";
+    state.mix = Math.max(0, Math.min(1, t));
+    state.currentName = state.mix >= 0.5 ? b : a;
   }
 
   function easeCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
@@ -364,8 +417,8 @@
     state.frames++;
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
 
-    // morph progress
-    if (state.mix < 1) state.mix = Math.min(1, (now - state.morphStart) / state.morphDur);
+    // morph progress (scrub mode is driven externally)
+    if (state.mode === "tween" && state.mix < 1) state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
 
     // smooth mouse strength + turbulence decay
     state.mouse.str += (state.mouse.strTarget - state.mouse.str) * (1 - Math.exp(-8 * dt));
@@ -438,9 +491,7 @@
       : Promise.resolve();
 
     return fontsReady.then(function () {
-      var logoPts = sampleLogo();
-      state.logoPts = logoPts;
-      rebuildFormations(logoPts);
+      rebuildFormations();
 
       // wire attribute pointers once buffers hold data
       var scattered = genAmbient();
@@ -462,13 +513,18 @@
 
       state.mix = 0;
       state.morphStart = 0;
-      state.morphDur = REDUCED ? 0.01 : 2.2; // slow, cinematic first assembly
+      state.mode = "tween";
+      state.tweenDur = state.morphDur = REDUCED ? 0.01 : 2.2; // slow, cinematic first assembly
       state.ready = true;
       state.running = true;
 
       window.addEventListener("resize", function () {
         resize();
-        rebuildFormations(state.logoPts);
+        // drop world-space text formations; normalized samples in textCache survive
+        Object.keys(state.formations).forEach(function (k) {
+          if (k.indexOf("text:") === 0) delete state.formations[k];
+        });
+        rebuildFormations();
         // snap current formation to its rebuilt geometry
         var name = state.currentName;
         state.currentName = null;
@@ -497,7 +553,8 @@
 
   window.DMDS_GL = {
     init: init,
-    setFormation: function (n) { setFormation(n, false); },
+    setFormation: function (n, dur) { setFormation(n, false, dur); },
+    setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); },
     fps: function () { return state.fps; },

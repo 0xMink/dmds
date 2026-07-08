@@ -28,6 +28,15 @@ Deploy `dist/index.html` to any static host (Vercel, Netlify, Cloudflare
 Pages, S3, or a plain nginx root). No build pipeline, no dependencies,
 no CDN, works from `file://`.
 
+## The live engine (v2)
+
+- **Type anything on the hero** — the keyboard is live; 42,000 particles
+  typeset whatever the visitor types, in Clash Display, in real time
+- **Scroll-scrubbed choreography** — formations morph with scroll position,
+  forward and backward, like scrubbing a timeline
+- **Work rows drive the engine** — hovering a project makes the field spell it
+- Boot-sequence preloader; cursor labels (VIEW / TRANSMIT)
+
 ## The particle engine
 
 - 42,000 particles (16,000 on mobile), one draw call, GL_POINTS

@@ -22,6 +22,7 @@
   <div class="loader__panel loader__panel--bottom"></div>
   <div class="loader__core">
     <div class="loader__mark mono">DMDS<span class="loader__reg">®</span></div>
+    <div class="loader__log mono" id="loader-log"></div>
     <div class="loader__row mono">
       <span id="loader-status">INITIALIZING RENDER</span>
       <span id="loader-pct">000</span>
@@ -33,7 +34,7 @@
 <!-- ══════════ PERSISTENT LAYERS ══════════ -->
 <canvas id="gl" aria-hidden="true"></canvas>
 <div class="grain" aria-hidden="true"></div>
-<div class="cursor" aria-hidden="true"><div class="cursor__dot"></div><div class="cursor__ring"></div></div>
+<div class="cursor" aria-hidden="true"><div class="cursor__dot"></div><div class="cursor__ring"><span class="cursor__label mono" id="cursor-label"></span></div></div>
 
 <!-- HUD -->
 <div class="hud mono" aria-hidden="true">
@@ -68,9 +69,13 @@
     <div class="hero__tag">
       <p class="hero__tagline reveal-lines">
         <span class="line">A digital studio that engineers</span>
-        <span class="line">outcomes — not impressions.</span>
+        <span class="line">outcomes — not impressions<span class="sig">.</span></span>
       </p>
       <p class="hero__sub mono reveal">WEBSITES&nbsp;&nbsp;APPS&nbsp;&nbsp;AI&nbsp;&nbsp;MARKETING</p>
+      <p class="hero__engine mono reveal" id="hero-engine">
+        <span id="engine-hint">[ KEYBOARD LIVE ]&nbsp;&nbsp;TYPE ANYTHING — THE ENGINE WILL SET IT</span>
+        <span id="engine-input" hidden>&gt;&nbsp;<span id="engine-buffer"></span><i class="engine-caret"></i></span>
+      </p>
     </div>
     <div class="hero__coords mono reveal" aria-hidden="true">
       40.7891°&nbsp;N&nbsp;&nbsp;73.1350°&nbsp;W<br>
@@ -100,7 +105,7 @@
       <span class="cap__ghost" aria-hidden="true">01</span>
       <div class="cap__body">
         <div class="cap__meta mono reveal"><span>FIG.01</span><span>DISCIPLINE / WEB</span></div>
-        <h2 class="cap__title reveal-lines"><span class="line">WEBSITES</span></h2>
+        <h2 class="cap__title reveal-lines"><span class="line">WEBSITES<span class="sig">.</span></span></h2>
         <p class="cap__desc reveal">
           Design systems, not page templates. Performance budgets set before the first
           pixel, sites that score green before they scroll, and a CMS your team will
@@ -116,7 +121,7 @@
       <span class="cap__ghost" aria-hidden="true">02</span>
       <div class="cap__body">
         <div class="cap__meta mono reveal"><span>FIG.02</span><span>DISCIPLINE / MOBILE</span></div>
-        <h2 class="cap__title reveal-lines"><span class="line">APPS</span></h2>
+        <h2 class="cap__title reveal-lines"><span class="line">APPS<span class="sig">.</span></span></h2>
         <p class="cap__desc reveal">
           Native-feeling apps for iOS and Android from one codebase, wired to backends
           built zero-trust from day one — mutual TLS between services, offline-first
@@ -132,7 +137,7 @@
       <span class="cap__ghost" aria-hidden="true">03</span>
       <div class="cap__body">
         <div class="cap__meta mono reveal"><span>FIG.03</span><span>DISCIPLINE / INTELLIGENCE</span></div>
-        <h2 class="cap__title reveal-lines"><span class="line">AI</span></h2>
+        <h2 class="cap__title reveal-lines"><span class="line">AI<span class="sig">.</span></span></h2>
         <p class="cap__desc reveal">
           Not a chatbot bolted on. We operate our own AI gateway across 20+ model
           providers — agents, retrieval, evals and cost controls, integrated where
@@ -148,7 +153,7 @@
       <span class="cap__ghost" aria-hidden="true">04</span>
       <div class="cap__body">
         <div class="cap__meta mono reveal"><span>FIG.04</span><span>DISCIPLINE / GROWTH</span></div>
-        <h2 class="cap__title reveal-lines"><span class="line">MARKETING</span></h2>
+        <h2 class="cap__title reveal-lines"><span class="line">MARKETING<span class="sig">.</span></span></h2>
         <p class="cap__desc reveal">
           Creative that answers to a dashboard. Content engines, campaigns and funnels
           instrumented end-to-end — because launch is the midpoint, not the finish line.
@@ -163,7 +168,7 @@
   <!-- 03 · PROOF -->
   <section class="proof section" id="proof" data-formation="ambient" data-dim="0.38" data-index="004">
     <div class="section-head mono"><span>[ SEC.03 / PROOF OF WORK ]</span><span class="section-head__rule"></span></div>
-    <h2 class="proof__title reveal-lines"><span class="line">ENGINEERED,</span><span class="line">NOT DECORATED.</span></h2>
+    <h2 class="proof__title reveal-lines"><span class="line">ENGINEERED,</span><span class="line">NOT DECORATED<span class="sig">.</span></span></h2>
     <div class="proof__table" role="list">
       <div class="proof__row reveal" role="listitem" data-cursor>
         <span class="proof__idx mono">P-01</span>
@@ -198,7 +203,7 @@
   <section class="work section" id="work" data-formation="ambient" data-dim="0.32" data-index="005">
     <div class="section-head mono"><span>[ SEC.04 / SELECTED WORK ]</span><span class="section-head__rule"></span></div>
     <div class="work__list">
-      <article class="work__row reveal" data-cursor tabindex="0">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE" tabindex="0">
         <div class="work__line">
           <span class="work__idx mono">W-01</span>
           <h3 class="work__name">ZOO CODE</h3>
@@ -208,7 +213,7 @@
         </div>
         <div class="work__detail"><p>Credit-based AI gateway routing 20+ model providers — VS Code extension auth, fraud detection, usage analytics, Stripe billing.</p></div>
       </article>
-      <article class="work__row reveal" data-cursor tabindex="0">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK" tabindex="0">
         <div class="work__line">
           <span class="work__idx mono">W-02</span>
           <h3 class="work__name">INSURE WITH MINK</h3>
@@ -218,7 +223,7 @@
         </div>
         <div class="work__detail"><p>Brand, site, lead API and an AI-assisted content engine for a licensed insurance practice — compliance-reviewed at every step.</p></div>
       </article>
-      <article class="work__row reveal" data-cursor tabindex="0">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ" tabindex="0">
         <div class="work__line">
           <span class="work__idx mono">W-03</span>
           <h3 class="work__name">COMFORT AIRZ</h3>
@@ -237,9 +242,9 @@
       <p class="contact__kicker mono reveal">[ SEC.05 / TRANSMIT ]</p>
       <h2 class="contact__title reveal-lines">
         <span class="line">HAVE A SYSTEM</span>
-        <span class="line">WORTH BUILDING?</span>
+        <span class="line">WORTH BUILDING<span class="sig">?</span></span>
       </h2>
-      <a class="contact__cta" href="mailto:dennis@shorevapesli.com?subject=Project%20inquiry%20—%20DMDS" data-cursor data-magnetic>
+      <a class="contact__cta" href="mailto:dennis@shorevapesli.com?subject=Project%20inquiry%20—%20DMDS" data-cursor data-cursor-label="TRANSMIT" data-magnetic>
         <span class="contact__cta-text scramble">START A PROJECT</span>
         <span class="contact__cta-arrow" aria-hidden="true">↗</span>
       </a>

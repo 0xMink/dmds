@@ -60,6 +60,18 @@ embedded as data URIs: ~87 KB total, zero layout shift, zero external requests.
 
 Reduced motion collapses all of the above to near-static.
 
+## The engine as instrument (v2)
+
+The particle system is not a background — it's the product demo. Three ways
+visitors operate it: typing on the hero (live typesetting via the same
+canvas-sampling pipeline that builds the wordmark), scrolling (morphs are
+scrubbed by scroll position through `setMorphPair`, not fired by triggers),
+and hovering work rows (the field spells the project). Manual modes lock the
+engine; scrolling ~90 px reclaims it for the scrub choreography.
+
+Brand signature: terminal punctuation set in signal orange (`.sig`) — the
+period as a shipped deliverable.
+
 ## Voice / copy rules
 
 - Declarative, load-bearing sentences. "Engineered, not decorated."
