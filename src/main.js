@@ -182,6 +182,7 @@
     }
   }
 
+  var nav = $("#nav"), navScrolled = false;
   function raf() {
     requestAnimationFrame(raf);
     targetY = window.scrollY || window.pageYOffset;
@@ -191,6 +192,11 @@
       wrap.style.transform = "translate3d(0," + -cur + "px,0)";
     } else {
       cur = targetY;
+    }
+    var scrolled = cur > vh * 0.7;
+    if (scrolled !== navScrolled) {
+      navScrolled = scrolled;
+      nav.classList.toggle("nav--scrolled", scrolled);
     }
     onScrollUpdate(cur);
     updateCursor();
@@ -415,6 +421,53 @@
       setTimeout(function () { el.style.transition = ""; }, 600);
     });
   });
+
+  /* ═══ Transmit form ═══ */
+  (function () {
+    var form = $("#transmit"), done = $("#transmit-done"), label = $("#transmit-label");
+    if (!form) return;
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var els = form.elements;
+      if (els.namedItem("_gotcha").value) return; // bot
+      if (!form.reportValidity()) return;
+      var data = {
+        name: els.namedItem("name").value.trim(),
+        email: els.namedItem("email").value.trim(),
+        project: (form.querySelector("input[name=project]:checked") || {}).value || "Unspecified",
+        brief: els.namedItem("brief").value.trim(),
+        source: "dmds-site"
+      };
+      var endpoint = form.dataset.endpoint;
+      function succeed() {
+        form.hidden = true;
+        done.hidden = false;
+        sfx("morph");
+        measure();
+      }
+      function fallbackMail() {
+        var body = "Name: " + data.name + "\nEmail: " + data.email +
+          "\nBuilding: " + data.project + "\n\nBrief:\n" + data.brief;
+        window.location.href = "mailto:dennis@shorevapesli.com?subject=" +
+          encodeURIComponent("Project inquiry — DMDS (" + data.project + ")") +
+          "&body=" + encodeURIComponent(body);
+        label.textContent = "OPENING YOUR MAIL CLIENT…";
+        setTimeout(function () { label.textContent = "START A PROJECT"; }, 2500);
+      }
+      if (endpoint) {
+        label.textContent = "TRANSMITTING…";
+        fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        }).then(function (r) {
+          if (r.ok) succeed(); else fallbackMail();
+        }).catch(fallbackMail);
+      } else {
+        fallbackMail();
+      }
+    });
+  })();
 
   /* ═══ Sound — synthesized in-house, zero assets ═══ */
   var snd = { ctx: null, on: false, master: null, droneGain: null, droneTarget: 0.05 };

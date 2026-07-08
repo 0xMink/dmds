@@ -61,6 +61,17 @@ no CDN, works from `file://`.
 - Graceful degradation: no WebGL → CSS gradient atmosphere; honors
   `prefers-reduced-motion` throughout
 
+## Conversion layer (v5)
+
+- **Transmit form** replaces the bare mailto: name/email/project-type/brief,
+  honeypot spam trap, `[ SIGNAL RECEIVED ]` success state. Set
+  `data-endpoint` on `#transmit` to your lead API URL at deploy; until then
+  submissions compose a structured email as fallback.
+- Mid-page shortcut CTA after Capabilities; plain-English translation lines
+  in the Proof table; nav gets a solid blurred bar past the hero; mobile
+  keeps all jump links (no hamburger needed); fixed a latent mobile
+  layout-viewport overflow caused by the marquee.
+
 ## Before launch
 
 - [ ] Swap the contact email in `src/index.html` (currently

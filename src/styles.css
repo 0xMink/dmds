@@ -22,7 +22,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: auto; }
+html { scroll-behavior: auto; overflow-x: clip; }
 
 body {
   background: var(--ink);
@@ -197,10 +197,23 @@ html.loaded .nav { opacity: 1; transform: none; }
 }
 .nav__snd:hover { color: var(--bone); }
 .nav__snd.on { color: var(--signal); }
+/* past the hero, the nav gets a solid bar so it never fights body text */
+.nav--scrolled {
+  mix-blend-mode: normal;
+  background: rgba(11, 11, 12, 0.78);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  transition: background 0.3s;
+}
 @media (max-width: 900px) { .nav__meta { display: none; } }
 @media (max-width: 560px) {
-  .nav__links { gap: 1rem; }
-  .nav__links a:not(.nav__cta):not(:first-child) { display: none; }
+  /* keep every jump link on phones — shrink instead of hiding */
+  .nav { padding: 1.1rem 1rem; }
+  .nav__logo { font-size: 1rem; }
+  .nav__links { gap: 0.8rem; }
+  .nav__links a { font-size: 0.55rem; letter-spacing: 0.1em; }
+  .nav__snd { display: none; }
 }
 
 /* ═══ Sections shared ═══ */
@@ -329,6 +342,23 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   .cap--alt .cap__desc { margin-left: 0; }
 }
 
+/* ═══ Mid-page shortcut CTA ═══ */
+.midcta { padding: 0 var(--pad); border-top: 1px solid var(--line); }
+.midcta__link {
+  display: flex; align-items: baseline; gap: 1.4rem; flex-wrap: wrap;
+  padding: 2.2rem 0; text-decoration: none;
+  transition: color 0.3s;
+}
+.midcta__tag { color: var(--signal); }
+.midcta__text {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: clamp(1.1rem, 2vw, 1.5rem); color: var(--bone-dim);
+  transition: color 0.3s;
+}
+.midcta__arrow { color: var(--signal); font-size: 1.2rem; transition: transform 0.3s var(--ease-out); }
+.midcta__link:hover .midcta__text { color: var(--bone); }
+.midcta__link:hover .midcta__arrow { transform: translate(4px, 4px); }
+
 /* ═══ Proof ═══ */
 .proof { padding-top: 9rem; padding-bottom: 9rem; border-top: 1px solid var(--line); }
 .proof__title {
@@ -356,7 +386,9 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .proof__idx { color: var(--signal); }
 .proof__name { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.3rem, 2.4vw, 2rem); letter-spacing: 0.01em; }
 .proof__body { color: var(--bone-dim); max-width: 46rem; }
+.proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-faint); font-size: 0.56rem; }
 .proof__row:hover > *, .proof__row:hover .proof__body, .proof__row:hover .proof__idx { color: var(--ink); }
+.proof__row:hover .proof__plain { color: rgba(11, 11, 12, 0.72); }
 @media (max-width: 860px) {
   .proof__row { grid-template-columns: 3.4rem 1fr; }
   .proof__body { grid-column: 2; }
@@ -487,7 +519,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   min-height: 100vh; display: flex; flex-direction: column;
   border-top: 1px solid var(--line); padding: 0;
 }
-.marquee { overflow: hidden; border-top: 1px solid var(--line); padding: 1rem 0; color: var(--bone-dim); }
+.marquee { overflow: hidden; contain: layout paint; border-top: 1px solid var(--line); padding: 1rem 0; color: var(--bone-dim); }
 .marquee__inner { display: flex; width: max-content; animation: marquee 22s linear infinite; }
 @keyframes marquee { to { transform: translateX(-50%); } }
 
@@ -500,8 +532,47 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   font-family: var(--font-display); font-weight: 600;
   font-size: clamp(2.5rem, 10vw, 10rem); line-height: 0.96;
 }
+.contact__sub { color: var(--bone-dim); max-width: 30rem; }
+
+/* ═══ Transmit form ═══ */
+.transmit { width: min(40rem, 100%); text-align: left; display: flex; flex-direction: column; gap: 1.4rem; align-items: center; }
+.transmit__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; }
+@media (max-width: 560px) { .transmit__grid { grid-template-columns: 1fr; } }
+.transmit__field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
+.transmit__field .mono { color: var(--signal); font-size: 0.56rem; }
+.transmit__field input, .transmit__field textarea {
+  background: var(--ink-2); border: 1px solid var(--line); color: var(--bone);
+  font-family: var(--font-body); font-size: 0.95rem;
+  padding: 0.9rem 1rem; border-radius: 0;
+  transition: border-color 0.25s;
+  width: 100%; resize: vertical;
+}
+.transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-faint); }
+.transmit__field input:focus, .transmit__field textarea:focus {
+  outline: none; border-color: var(--signal);
+}
+.transmit__field input:user-invalid { border-color: #d4452c; }
+.transmit__chips { border: none; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.transmit__chips legend { color: var(--signal); font-size: 0.56rem; margin-bottom: 0.7rem; }
+.transmit__chips label { cursor: pointer; }
+.transmit__chips input { position: absolute; opacity: 0; pointer-events: none; }
+.transmit__chips span {
+  display: inline-block; border: 1px solid var(--line); padding: 0.5rem 0.9rem;
+  color: var(--bone-dim); transition: all 0.25s;
+}
+.transmit__chips input:checked + span { border-color: var(--signal); color: var(--signal); background: rgba(255, 74, 0, 0.08); }
+.transmit__chips input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
+.transmit__hp { position: absolute; left: -5000px; width: 1px; height: 1px; opacity: 0; }
+.transmit__micro { color: var(--bone-faint); text-align: center; }
+.transmit__micro a { color: var(--bone-dim); }
+.transmit__done {
+  border: 1px solid var(--signal); color: var(--signal);
+  padding: 1.6rem 2rem; margin-top: 1rem;
+}
+
 .contact__cta {
   display: inline-flex; align-items: center; gap: 1.1rem;
+  background: transparent; color: inherit; cursor: pointer;
   border: 1px solid var(--bone-dim); border-radius: 100px;
   padding: 1.3rem 2.6rem; margin-top: 1rem;
   font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.16em;
