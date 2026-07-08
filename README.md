@@ -28,6 +28,19 @@ Deploy `dist/index.html` to any static host (Vercel, Netlify, Cloudflare
 Pages, S3, or a plain nginx root). No build pipeline, no dependencies,
 no CDN, works from `file://`.
 
+## Rendering & sound (v3)
+
+- **Post-processing pipeline** (desktop): persistence buffer (motion trails),
+  quarter-res two-pass bloom, radial chromatic aberration, vignette — all
+  hand-rolled, ping-pong FBOs, frame-rate-independent trail decay
+- **Fluid morphs**: curl advection peaks mid-transition so formations swirl
+- **Synthesized sound** (SND toggle in nav, off by default): scroll-reactive
+  drone, morph whooshes, hover blips, keystroke ticks — WebAudio, zero assets
+- **Adaptive quality governor**: halves the particle budget if FPS drops,
+  restores it when headroom returns
+- `dist/og-image.png` — generated link-card image (set the absolute
+  `og:image` URL in the head after deploy)
+
 ## The live engine (v2)
 
 - **Type anything on the hero** — the keyboard is live; 42,000 particles

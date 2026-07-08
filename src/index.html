@@ -8,6 +8,9 @@
 <meta property="og:title" content="DMDS® — Digital Studio">
 <meta property="og:description" content="Websites. Apps. AI. Marketing. Engineered, not decorated.">
 <meta property="og:type" content="website">
+<!-- After deploy, point this at your domain (crawlers need an absolute URL): -->
+<!-- <meta property="og:image" content="https://YOURDOMAIN/og-image.png"> -->
+<!-- <meta name="twitter:card" content="summary_large_image"> -->
 <meta name="theme-color" content="#0b0b0c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0b0c'/%3E%3Crect x='6' y='6' width='52' height='52' fill='none' stroke='%23ff4a00' stroke-width='4'/%3E%3Ctext x='32' y='44' font-family='Arial Black,Arial' font-size='34' font-weight='900' fill='%23edeae3' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="fonts.css">
@@ -50,6 +53,7 @@
     <span class="nav__clock" id="clock">00:00:00 EST</span>
   </div>
   <nav class="nav__links mono" aria-label="Primary">
+    <button class="nav__snd" id="snd-toggle" aria-pressed="false" data-cursor>SND&nbsp;·&nbsp;OFF</button>
     <a href="#work" class="scramble" data-cursor>WORK</a>
     <a href="#capabilities" class="scramble" data-cursor>CAPABILITIES</a>
     <a href="#proof" class="scramble" data-cursor>PROOF</a>

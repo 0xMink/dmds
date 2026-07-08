@@ -147,7 +147,9 @@
         var a = sections[cur], b = sections[Math.min(cur + 1, sections.length - 1)];
         window.DMDS_GL.setMorphPair(a.formation, b.formation, t);
         window.DMDS_GL.setDim(a.dim + (b.dim - a.dim) * smooth01(t));
-        lastFormation = t >= 0.5 ? b.formation : a.formation;
+        var nowFormation = t >= 0.5 ? b.formation : a.formation;
+        if (nowFormation !== lastFormation) sfx("morph");
+        lastFormation = nowFormation;
       }
     }
 
@@ -161,9 +163,16 @@
       }
     }
 
-    // scroll velocity → particle turbulence
+    // scroll velocity → particle turbulence + drone swell
     var v = Math.abs(y - lastY);
     if (v > 2 && glOK) window.DMDS_GL.kick(v * 0.004);
+    if (snd.on && snd.droneGain) {
+      var dg = 0.05 + Math.min(v * 0.005, 0.11);
+      if (Math.abs(dg - snd.droneTarget) > 0.012) {
+        snd.droneTarget = dg;
+        snd.droneGain.gain.setTargetAtTime(dg, snd.ctx.currentTime, 0.25);
+      }
+    }
     lastY = y;
 
     // scrolling far enough reclaims the engine from hover/typing
@@ -304,10 +313,12 @@
       manualLock = true;
       manualY0 = cur;
       updateReadout();
+      sfx("key");
       clearTimeout(typeTimer);
       typeTimer = setTimeout(function () {
         var s = typeBuffer.trim();
         window.DMDS_GL.setFormation(s ? "text:" + s : "logo", 0.9);
+        sfx("morph");
       }, 200);
       clearTimeout(typeIdleTimer);
       typeIdleTimer = setTimeout(exitType, 9000);
@@ -323,6 +334,7 @@
       manualY0 = cur;
       window.DMDS_GL.setDim(0.95);
       window.DMDS_GL.setFormation("text:" + row.dataset.particles, 1.0);
+      sfx("morph");
     });
     row.addEventListener("mouseleave", function () {
       if (!glOK || typingActive) return;
@@ -346,6 +358,7 @@
         var label = el.dataset.cursorLabel || "";
         cursorLabel.textContent = label;
         cursor.classList.toggle("cursor--labeled", !!label);
+        sfx("blip");
       });
       el.addEventListener("mouseleave", function () {
         cursor.classList.remove("cursor--active");
@@ -377,6 +390,103 @@
       setTimeout(function () { el.style.transition = ""; }, 600);
     });
   });
+
+  /* ═══ Sound — synthesized in-house, zero assets ═══ */
+  var snd = { ctx: null, on: false, master: null, droneGain: null, droneTarget: 0.05 };
+
+  function sndInit() {
+    if (snd.ctx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    var ctx = snd.ctx = new AC();
+    snd.master = ctx.createGain();
+    snd.master.gain.value = 0;
+    snd.master.connect(ctx.destination);
+
+    // drone: two detuned oscillators through a dark lowpass
+    var lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 190; lp.Q.value = 0.6;
+    snd.droneGain = ctx.createGain();
+    snd.droneGain.gain.value = 0.05;
+    [55, 55.7].forEach(function (f) {
+      var o = ctx.createOscillator();
+      o.type = "sawtooth"; o.frequency.value = f;
+      o.connect(lp); o.start();
+    });
+    lp.connect(snd.droneGain);
+    snd.droneGain.connect(snd.master);
+
+    // airy noise bed
+    var len = ctx.sampleRate * 2;
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.4;
+    var noise = ctx.createBufferSource();
+    noise.buffer = buf; noise.loop = true;
+    var bp = ctx.createBiquadFilter();
+    bp.type = "bandpass"; bp.frequency.value = 420; bp.Q.value = 0.4;
+    var ng = ctx.createGain(); ng.gain.value = 0.012;
+    noise.connect(bp); bp.connect(ng); ng.connect(snd.master); noise.start();
+  }
+
+  function sfx(kind) {
+    if (!snd.on || !snd.ctx) return;
+    var ctx = snd.ctx, t = ctx.currentTime;
+    if (kind === "blip") {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(920, t);
+      o.frequency.exponentialRampToValueAtTime(1480, t + 0.06);
+      g.gain.setValueAtTime(0.05, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      o.connect(g); g.connect(snd.master); o.start(t); o.stop(t + 0.12);
+    } else if (kind === "key") {
+      var o2 = ctx.createOscillator(), g2 = ctx.createGain();
+      o2.type = "square"; o2.frequency.value = 1700 + Math.random() * 500;
+      g2.gain.setValueAtTime(0.028, t);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      o2.connect(g2); g2.connect(snd.master); o2.start(t); o2.stop(t + 0.05);
+    } else if (kind === "morph") {
+      var len = ctx.sampleRate * 0.5;
+      var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = ctx.createBufferSource(); src.buffer = buf;
+      var f = ctx.createBiquadFilter();
+      f.type = "bandpass"; f.Q.value = 1.4;
+      f.frequency.setValueAtTime(180, t);
+      f.frequency.exponentialRampToValueAtTime(1300, t + 0.4);
+      var g3 = ctx.createGain();
+      g3.gain.setValueAtTime(0.1, t);
+      g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      src.connect(f); f.connect(g3); g3.connect(snd.master); src.start(t);
+    }
+  }
+
+  var sndToggle = $("#snd-toggle");
+  if (sndToggle) {
+    sndToggle.addEventListener("click", function () {
+      sndInit();
+      if (!snd.ctx) return;
+      if (snd.ctx.state === "suspended") snd.ctx.resume();
+      snd.on = !snd.on;
+      snd.master.gain.setTargetAtTime(snd.on ? 0.85 : 0, snd.ctx.currentTime, 0.15);
+      sndToggle.innerHTML = "SND&nbsp;·&nbsp;" + (snd.on ? "ON" : "OFF");
+      sndToggle.classList.toggle("on", snd.on);
+      sndToggle.setAttribute("aria-pressed", String(snd.on));
+      if (snd.on) sfx("blip");
+    });
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!snd.ctx) return;
+    if (document.hidden) snd.ctx.suspend();
+    else if (snd.on) snd.ctx.resume();
+  });
+
+  /* ═══ Tab title: signal integrity ═══ */
+  var baseTitle = document.title;
+  window.addEventListener("blur", function () { document.title = "[ SIGNAL LOST ] — DMDS®"; });
+  window.addEventListener("focus", function () { document.title = baseTitle; });
 
   /* ═══ Clocks + FPS ═══ */
   var clockFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });

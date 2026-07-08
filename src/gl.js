@@ -25,6 +25,7 @@
     "uniform vec3 uMouse;",
     "uniform float uMouseStr;",
     "uniform float uSize;",
+    "uniform float uSwirl;",
     "varying float vMix;",
     "varying float vTwinkle;",
     "varying float vDepth;",
@@ -37,6 +38,13 @@
     "  pos.x += amp * sin(pos.y*0.9 + uTime*0.7 + aRand.w*6.283);",
     "  pos.y += amp * sin(pos.z*1.1 + uTime*0.6 + aRand.w*4.0) * 0.8;",
     "  pos.z += amp * sin(pos.x*0.8 + uTime*0.5 + aRand.w*2.7) * 0.9;",
+    // curl advection — peaks mid-morph so transitions swirl like fluid
+    "  float sw = uMix * (1.0 - uMix) * 4.0;",
+    "  pos += vec3(",
+    "    sin(pos.y*0.35 + uTime*0.9 + aRand.w*6.283),",
+    "    sin(pos.z*0.30 + uTime*0.8 + aRand.x*6.283),",
+    "    sin(pos.x*0.32 + uTime*0.7 + aRand.y*6.283)",
+    "  ) * sw * (0.6 + aRand.z * 1.4) * uSwirl;",
     // mouse repulsion in world space
     "  vec3 d = pos - uMouse;",
     "  float dist2 = dot(d.xy, d.xy);",
@@ -69,6 +77,60 @@
     "}"
   ].join("\n");
 
+  // ── post-processing shaders ──
+  var QUAD_VS = [
+    "precision mediump float;",
+    "attribute vec2 aXY;",
+    "varying vec2 vUv;",
+    "void main(){ vUv = aXY * 0.5 + 0.5; gl_Position = vec4(aXY, 0.0, 1.0); }"
+  ].join("\n");
+
+  var FADE_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uTex;",
+    "uniform float uDecay;",
+    "varying vec2 vUv;",
+    "void main(){ gl_FragColor = texture2D(uTex, vUv) * uDecay; }"
+  ].join("\n");
+
+  var BLUR_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uTex;",
+    "uniform vec2 uDir;",
+    "varying vec2 vUv;",
+    "void main(){",
+    "  vec4 c = texture2D(uTex, vUv) * 0.227;",
+    "  c += (texture2D(uTex, vUv + uDir * 1.384) + texture2D(uTex, vUv - uDir * 1.384)) * 0.316;",
+    "  c += (texture2D(uTex, vUv + uDir * 3.230) + texture2D(uTex, vUv - uDir * 3.230)) * 0.070;",
+    "  gl_FragColor = c;",
+    "}"
+  ].join("\n");
+
+  var COMP_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uField;",
+    "uniform sampler2D uGlow;",
+    "varying vec2 vUv;",
+    "void main(){",
+    "  vec2 c = vUv - 0.5;",
+    "  float r = length(c);",
+    // radial chromatic aberration on the particle field
+    "  float k = 0.0045 * r;",
+    "  vec3 field;",
+    "  field.r = texture2D(uField, vUv + c * k).r;",
+    "  field.g = texture2D(uField, vUv).g;",
+    "  field.b = texture2D(uField, vUv - c * k).b;",
+    "  vec3 glow = texture2D(uGlow, vUv).rgb;",
+    // background: deep ink with a faint warm lift top-right
+    "  vec3 bg = mix(vec3(0.082, 0.080, 0.088), vec3(0.043, 0.043, 0.047), smoothstep(0.0, 1.0, distance(vUv, vec2(0.72, 0.92))));",
+    "  vec3 col = bg + field + glow * 1.15;",
+    "  col *= 1.0 - 0.38 * smoothstep(0.5, 1.1, r);",
+    // dither to kill gradient banding
+    "  col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;",
+    "  gl_FragColor = vec4(col, 1.0);",
+    "}"
+  ].join("\n");
+
   // ── tiny mat4 kit ──
   function perspective(fovy, aspect, near, far) {
     var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
@@ -93,7 +155,13 @@
     dim: 1, dimTarget: 1,
     rot: { x: 0, y: 0 },
     fps: 60, frames: 0, fpsT: 0,
-    hw: 8, hh: 8, ready: false, running: false
+    hw: 8, hh: 8, ready: false, running: false,
+    // post pipeline
+    post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
+    trailA: null, trailB: null, glowA: null, glowB: null,
+    locPoints: null, enabledAttribs: [],
+    // adaptive quality governor
+    drawCount: 0, govT: 0
   };
 
   function worldExtents() {
@@ -316,12 +384,82 @@
     return s;
   }
 
+  function makeProgram(gl, vs, fs) {
+    var p = gl.createProgram();
+    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  function makeFBO(gl, w, h) {
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!ok) throw new Error("fbo incomplete");
+    return { tex: tex, fb: fb, w: w, h: h };
+  }
+
+  function destroyFBO(gl, f) {
+    if (!f) return;
+    gl.deleteTexture(f.tex);
+    gl.deleteFramebuffer(f.fb);
+  }
+
+  function allocTargets() {
+    var gl = state.gl, w = state.canvas.width, h = state.canvas.height;
+    ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); });
+    state.trailA = makeFBO(gl, w, h);
+    state.trailB = makeFBO(gl, w, h);
+    var qw = Math.max(2, w >> 2), qh = Math.max(2, h >> 2);
+    state.glowA = makeFBO(gl, qw, qh);
+    state.glowB = makeFBO(gl, qw, qh);
+  }
+
+  // attribute switching between the points pass and fullscreen-quad passes
+  function useAttribs(list) {
+    var gl = state.gl;
+    var want = {};
+    list.forEach(function (a) { want[a.loc] = true; });
+    state.enabledAttribs.forEach(function (l) { if (!want[l]) gl.disableVertexAttribArray(l); });
+    list.forEach(function (a) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+      gl.enableVertexAttribArray(a.loc);
+      gl.vertexAttribPointer(a.loc, a.size, gl.FLOAT, false, 0, 0);
+    });
+    state.enabledAttribs = list.map(function (a) { return a.loc; });
+  }
+
+  function drawQuad(prog, tex, uniforms) {
+    var gl = state.gl;
+    gl.useProgram(prog.p);
+    useAttribs([{ loc: prog.aXY, buf: state.quadBuf, size: 2 }]);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(prog.uTex, 0);
+    if (uniforms) uniforms();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
   function resize() {
     var c = state.canvas, dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     var w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) {
       c.width = w; c.height = h;
       state.gl.viewport(0, 0, w, h);
+      if (state.post) {
+        try { allocTargets(); } catch (e) { state.post = false; }
+      }
     }
     worldExtents();
   }
@@ -429,19 +567,83 @@
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(state.program);
-    gl.uniformMatrix4fv(state.loc.uProj, false, perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100));
-    gl.uniformMatrix4fv(state.loc.uView, false, viewMatrix(rx, ry, CAM_Z));
-    gl.uniform1f(state.loc.uTime, now);
-    gl.uniform1f(state.loc.uMix, state.mix);
-    gl.uniform1f(state.loc.uNoise, REDUCED ? 0.02 : 0.085);
-    gl.uniform1f(state.loc.uTurb, state.turb);
-    gl.uniform3f(state.loc.uMouse, state.mouse.wx, state.mouse.wy, 0);
-    gl.uniform1f(state.loc.uMouseStr, state.mouse.str);
-    gl.uniform1f(state.loc.uSize, (MOBILE ? 2.1 : 2.5) * Math.min(window.devicePixelRatio || 1, DPR_CAP));
-    gl.uniform1f(state.loc.uDim, state.dim);
-    gl.drawArrays(gl.POINTS, 0, COUNT);
+    // adaptive quality governor: protect frame rate before aesthetics
+    if (!state.govLocked && now - state.govT > 2 && state.fpsT > 3) {
+      state.govT = now;
+      if (state.fps < 40 && state.drawCount > COUNT / 4) {
+        state.drawCount = Math.floor(state.drawCount / 2);
+        if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
+      } else if (state.fps > 56 && state.drawCount < COUNT) {
+        state.drawCount = Math.min(COUNT, state.drawCount * 2);
+      }
+    }
+
+    function drawPoints() {
+      gl.useProgram(state.program);
+      useAttribs([
+        { loc: state.locPoints.aPosA, buf: state.bufA, size: 3 },
+        { loc: state.locPoints.aPosB, buf: state.bufB, size: 3 },
+        { loc: state.locPoints.aRand, buf: state.bufR, size: 4 }
+      ]);
+      gl.uniformMatrix4fv(state.loc.uProj, false, perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100));
+      gl.uniformMatrix4fv(state.loc.uView, false, viewMatrix(rx, ry, CAM_Z));
+      gl.uniform1f(state.loc.uTime, now);
+      gl.uniform1f(state.loc.uMix, state.mix);
+      gl.uniform1f(state.loc.uNoise, REDUCED ? 0.02 : 0.085);
+      gl.uniform1f(state.loc.uTurb, state.turb);
+      gl.uniform3f(state.loc.uMouse, state.mouse.wx, state.mouse.wy, 0);
+      gl.uniform1f(state.loc.uMouseStr, state.mouse.str);
+      gl.uniform1f(state.loc.uSize, (MOBILE ? 2.1 : 2.5) * Math.min(window.devicePixelRatio || 1, DPR_CAP));
+      gl.uniform1f(state.loc.uDim, state.dim);
+      gl.uniform1f(state.loc.uSwirl, REDUCED ? 0 : 2.1);
+      gl.drawArrays(gl.POINTS, 0, state.drawCount);
+    }
+
+    if (state.post) {
+      var W = state.canvas.width, H = state.canvas.height;
+      // 1 — persistence: previous trail, decayed, into the other trail buffer
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.trailB.fb);
+      gl.viewport(0, 0, W, H);
+      drawQuad(state.progFade, state.trailA.tex, function () {
+        // frame-rate-independent persistence (~9/s decay)
+        gl.uniform1f(state.progFade.uDecay, REDUCED ? 0.0 : Math.exp(-dt * 9));
+      });
+      // 2 — points, additive, on top of the decayed trail
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      drawPoints();
+      gl.disable(gl.BLEND);
+      // 3 — bloom: downsample + separable blur at quarter res
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.glowA.fb);
+      gl.viewport(0, 0, state.glowA.w, state.glowA.h);
+      drawQuad(state.progBlur, state.trailB.tex, function () {
+        gl.uniform2f(state.progBlur.uDir, 1 / state.glowA.w, 0);
+      });
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.glowB.fb);
+      gl.viewport(0, 0, state.glowB.w, state.glowB.h);
+      drawQuad(state.progBlur, state.glowA.tex, function () {
+        gl.uniform2f(state.progBlur.uDir, 0, 1 / state.glowB.h);
+      });
+      // 4 — composite: field + glow + chromatic aberration + vignette
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+      drawQuad(state.progComp, state.trailB.tex, function () {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, state.glowB.tex);
+        gl.uniform1i(state.progComp.uGlow, 1);
+        gl.activeTexture(gl.TEXTURE0);
+      });
+      // swap trail buffers
+      var t = state.trailA; state.trailA = state.trailB; state.trailB = t;
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, state.canvas.width, state.canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      drawPoints();
+    }
   }
 
   function init(canvas) {
@@ -472,19 +674,41 @@
     state.bufR = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, state.bufR);
     gl.bufferData(gl.ARRAY_BUFFER, rand, gl.STATIC_DRAW);
-    var locR = gl.getAttribLocation(prog, "aRand");
-    gl.enableVertexAttribArray(locR);
-    gl.vertexAttribPointer(locR, 4, gl.FLOAT, false, 0, 0);
 
     state.bufA = gl.createBuffer();
     state.bufB = gl.createBuffer();
+    state.locPoints = {
+      aPosA: gl.getAttribLocation(prog, "aPosA"),
+      aPosB: gl.getAttribLocation(prog, "aPosB"),
+      aRand: gl.getAttribLocation(prog, "aRand")
+    };
+    state.drawCount = COUNT;
 
     gl.clearColor(0, 0, 0, 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.disable(gl.DEPTH_TEST);
 
+    // post-processing pipeline (desktop): trails, bloom, aberration
+    if (!MOBILE) {
+      try {
+        var pf = makeProgram(gl, QUAD_VS, FADE_FS);
+        state.progFade = { p: pf, aXY: gl.getAttribLocation(pf, "aXY"), uTex: gl.getUniformLocation(pf, "uTex"), uDecay: gl.getUniformLocation(pf, "uDecay") };
+        var pb = makeProgram(gl, QUAD_VS, BLUR_FS);
+        state.progBlur = { p: pb, aXY: gl.getAttribLocation(pb, "aXY"), uTex: gl.getUniformLocation(pb, "uTex"), uDir: gl.getUniformLocation(pb, "uDir") };
+        var pc = makeProgram(gl, QUAD_VS, COMP_FS);
+        state.progComp = { p: pc, aXY: gl.getAttribLocation(pc, "aXY"), uTex: gl.getUniformLocation(pc, "uField"), uGlow: gl.getUniformLocation(pc, "uGlow") };
+        state.quadBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, state.quadBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        state.post = true;
+      } catch (e) {
+        state.post = false; // direct path still works
+      }
+    }
+
     resize();
+    if (state.post) {
+      try { allocTargets(); } catch (e) { state.post = false; }
+    }
 
     var fontsReady = (document.fonts && document.fonts.load)
       ? document.fonts.load("600 250px 'Clash Display'").then(function () { return document.fonts.ready; })
@@ -501,15 +725,9 @@
       var gl2 = state.gl;
       gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufA);
       gl2.bufferData(gl2.ARRAY_BUFFER, state.curA, gl2.DYNAMIC_DRAW);
-      var locA = gl2.getAttribLocation(prog, "aPosA");
-      gl2.enableVertexAttribArray(locA);
-      gl2.vertexAttribPointer(locA, 3, gl2.FLOAT, false, 0, 0);
       gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufB);
       gl2.bufferData(gl2.ARRAY_BUFFER, state.curB, gl2.DYNAMIC_DRAW);
-      var locB = gl2.getAttribLocation(prog, "aPosB");
-      gl2.enableVertexAttribArray(locB);
-      gl2.vertexAttribPointer(locB, 3, gl2.FLOAT, false, 0, 0);
-      // note: attribute pointers bound once — bufferData on same buffer objects keeps bindings valid
+      // attribute binding happens per-pass via useAttribs()
 
       state.mix = 0;
       state.morphStart = 0;
@@ -556,6 +774,7 @@
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
+    setBudget: function (n) { state.drawCount = Math.min(COUNT, n | 0); state.govLocked = true; },
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); },
     fps: function () { return state.fps; },
     isReady: function () { return state.ready; }
