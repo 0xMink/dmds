@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-mYV6eZhwo7aZD22iscUOn6JKTiZFCmXjRNVQaDGwBTI=' 'sha256-XcxqvC6ZmU0svVjoQBTBtmZ69i3U3mNB/3xD1tVhXwI=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-0PnbAQoGNP6ucvknGVRZwrypqRk88gCjJesiy4xgq9U='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-FCS6RVMXRlKj0y6/8a5KW7f9ZIFEVW9ONUE6PJsMG6Q=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-fLba3DhF1iiuzVA+Z04hiAi8P5V2YW0Ks8Ubk2kEt6Y='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -291,6 +291,13 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
 .hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
+/* the signature interaction advertises itself — a chip, not a whisper */
+#engine-hint {
+  display: inline-block; padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line); color: var(--bone-dim);
+  font-size: 0.625rem; letter-spacing: 0.14em;
+}
+#engine-hint b { color: var(--signal); font-weight: 400; }
 #engine-input { color: var(--signal); letter-spacing: 0.2em; }
 #engine-buffer { color: var(--bone); }
 .engine-caret {
@@ -667,7 +674,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="25188a6 2026-07-17T23:14:53Z">
+<meta name="dmds-build" content="354ecb8 2026-07-17T23:32:45Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1318,7 +1325,11 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   "use strict";
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
+  // device class, not window size: a touchscreen laptop is a desktop
+  // (primary pointer is fine), and a scaled/restored window is not a phone.
+  // Screen dimensions are stable; innerHeight lies under browser chrome.
+  var MOBILE = window.matchMedia("(pointer: coarse)").matches ||
+    Math.min(window.screen.width || 9999, window.screen.height || 9999) < 600;
   var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
   var DPR_CAP = MOBILE ? 1.5 : 1.75;
   var DEPTH_FREE = -2.0; // position.w sentinel (spec: grab depth channel)
@@ -2784,7 +2795,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   "use strict";
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
+  // same device-class fix as gl2.js: touchscreen laptops and scaled
+  // windows were misclassified as mobile (quarter budget, no post)
+  var MOBILE = window.matchMedia("(pointer: coarse)").matches ||
+    Math.min(window.screen.width || 9999, window.screen.height || 9999) < 600;
   // honor Save-Data: mobile particle budget, no post pipeline
   var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
   var COUNT = (MOBILE || SAVEDATA) ? 16000 : 42000;
@@ -3811,7 +3825,15 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     }
     return bootTier2(canvas);
   })()
-    .then(function () { glOK = true; })
+    .then(function () {
+      glOK = true;
+      // truthful affordance: advertise the grab only where it exists
+      // (tier-1 physical engine, non-touch pointer)
+      var hint = $("#engine-hint");
+      if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
+        hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
+      }
+    })
     .catch(function () {
       $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
       bootLog("COMPILE render engine", "FAIL");
@@ -4492,4 +4514,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 25188a6 2026-07-17T23:14:53Z -->
+<!-- dmds build 354ecb8 2026-07-17T23:32:45Z -->
