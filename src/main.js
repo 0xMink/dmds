@@ -11,45 +11,60 @@
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var TOUCH = "ontouchstart" in window || navigator.maxTouchPoints > 0;
   var SMOOTH = !REDUCED && !TOUCH;
-  if (SMOOTH) doc.classList.add("smooth");
 
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
-  /* ═══ Preloader — boot sequence ═══ */
+  /* ═══ Claim verification — the registry is the source of truth ═══ */
+  function verifyClaims() {
+    var reg = window.DMDS_CLAIMS && window.DMDS_CLAIMS.claims;
+    var failures = [], checked = 0;
+    if (!reg) return { ok: false, checked: 0, failures: ["claim registry missing"] };
+    $$("[data-claim]").forEach(function (el) {
+      var id = el.dataset.claim, c = reg[id];
+      if (!c) { failures.push(id + ": on page, not in registry"); return; }
+      checked++;
+      var dom = (el.dataset.count !== undefined ? el.dataset.count : el.textContent).trim();
+      if (dom !== String(c.page)) failures.push(id + ": page says “" + dom + "”, registry says “" + c.page + "”");
+    });
+    Object.keys(reg).forEach(function (id) {
+      if (reg[id].dom && !document.querySelector("[data-claim='" + id + "']")) {
+        failures.push(id + ": in registry, missing from page");
+      }
+    });
+    return { ok: !failures.length, checked: checked, failures: failures };
+  }
+
+  /* ═══ Preloader — boot sequence ═══
+     The bar is a time-paced animation (it makes no factual claim);
+     every LOG LINE is fired by the event it names, or not at all. */
   var loader = $("#loader"), pctEl = $("#loader-pct"), barEl = $("#loader-bar"), statusEl = $("#loader-status");
   var logEl = $("#loader-log");
-  var progress = 0, target = 0, loadDone = false;
-  var STATUSES = ["INITIALIZING RENDER", "EMBEDDING TYPEFACES", "COMPILING SHADERS", "SEEDING 42,000 PARTICLES", "ALL SYSTEMS NOMINAL"];
-  var BOOT_LOG = [
-    [4,  "MOUNT /typefaces", "OK"],
-    [22, "COMPILE vertex + fragment", "OK"],
-    [42, "SEED particles", "42,000"],
-    [62, "LINK render loop", "60 FPS"],
-    [82, "VERIFY claims", "PASS"],
-    [97, "BOOT dmds.sys", "READY"]
-  ];
-  var logIdx = 0;
+  var progress = 0, target = 0, loadDone = false, booted = false;
+  var RAMP = REDUCED ? 500 : 1800;
+
+  function bootLog(label, value, opts) {
+    opts = opts || {};
+    var line = document.createElement("div");
+    line.className = "loader__log-line" + (opts.last ? " loader__log-line--last" : "");
+    var dots = new Array(Math.max(2, 30 - label.length)).join(".");
+    line.innerHTML = "<span>" + label + " " + dots + "</span><span>" + value + "</span>";
+    logEl.appendChild(line);
+    statusEl.textContent = (opts.status || label).toUpperCase();
+  }
 
   var loaderT0 = performance.now();
   function tickLoader() {
     // time-driven so blocked frames (shader compile) can't stall the count
     var elapsed = performance.now() - loaderT0;
-    target = Math.max(target, Math.min(loadDone ? 100 : 92, (elapsed / 1800) * 100));
-    progress += (target - progress) * 0.2;
+    target = Math.max(target, Math.min(loadDone ? 100 : 92, (elapsed / RAMP) * 100));
+    // eased, but with a floor once ready so low frame rates can't
+    // stretch the asymptotic tail — the bar always closes promptly
+    progress += Math.max((target - progress) * 0.2, loadDone ? 0.75 : 0);
+    progress = Math.min(progress, target);
     var p = Math.min(100, Math.round(progress));
     pctEl.textContent = ("00" + p).slice(-3);
     barEl.style.width = p + "%";
-    statusEl.textContent = STATUSES[Math.min(Math.floor(p / 22), STATUSES.length - 1)];
-    while (logIdx < BOOT_LOG.length && p >= BOOT_LOG[logIdx][0]) {
-      var entry = BOOT_LOG[logIdx];
-      var line = document.createElement("div");
-      line.className = "loader__log-line" + (logIdx === BOOT_LOG.length - 1 ? " loader__log-line--last" : "");
-      var dots = new Array(Math.max(2, 30 - entry[1].length)).join(".");
-      line.innerHTML = "<span>" + entry[1] + " " + dots + "</span><span>" + entry[2] + "</span>";
-      logEl.appendChild(line);
-      logIdx++;
-    }
     if (p < 100) requestAnimationFrame(tickLoader);
     else finishLoader();
   }
@@ -65,11 +80,84 @@
     setTimeout(function () { manualLock = false; }, 2300);
   }
 
-  /* ═══ GL boot ═══ */
+  // the loader never holds usable content hostage: click or Escape skips it
+  function skipLoader() { loadDone = true; progress = target = 100; }
+  loader.addEventListener("click", skipLoader);
+  window.addEventListener("keydown", function (e) {
+    if (!finished && e.key === "Escape") skipLoader();
+  });
+
+  // fonts.ready settles even when a face fails — load each required face
+  // and report the real count, so the OK is earned per-face
+  if (document.fonts && document.fonts.load) {
+    var FACES = [
+      '500 1em "Clash Display"', '600 1em "Clash Display"',
+      '400 1em "General Sans"', '500 1em "General Sans"',
+      '400 1em "Space Mono"', '700 1em "Space Mono"'
+    ];
+    Promise.all(FACES.map(function (f) {
+      return document.fonts.load(f, "DMDS").then(
+        function (m) { return m.length > 0; },
+        function () { return false; }
+      );
+    })).then(function (r) {
+      var ok = r.filter(Boolean).length;
+      bootLog("MOUNT /typefaces (" + ok + "/" + FACES.length + ")",
+        ok === FACES.length ? "OK" : "DEGRADED");
+    });
+  }
+
+  /* ═══ GL boot — tier chain: gl2 (GPGPU sim) → gl1 → CSS ═══
+     A canvas that ever held a WebGL2 context can't hand out WebGL1,
+     so a failed tier-1 init tears down and replaces the canvas node
+     before tier 2 boots. */
   var glOK = false;
-  var glInit = (window.DMDS_GL ? window.DMDS_GL.init($("#gl")) : Promise.reject())
+  var GL = null;
+  function onMilestone(kind, detail) {
+    if (kind === "compile") bootLog(detail === "sim" ? "COMPILE sim + render" : "COMPILE vertex + fragment", "OK");
+    else if (kind === "post") bootLog("PIPELINE post-fx", detail ? "ON" : "DIRECT");
+    else if (kind === "seed") bootLog("SEED particles", Number(detail).toLocaleString("en-US"));
+    else if (kind === "loop") bootLog("LINK render loop", "OK");
+  }
+  function replaceCanvas(old) {
+    var fresh = old.cloneNode(false);
+    old.parentNode.replaceChild(fresh, old);
+    return fresh;
+  }
+  function bootTier2(canvas) {
+    if (!window.DMDS_GL) return Promise.reject(new Error("no engine"));
+    return window.DMDS_GL.init(canvas, onMilestone).then(function () { GL = window.DMDS_GL; });
+  }
+  var glInit = (function () {
+    var canvas = $("#gl");
+    if (window.DMDS_GL2 && window.DMDS_GL2.probe()) {
+      return window.DMDS_GL2.init(canvas, onMilestone).then(function () {
+        GL = window.DMDS_GL2;
+        GL.onLostTimeout(function () {
+          // context gone >4s: tear down tier 1, boot tier 2 on a fresh canvas
+          try { window.DMDS_GL2.destroy(); } catch (e) {}
+          bootTier2(replaceCanvas($("#gl"))).catch(function () {});
+        });
+      }, function (err) {
+        if (window.console) console.warn("[DMDS] gl2 init failed → tier 2:", err && err.message);
+        try { window.DMDS_GL2.destroy(); } catch (e) {}
+        return bootTier2(replaceCanvas(canvas));
+      });
+    }
+    return bootTier2(canvas);
+  })()
     .then(function () { glOK = true; })
-    .catch(function () { $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */ });
+    .catch(function () {
+      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
+      bootLog("COMPILE render engine", "FAIL");
+      bootLog("FALLBACK static field", "ACTIVE");
+    });
+
+  // a consistency check — the DOM against the embedded registry — not a
+  // re-proof of the underlying facts; those live behind the evidence links
+  var claimReport = verifyClaims();
+  bootLog("VERIFY claims↔DOM (" + claimReport.checked + ")", claimReport.ok ? "PASS" : "FAIL");
+  if (!claimReport.ok && window.console) console.warn("[DMDS] claim verification failed:", claimReport.failures);
 
   Promise.all([
     glInit,
@@ -77,20 +165,28 @@
       if (document.readyState === "complete") res();
       else window.addEventListener("load", res);
     })
-  ]).then(function () { loadDone = true; });
+  ]).then(function () {
+    if (!booted) { booted = true; bootLog("BOOT dmds.sys", "READY", { last: true, status: "ALL CHECKS COMPLETE" }); }
+    loadDone = true;
+  });
 
   // hard timeout so a stalled asset never traps the visitor
-  setTimeout(function () { loadDone = true; }, 2600);
+  setTimeout(function () {
+    if (!booted) { booted = true; bootLog("BOOT dmds.sys", "TIMEOUT — CONTINUING", { last: true }); }
+    loadDone = true;
+  }, 2600);
   requestAnimationFrame(tickLoader);
 
-  /* ═══ Virtual scroll ═══ */
-  var wrap = $("#scroll-wrap");
+  /* ═══ Smooth scroll — native scroll is the source of truth ═══
+     Wheel input retargets `targetY`; a rAF loop eases the REAL scroll
+     position toward it with window.scrollTo. Anything else that moves
+     the page (keys, find-in-page, tab focus, scrollbar, history) is
+     detected as an external scroll and adopted, never fought. */
   var cur = 0, targetY = 0, contentH = 0, vh = window.innerHeight;
 
   function measure() {
     vh = window.innerHeight;
-    contentH = wrap.scrollHeight;
-    if (SMOOTH) document.body.style.height = contentH + "px";
+    contentH = document.documentElement.scrollHeight;
     measureSections();
   }
 
@@ -131,8 +227,8 @@
     if (glOK && !manualLock && sections.length) {
       if (REDUCED) {
         if (active.formation !== lastFormation) {
-          window.DMDS_GL.setFormation(active.formation);
-          window.DMDS_GL.setDim(active.dim);
+          GL.setFormation(active.formation);
+          GL.setDim(active.dim);
           lastFormation = active.formation;
         }
       } else {
@@ -145,8 +241,8 @@
           else break;
         }
         var a = sections[cur], b = sections[Math.min(cur + 1, sections.length - 1)];
-        window.DMDS_GL.setMorphPair(a.formation, b.formation, t);
-        window.DMDS_GL.setDim(a.dim + (b.dim - a.dim) * smooth01(t));
+        GL.setMorphPair(a.formation, b.formation, t);
+        GL.setDim(a.dim + (b.dim - a.dim) * smooth01(t));
         var nowFormation = t >= 0.5 ? b.formation : a.formation;
         if (nowFormation !== lastFormation) sfx("morph");
         lastFormation = nowFormation;
@@ -165,7 +261,7 @@
 
     // scroll velocity → particle turbulence + drone swell
     var v = Math.abs(y - lastY);
-    if (v > 2 && glOK) window.DMDS_GL.kick(v * 0.004);
+    if (v > 2 && glOK) GL.kick(v * 0.004);
     if (snd.on && snd.droneGain) {
       var dg = 0.05 + Math.min(v * 0.005, 0.11);
       if (Math.abs(dg - snd.droneTarget) > 0.012) {
@@ -183,15 +279,35 @@
   }
 
   var nav = $("#nav"), navScrolled = false;
+  var lastSetY = -1;
+  var maxScroll = function () { return Math.max(0, contentH - vh); };
+
+  if (SMOOTH) {
+    window.addEventListener("wheel", function (e) {
+      if (e.ctrlKey || e.metaKey) return; // pinch-zoom / modifier gestures stay native
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal swipes stay native
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * vh : e.deltaY;
+      targetY = Math.max(0, Math.min(maxScroll(), targetY + dy));
+    }, { passive: false });
+  }
+
   function raf() {
     requestAnimationFrame(raf);
-    targetY = window.scrollY || window.pageYOffset;
+    var y = window.scrollY || window.pageYOffset;
     if (SMOOTH) {
-      cur += (targetY - cur) * 0.085;
-      if (Math.abs(targetY - cur) < 0.1) cur = targetY;
-      wrap.style.transform = "translate3d(0," + -cur + "px,0)";
+      // external movement (keys, find, focus, scrollbar, history) wins
+      if (Math.abs(y - lastSetY) > 1.5) cur = targetY = y;
+      if (Math.abs(targetY - cur) > 0.15) {
+        cur += (targetY - cur) * 0.085;
+        lastSetY = cur;
+        window.scrollTo(0, cur);
+      } else {
+        cur = targetY;
+        lastSetY = y;
+      }
     } else {
-      cur = targetY;
+      cur = y;
     }
     var scrolled = cur > vh * 0.7;
     if (scrolled !== navScrolled) {
@@ -202,14 +318,16 @@
     updateCursor();
   }
 
-  /* anchor navigation works against native scroll position */
+  /* anchor navigation: retarget the eased scroll (desktop) or hand the
+     jump to native smooth scrolling (touch / reduced motion) */
   $$("a[href^='#']").forEach(function (a) {
     a.addEventListener("click", function (e) {
       var id = a.getAttribute("href");
       var el = id.length > 1 && $(id);
       if (!el) return;
       e.preventDefault();
-      window.scrollTo({ top: el.offsetTop, behavior: SMOOTH ? "auto" : "smooth" });
+      if (SMOOTH) targetY = Math.max(0, Math.min(maxScroll(), el.offsetTop));
+      else window.scrollTo({ top: el.offsetTop, behavior: REDUCED ? "auto" : "smooth" });
     });
   });
 
@@ -234,7 +352,9 @@
   }, { rootMargin: "0px 0px -12% 0px", threshold: 0.05 });
   $$(".reveal, .reveal-lines").forEach(function (el) { io.observe(el); });
 
-  /* ═══ Stat counters ═══ */
+  /* ═══ Stat counters ═══
+     Markup carries the real value (no-JS readers see the truth);
+     the animation resets to 0 and counts back up to data-count. */
   function countUp(stat) {
     var numEl = $(".stat__num", stat);
     if (!numEl) return;
@@ -247,7 +367,7 @@
       numEl.textContent = Math.round(end * eased);
       if (p < 1) requestAnimationFrame(step);
     }
-    if (REDUCED) { numEl.textContent = end; } else { requestAnimationFrame(step); }
+    if (REDUCED) { numEl.textContent = end; } else { numEl.textContent = "0"; requestAnimationFrame(step); }
   }
 
   /* ═══ Scramble text ═══ */
@@ -277,9 +397,16 @@
     el.addEventListener("focus", function () { scramble(el); });
   });
 
-  /* ═══ Hero: live typesetting — the engine takes dictation ═══ */
+  /* ═══ Hero: live typesetting — the engine takes dictation ═══
+     Ambient capture is deliberately narrow: hero on stage only, no
+     modifier keys, no IME composition, never when focus is inside an
+     interactive element, preventDefault only on keys it consumes.
+     Activation and exit are announced to assistive technology. */
   var engineHint = $("#engine-hint"), engineInput = $("#engine-input"), engineBuffer = $("#engine-buffer");
+  var engineLive = $("#engine-live");
   var typeBuffer = "", typeTimer = null, typeIdleTimer = null, typingActive = false;
+
+  function announce(msg) { if (engineLive) engineLive.textContent = msg; }
 
   function updateReadout() {
     if (!engineInput) return;
@@ -295,13 +422,16 @@
     clearTimeout(typeTimer);
     clearTimeout(typeIdleTimer);
     updateReadout();
-    if (!silent && glOK) window.DMDS_GL.setFormation("logo", 1.1);
+    announce("Type mode exited.");
+    if (!silent && glOK) GL.setFormation("logo", 1.1);
     manualLock = false;
   }
 
   if (!TOUCH && !REDUCED) {
     window.addEventListener("keydown", function (e) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      var tgt = e.target;
+      if (tgt && tgt.closest && tgt.closest("input, textarea, select, button, a, [contenteditable]")) return;
       if (!glOK || !doc.classList.contains("loaded")) return;
       if (cur > vh * 0.6) return; // keyboard is live only while the hero is on stage
       var k = e.key;
@@ -315,6 +445,7 @@
         typeBuffer += k.toUpperCase();
       } else return;
       e.preventDefault();
+      if (!typingActive) announce("Type mode active — the particle field is typesetting your input. Press Escape to exit.");
       typingActive = true;
       manualLock = true;
       manualY0 = cur;
@@ -323,7 +454,7 @@
       clearTimeout(typeTimer);
       typeTimer = setTimeout(function () {
         var s = typeBuffer.trim();
-        window.DMDS_GL.setFormation(s ? "text:" + s : "logo", 0.9);
+        GL.setFormation(s ? "text:" + s : "logo", 0.9);
         sfx("morph");
       }, 200);
       clearTimeout(typeIdleTimer);
@@ -331,28 +462,18 @@
     });
   }
 
-  /* ═══ Dossiers: click a work row to open the evidence ═══ */
+  /* ═══ Dossiers: native disclosure buttons open the evidence ═══
+     aria-expanded lives on the button, visibility on the row class;
+     without JS the dossiers simply render expanded. */
   $$(".work__row").forEach(function (row) {
-    var dossier = $(".dossier", row);
-    if (!dossier) return;
-    row.setAttribute("aria-expanded", "false");
-    function toggle() {
+    var btn = $("button.work__line", row), dossier = $(".dossier", row);
+    if (!btn || !dossier) return;
+    btn.addEventListener("click", function () {
       var open = row.classList.toggle("open");
-      dossier.hidden = !open;
-      row.setAttribute("aria-expanded", String(open));
+      btn.setAttribute("aria-expanded", String(open));
       sfx("blip");
       measure();               // dossier changes page height — virtual scroll must know
       setTimeout(measure, 400);
-    }
-    row.addEventListener("click", function (e) {
-      if (e.target.closest("a") || e.target.closest(".dossier")) return;
-      toggle();
-    });
-    row.addEventListener("keydown", function (e) {
-      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) {
-        e.preventDefault();
-        toggle();
-      }
     });
   });
 
@@ -363,14 +484,14 @@
       if (!glOK || typingActive) return;
       manualLock = true;
       manualY0 = cur;
-      window.DMDS_GL.setDim(0.95);
-      window.DMDS_GL.setFormation("text:" + row.dataset.particles, 1.0);
+      GL.setDim(0.95);
+      GL.setFormation("text:" + row.dataset.particles, 1.0);
       sfx("morph");
     });
     row.addEventListener("mouseleave", function () {
       if (!glOK || typingActive) return;
-      window.DMDS_GL.setDim(0.32);
-      window.DMDS_GL.setFormation("ambient", 1.0);
+      GL.setDim(0.32);
+      GL.setFormation("ambient", 1.0);
       manualLock = false;
     });
   });
@@ -422,14 +543,87 @@
     });
   });
 
-  /* ═══ Transmit form ═══ */
+  /* ═══ Transmit form ═══
+     Success shows only after the endpoint confirms (HTTP 2xx). On any
+     failure the filled form stays on screen, the draft is in
+     localStorage, and a copy-to-clipboard recovery path appears —
+     losing the visitor's message is the one unforgivable failure. */
   (function () {
     var form = $("#transmit"), done = $("#transmit-done"), label = $("#transmit-label");
+    var recover = $("#transmit-recover"), copyBtn = $("#copy-brief");
     if (!form) return;
+    var els = form.elements;
+    var formT0 = 0; // stamped on first real interaction, not page load
+    var lastComposed = "";
+    var DRAFT_KEY = "dmds-draft";
+    var DRAFT_TTL = 7 * 86400000; // drafts expire — this is a recovery net, not storage
+
+    form.addEventListener("focusin", function () { if (!formT0) formT0 = performance.now(); });
+
+    // draft preservation: survive reloads, crashes, and mailto detours
+    try {
+      var draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (draft && (!draft.t || Date.now() - draft.t > DRAFT_TTL)) {
+        localStorage.removeItem(DRAFT_KEY);
+        draft = null;
+      }
+      if (draft) {
+        if (draft.name) els.namedItem("name").value = draft.name;
+        if (draft.email) els.namedItem("email").value = draft.email;
+        if (draft.brief) els.namedItem("brief").value = draft.brief;
+        if (draft.project) {
+          var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
+          if (radio) radio.checked = true;
+        }
+      }
+    } catch (e) {}
+    var draftTimer = null;
+    form.addEventListener("input", function () {
+      if (!formT0) formT0 = performance.now();
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(function () {
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({
+            t: Date.now(),
+            name: els.namedItem("name").value,
+            email: els.namedItem("email").value,
+            project: (form.querySelector("input[name=project]:checked") || {}).value,
+            brief: els.namedItem("brief").value
+          }));
+        } catch (e) {}
+      }, 400);
+    });
+
+    if (copyBtn) copyBtn.addEventListener("click", function () {
+      function flash(ok) {
+        copyBtn.textContent = ok ? "COPIED" : "SELECT + COPY MANUALLY";
+        setTimeout(function () { copyBtn.textContent = "COPY MESSAGE"; }, 2200);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastComposed).then(function () { flash(true); }, function () { flash(false); });
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = lastComposed;
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        flash(ok);
+      }
+    });
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      var els = form.elements;
-      if (els.namedItem("_gotcha").value) return; // bot
+      if (els.namedItem("_gotcha").value) return;               // bot: honeypot
+      // instant fill (autofill, paste, bot) is a risk signal, not proof —
+      // never silently eat the submission: ask for one confirming press
+      if (!formT0 || performance.now() - formT0 < 2000) {
+        formT0 = performance.now() - 2000; // the next press goes through
+        label.textContent = "QUICK CHECK — PRESS TRANSMIT AGAIN TO SEND";
+        setTimeout(function () { label.textContent = "START A PROJECT"; }, 3000);
+        return;
+      }
       if (!form.reportValidity()) return;
       var data = {
         name: els.namedItem("name").value.trim(),
@@ -440,6 +634,7 @@
       };
       var endpoint = form.dataset.endpoint;
       function succeed() {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
         form.hidden = true;
         done.hidden = false;
         sfx("morph");
@@ -448,10 +643,12 @@
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nBuilding: " + data.project + "\n\nBrief:\n" + data.brief;
+        lastComposed = "To: dennis@shorevapesli.com\nSubject: Project inquiry — DMDS (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@shorevapesli.com?subject=" +
           encodeURIComponent("Project inquiry — DMDS (" + data.project + ")") +
           "&body=" + encodeURIComponent(body);
         label.textContent = "OPENING YOUR MAIL CLIENT…";
+        if (recover) { recover.hidden = false; measure(); }
         setTimeout(function () { label.textContent = "START A PROJECT"; }, 2500);
       }
       if (endpoint) {
@@ -566,10 +763,20 @@
   window.addEventListener("blur", function () { document.title = "[ SIGNAL LOST ] — DMDS®"; });
   window.addEventListener("focus", function () { document.title = baseTitle; });
 
-  /* ═══ Clocks + FPS ═══ */
-  var clockFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  /* ═══ Clocks + FPS ═══
+     The zone label comes from Intl, so it reads EST or EDT truthfully
+     across daylight-saving transitions. */
+  var clockFmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hourCycle: "h23",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
+  });
   function tickClock() {
-    var t = clockFmt.format(new Date()) + " EST";
+    var t = "", zone = "ET";
+    clockFmt.formatToParts(new Date()).forEach(function (p) {
+      if (p.type === "hour" || p.type === "minute" || p.type === "second") t += (t ? ":" : "") + p.value;
+      else if (p.type === "timeZoneName") zone = p.value;
+    });
+    t += " " + zone;
     var c1 = $("#clock"), c2 = $("#clock-2");
     if (c1) c1.textContent = t;
     if (c2) c2.textContent = t;
@@ -579,8 +786,21 @@
 
   var fpsEl = $("#fps");
   setInterval(function () {
-    if (fpsEl && glOK) fpsEl.textContent = window.DMDS_GL.fps();
+    if (fpsEl && glOK) fpsEl.textContent = GL.fps();
   }, 800);
+
+  /* ═══ Footer status: says what the renderer is actually doing ═══ */
+  var sysStatus = $("#sys-status");
+  function updateSysStatus() {
+    if (!sysStatus) return;
+    if (!glOK) { sysStatus.textContent = "STATIC RENDER · CONTENT NOMINAL"; return; }
+    var s = GL.status();
+    sysStatus.textContent = s.count < s.max
+      ? "RENDER DEGRADED · CORE NOMINAL"
+      : "ALL SYSTEMS NOMINAL";
+  }
+  glInit.then(updateSysStatus);
+  setInterval(updateSysStatus, 4000);
 
   /* ═══ Boot ═══ */
   window.addEventListener("resize", measure);
@@ -591,12 +811,15 @@
   raf();
 
   /* eslint-disable no-console */
-  console.log(
-    "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
-    "%c 42,000 particles · 1 draw call · 0 external requests.\n" +
-    " We audit our console too. → dennis@shorevapesli.com",
-    "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
-    "background:#0b0b0c;color:#edeae3;padding:4px 8px;",
-    "color:#8a8781;"
-  );
+  glInit.then(function () {
+    var count = glOK ? GL.status().max.toLocaleString("en-US") + " particles · 1 draw call" : "static render";
+    console.log(
+      "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
+      "%c " + count + " · 0 external requests on load.\n" +
+      " We audit our console too. → dennis@shorevapesli.com",
+      "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
+      "background:#0b0b0c;color:#edeae3;padding:4px 8px;",
+      "color:#8a8781;"
+    );
+  });
 })();

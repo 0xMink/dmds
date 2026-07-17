@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""DMDS® build verification — the enforcement half of DESIGN.md.
+
+Fails the build when:
+  1. a data-claim value on the page disagrees with the claim registry
+  2. a registry claim marked dom:true is missing from the page
+  3. a claim is past its review_by date (stale evidence never ships)
+  4. markup/styles/scripts use a glyph that is neither in the embedded
+     font subsets nor on the explicit system-fallback allowlist
+  5. the CSP hashes in dist/ don't match the inline blocks they guard
+  6. the provenance stamp is missing from dist/
+  7. dist/ exceeds its size budgets (raw / gzip)
+"""
+import base64
+import datetime
+import gzip
+import hashlib
+import io
+import json
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+DIST = os.path.join(ROOT, "dist", "index.html")
+
+# Budgets (bytes). Raw is what a cheap host serves uncompressed;
+# gzip is what any sane host actually sends.
+BUDGET_RAW = 320 * 1024
+BUDGET_GZIP = 200 * 1024
+
+# Glyphs intentionally rendered by system fallback fonts (not in the
+# embedded subsets): UI arrows and the scramble-effect block glyphs.
+# Present in every mainstream OS font stack; worst case they degrade
+# to a different arrow/block shape, never to meaning loss.
+SYSTEM_FALLBACK_OK = set("↗↘→↔█▓▒░")
+
+errors = []
+warnings = []
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+# ── 1–3: claim registry ─────────────────────────────────────────
+claims_src = read(os.path.join(SRC, "claims.js"))
+m = re.search(r"/\* claims-json-start \*/(.*)/\* claims-json-end \*/", claims_src, re.S)
+if not m:
+    errors.append("claims.js: json markers missing")
+    registry = {}
+else:
+    registry = json.loads(m.group(1))["claims"]
+
+html = read(os.path.join(SRC, "index.html"))
+page_claims = {}
+for tag in re.finditer(r'<(\w+)([^>]*\bdata-claim="([^"]+)"[^>]*)>([^<]*)<', html):
+    attrs, cid, text = tag.group(2), tag.group(3), tag.group(4).strip()
+    dc = re.search(r'data-count="([^"]*)"', attrs)
+    page_claims[cid] = dc.group(1) if dc else text
+
+for cid, value in page_claims.items():
+    if cid not in registry:
+        errors.append(f"claim {cid}: on page, not in registry")
+    elif value != str(registry[cid]["page"]):
+        errors.append(f"claim {cid}: page says {value!r}, registry says {registry[cid]['page']!r}")
+
+today = datetime.date.today()
+for cid, c in registry.items():
+    if c.get("dom") and cid not in page_claims:
+        errors.append(f"claim {cid}: dom:true but missing from page")
+    due = datetime.date.fromisoformat(c["review_by"])
+    if due < today:
+        errors.append(f"claim {cid}: past review_by {c['review_by']} — re-verify and bump the date")
+    elif (due - today).days <= 14:
+        warnings.append(f"claim {cid}: review due {c['review_by']}")
+
+# stat animation integrity: text content must equal data-count
+for m2 in re.finditer(r'data-count="(\d+)"[^>]*>(\d+)<', html):
+    if m2.group(1) != m2.group(2):
+        errors.append(f"stat markup: data-count={m2.group(1)} but text={m2.group(2)} (no-JS readers see the text)")
+
+# ── 4: glyph coverage against the real embedded cmaps ───────────
+try:
+    from fontTools.ttLib import TTFont
+
+    covered = set()
+    fonts_css = read(os.path.join(SRC, "fonts.css"))
+    for fm in re.finditer(r"base64,([A-Za-z0-9+/=]+)", fonts_css):
+        font = TTFont(io.BytesIO(base64.b64decode(fm.group(1))))
+        for table in font["cmap"].tables:
+            covered.update(chr(cp) for cp in table.cmap)
+
+    def strip_comments(text, kind):
+        if kind == "html":
+            return re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        if kind == "js":  # line comments never reach a visitor's screen
+            text = re.sub(r"(?:^|(?<=\s))//.*$", "", text, flags=re.M)
+        return text
+
+    for fname, kind in (("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js")):
+        body = strip_comments(read(os.path.join(SRC, fname)), kind)
+        for ch in sorted({c for c in body if ord(c) > 127}):
+            if ch not in covered and ch not in SYSTEM_FALLBACK_OK:
+                errors.append(f"{fname}: glyph {ch!r} (U+{ord(ch):04X}) not in font subsets or fallback allowlist")
+except ImportError:
+    warnings.append("fontTools unavailable — glyph coverage not checked")
+
+# ── 5–7: the built artifact ─────────────────────────────────────
+if os.path.exists(DIST):
+    dist = read(DIST)
+
+    def sha(s):
+        return "sha256-" + base64.b64encode(hashlib.sha256(s.encode()).digest()).decode()
+
+    cm = re.search(r'Content-Security-Policy" content="([^"]+)"', dist)
+    if not cm:
+        errors.append("dist: CSP meta missing")
+    else:
+        declared = set(re.findall(r"sha256-[A-Za-z0-9+/=]+", cm.group(1)))
+        actual = {sha(b.group(1)) for b in re.finditer(r"<style>(.*?)</style>", dist, re.S)}
+        actual |= {sha(b.group(1)) for b in re.finditer(r"<script>(.*?)</script>", dist, re.S)}
+        if declared != actual:
+            errors.append(f"dist: CSP hash mismatch (declared {len(declared)}, actual {len(actual)})")
+
+    if "dmds-build" not in dist:
+        errors.append("dist: provenance stamp missing")
+
+    raw = os.path.getsize(DIST)
+    gz = len(gzip.compress(dist.encode()))
+    print(f"check: dist {raw/1024:.0f} KB raw / {gz/1024:.0f} KB gzip "
+          f"(budget {BUDGET_RAW//1024}/{BUDGET_GZIP//1024})")
+    if raw > BUDGET_RAW:
+        errors.append(f"dist: {raw/1024:.0f} KB raw exceeds {BUDGET_RAW//1024} KB budget")
+    if gz > BUDGET_GZIP:
+        errors.append(f"dist: {gz/1024:.0f} KB gzip exceeds {BUDGET_GZIP//1024} KB budget")
+else:
+    warnings.append("dist/index.html not built yet — artifact checks skipped")
+
+for w in warnings:
+    print(f"check: WARN  {w}")
+for e in errors:
+    print(f"check: FAIL  {e}")
+if errors:
+    sys.exit(1)
+print(f"check: PASS  {len(registry)} claims verified, glyphs covered, CSP + provenance + budgets OK")

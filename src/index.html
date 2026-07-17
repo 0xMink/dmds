@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- build:csp — build.sh replaces this with a hash-based Content-Security-Policy meta tag -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -50,7 +51,7 @@
   <a class="nav__logo" href="#hero" data-cursor>DMDS<span class="nav__reg">®</span></a>
   <div class="nav__meta mono">
     <span class="nav__loc">LONG&nbsp;ISLAND,&nbsp;NY</span>
-    <span class="nav__clock" id="clock">00:00:00 EST</span>
+    <span class="nav__clock" id="clock">00:00:00 ET</span>
   </div>
   <nav class="nav__links mono" aria-label="Primary">
     <button class="nav__snd" id="snd-toggle" aria-pressed="false" data-cursor>SND&nbsp;·&nbsp;OFF</button>
@@ -80,6 +81,7 @@
         <span id="engine-hint">[ KEYBOARD LIVE ]&nbsp;&nbsp;TYPE ANYTHING — THE ENGINE WILL SET IT</span>
         <span id="engine-input" hidden>&gt;&nbsp;<span id="engine-buffer"></span><i class="engine-caret"></i></span>
       </p>
+      <span id="engine-live" class="visually-hidden" role="status"></span>
     </div>
     <div class="hero__coords mono reveal" aria-hidden="true">
       40.7891°&nbsp;N&nbsp;&nbsp;73.1350°&nbsp;W<br>
@@ -209,10 +211,10 @@
       </div>
     </div>
     <div class="proof__stats mono">
-      <div class="stat reveal"><span class="stat__num" data-count="20">0</span><span class="stat__plus">+</span><span class="stat__label">AI PROVIDERS ROUTED</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="3">0</span><span class="stat__label">PLATFORMS IN PRODUCTION</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="0">0</span><span class="stat__label">TEMPLATES USED</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="100">0</span><span class="stat__plus">%</span><span class="stat__label">BUILT IN-HOUSE</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="20" data-claim="providers-routed">20</span><span class="stat__plus">+</span><span class="stat__label">AI PROVIDERS ROUTED</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="3" data-claim="platforms-production">3</span><span class="stat__label">PLATFORMS IN PRODUCTION</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="0" data-claim="templates-used">0</span><span class="stat__label">TEMPLATES USED</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="100" data-claim="built-in-house">100</span><span class="stat__plus">%</span><span class="stat__label">BUILT IN-HOUSE</span></div>
     </div>
   </section>
 
@@ -230,10 +232,10 @@
         between the person you brief and the person who builds.
       </p>
       <div class="operator__stats mono">
-        <div class="stat reveal"><span class="stat__num" data-count="34">0</span><span class="stat__label">PULL REQUESTS AUTHORED</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="12">0</span><span class="stat__label">MERGED INTO PUBLIC AI TOOLING</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="38">0</span><span class="stat__label">ISSUES FILED &amp; TRIAGED</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="1">0</span><span class="stat__label">PERSON. ZERO HANDOFFS.</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="34" data-claim="prs-authored">34</span><span class="stat__label">PULL REQUESTS AUTHORED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="12" data-claim="prs-upstream">12</span><span class="stat__label">MERGED INTO PUBLIC AI TOOLING</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="38" data-claim="issues-triaged">38</span><span class="stat__label">ISSUES FILED &amp; TRIAGED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="1" data-claim="operators">1</span><span class="stat__label">PERSON. ZERO HANDOFFS.</span></div>
       </div>
     </div>
   </section>
@@ -242,22 +244,22 @@
   <section class="work section" id="work" data-formation="ambient" data-dim="0.32" data-index="006">
     <div class="section-head mono"><span>[ SEC.05 / SELECTED WORK — EVIDENCE ON FILE ]</span><span class="section-head__rule"></span></div>
     <div class="work__list">
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w01">
           <span class="work__idx mono">W-01</span>
-          <h3 class="work__name">ZOO CODE</h3>
+          <span class="work__name">ZOO CODE</span>
           <span class="work__cat mono">AI PLATFORM</span>
           <span class="work__year mono">2025—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>Credit-based AI gateway routing 20+ model providers — VS Code extension auth, fraud detection, usage analytics, Stripe billing.</p></div>
-        <div class="dossier" hidden>
+        <div class="dossier" id="dossier-w01" role="region" aria-label="Dossier W-01: Zoo Code evidence">
           <div class="dossier__head mono">[ DOSSIER W-01 · FACTS VERIFIABLE VIA GITHUB ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>1,266</b><span class="mono">GITHUB STARS</span></div>
-            <div class="dstat"><b>7</b><span class="mono">PRS MERGED</span></div>
-            <div class="dstat"><b>7</b><span class="mono">PRS REVIEWED</span></div>
-            <div class="dstat"><b>85,900</b><span class="mono">LOC AUDITED — POWER OF TEN</span></div>
+            <div class="dstat"><b data-claim="zoo-stars">1,266</b><span class="mono">GITHUB STARS</span></div>
+            <div class="dstat"><b data-claim="zoo-prs-merged">7</b><span class="mono">PRS MERGED</span></div>
+            <div class="dstat"><b data-claim="zoo-prs-reviewed">7</b><span class="mono">PRS REVIEWED</span></div>
+            <div class="dstat"><b data-claim="zoo-loc-audited">85,900</b><span class="mono">LOC AUDITED — POWER OF TEN</span></div>
           </div>
           <p class="dossier__sum">
             Core maintainer of the community-maintained VS Code AI coding extension
@@ -281,22 +283,22 @@
           </div>
         </div>
       </article>
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w02">
           <span class="work__idx mono">W-02</span>
-          <h3 class="work__name">INSURE WITH MINK</h3>
+          <span class="work__name">INSURE WITH MINK</span>
           <span class="work__cat mono">GROWTH ENGINE</span>
           <span class="work__year mono">2025—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>Brand, site, lead API and an AI-assisted content engine for a licensed insurance practice — compliance-reviewed at every step.</p></div>
-        <div class="dossier" hidden>
+        <div class="dossier" id="dossier-w02" role="region" aria-label="Dossier W-02: Insure With Mink evidence">
           <div class="dossier__head mono">[ DOSSIER W-02 · GROWTH SYSTEM ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>1</b><span class="mono">BRAND SYSTEM</span></div>
-            <div class="dstat"><b>4</b><span class="mono">CHANNELS INSTRUMENTED</span></div>
-            <div class="dstat"><b>100%</b><span class="mono">COMPLIANCE-GATED CONTENT</span></div>
-            <div class="dstat"><b>T-65</b><span class="mono">CAMPAIGN OPS SPEC</span></div>
+            <div class="dstat"><b data-claim="iwm-brand-systems">1</b><span class="mono">BRAND SYSTEM</span></div>
+            <div class="dstat"><b data-claim="iwm-channels">4</b><span class="mono">CHANNELS INSTRUMENTED</span></div>
+            <div class="dstat"><b data-claim="iwm-compliance">100%</b><span class="mono">COMPLIANCE-GATED CONTENT</span></div>
+            <div class="dstat"><b data-claim="iwm-t65">T-65</b><span class="mono">CAMPAIGN OPS SPEC</span></div>
           </div>
           <p class="dossier__sum">
             Full growth system for a licensed insurance practice: brand, website,
@@ -315,22 +317,22 @@
           </div>
         </div>
       </article>
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w03">
           <span class="work__idx mono">W-03</span>
-          <h3 class="work__name">COMFORT AIRZ</h3>
+          <span class="work__name">COMFORT AIRZ</span>
           <span class="work__cat mono">FIELD SERVICE</span>
           <span class="work__year mono">2026—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>React Native customer app and a zero-trust backend — mutual-TLS service mesh, formally reviewed critical paths.</p></div>
-        <div class="dossier" hidden>
-          <div class="dossier__head mono">[ DOSSIER W-03 · PRIVATE ENGAGEMENT — REFERENCES ON REQUEST ]</div>
+        <div class="dossier" id="dossier-w03" role="region" aria-label="Dossier W-03: Comfort Airz evidence — private engagement">
+          <div class="dossier__head mono">[ DOSSIER W-03 · PRIVATE ENGAGEMENT — PRIVATELY VERIFIABLE, REFERENCES ON REQUEST ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>412</b><span class="mono">COMMITS, SOLE ENGINEER</span></div>
-            <div class="dstat"><b>4</b><span class="mono">PROVERIF MODELS</span></div>
-            <div class="dstat"><b>3</b><span class="mono">TLA+ SPECS, MODEL-CHECKED</span></div>
-            <div class="dstat"><b>2</b><span class="mono">PLATFORMS — RUST + REACT NATIVE</span></div>
+            <div class="dstat"><b data-claim="airz-commits">412</b><span class="mono">COMMITS, SOLE ENGINEER</span></div>
+            <div class="dstat"><b data-claim="airz-proverif">4</b><span class="mono">PROVERIF MODELS</span></div>
+            <div class="dstat"><b data-claim="airz-tla">3</b><span class="mono">TLA+ SPECS, MODEL-CHECKED</span></div>
+            <div class="dstat"><b data-claim="airz-platforms">2</b><span class="mono">PLATFORMS — RUST + REACT NATIVE</span></div>
           </div>
           <p class="dossier__sum">
             Field-service platform for an HVAC operation: a Rust backend with a
@@ -389,11 +391,17 @@
         </label>
         <input type="text" name="_gotcha" class="transmit__hp" tabindex="-1" autocomplete="off" aria-hidden="true">
         <button type="submit" class="contact__cta" data-cursor data-cursor-label="TRANSMIT" data-magnetic>
-          <span class="contact__cta-text" id="transmit-label">START A PROJECT</span>
+          <span class="contact__cta-text" id="transmit-label" aria-live="polite">START A PROJECT</span>
           <span class="contact__cta-arrow" aria-hidden="true">↗</span>
         </button>
         <p class="transmit__micro mono">NO SPAM, NO DRIP SEQUENCE. ONE HUMAN READS THIS — AND REPLIES, USUALLY WITHIN A DAY.</p>
+        <p class="transmit__micro mono">YOUR DETAILS GO TO ONE INBOX. NO THIRD-PARTY ANALYTICS, NO TRACKING, NO LIST. UNSENT TEXT IS KEPT ON YOUR DEVICE ONLY, FOR 7 DAYS.</p>
         <p class="transmit__micro mono">PREFER EMAIL? <a href="mailto:dennis@shorevapesli.com?subject=Project%20inquiry%20—%20DMDS" data-cursor>DIRECT LINE&nbsp;↗</a></p>
+        <div class="transmit__recover mono" id="transmit-recover" hidden role="status">
+          MAIL CLIENT DIDN'T OPEN? YOUR MESSAGE IS STILL HERE —
+          <button type="button" id="copy-brief" data-cursor>COPY MESSAGE</button>
+          AND SEND IT TO DENNIS@SHOREVAPESLI.COM
+        </div>
       </form>
       <div class="transmit__done mono" id="transmit-done" hidden role="status">
         [ SIGNAL RECEIVED ] — MESSAGE LOGGED. DENNIS REPLIES DIRECTLY, USUALLY WITHIN A DAY.
@@ -405,15 +413,17 @@
       </div>
     </div>
     <footer class="footer mono">
-      <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;ALL&nbsp;SYSTEMS&nbsp;NOMINAL</span>
-      <span>LONG&nbsp;ISLAND,&nbsp;NY&nbsp;·&nbsp;<span id="clock-2">EST</span></span>
-      <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS</span>
+      <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;<span id="sys-status">STATIC&nbsp;RENDER&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span></span>
+      <span>LONG&nbsp;ISLAND,&nbsp;NY&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
+      <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
     </footer>
   </section>
 
 </main>
 </div>
 
+<script src="claims.js"></script>
+<script src="gl2.js"></script>
 <script src="gl.js"></script>
 <script src="main.js"></script>
 </body>

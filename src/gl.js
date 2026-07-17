@@ -8,7 +8,9 @@
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
-  var COUNT = MOBILE ? 16000 : 42000;
+  // honor Save-Data: mobile particle budget, no post pipeline
+  var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
+  var COUNT = (MOBILE || SAVEDATA) ? 16000 : 42000;
   var DPR_CAP = MOBILE ? 1.5 : 1.75;
 
   var VERT = [
@@ -160,9 +162,15 @@
     post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
     trailA: null, trailB: null, glowA: null, glowB: null,
     locPoints: null, enabledAttribs: [],
-    // adaptive quality governor
-    drawCount: 0, govT: 0
+    // adaptive quality governor (hysteresis: drop fast, restore slow)
+    drawCount: 0, govT: 0, govGood: 0,
+    // boot milestone reporter (main.js wires the loader log to this)
+    ms: null, firstFrame: false
   };
+
+  function milestone(kind, detail) {
+    if (state.ms) { try { state.ms(kind, detail); } catch (e) {} }
+  }
 
   function worldExtents() {
     var hh = CAM_Z * Math.tan(FOV / 2);
@@ -555,6 +563,8 @@
     state.frames++;
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
 
+    if (!state.firstFrame) { state.firstFrame = true; milestone("loop"); }
+
     // morph progress (scrub mode is driven externally)
     if (state.mode === "tween" && state.mix < 1) state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
 
@@ -567,14 +577,24 @@
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    // adaptive quality governor: protect frame rate before aesthetics
+    // adaptive quality governor: protect frame rate before aesthetics.
+    // drops immediately on a slow window; restores only after two
+    // consecutive fast windows so it can't oscillate at a tier boundary
     if (!state.govLocked && now - state.govT > 2 && state.fpsT > 3) {
       state.govT = now;
       if (state.fps < 40 && state.drawCount > COUNT / 4) {
+        state.govGood = 0;
         state.drawCount = Math.floor(state.drawCount / 2);
         if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
       } else if (state.fps > 56 && state.drawCount < COUNT) {
-        state.drawCount = Math.min(COUNT, state.drawCount * 2);
+        state.govGood++;
+        if (state.govGood >= 2) {
+          state.govGood = 0;
+          state.drawCount = Math.min(COUNT, state.drawCount * 2);
+          if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
+        }
+      } else {
+        state.govGood = 0;
       }
     }
 
@@ -646,17 +666,15 @@
     }
   }
 
-  function init(canvas) {
-    state.canvas = canvas;
-    var gl = canvas.getContext("webgl", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
-    if (!gl) return Promise.reject(new Error("no webgl"));
-    state.gl = gl;
-
+  // every GPU-side resource, in one place, so a restored context can
+  // rebuild the world from the CPU-side state it still holds
+  function buildGLResources() {
+    var gl = state.gl;
     var prog = gl.createProgram();
     gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
     gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return Promise.reject(new Error(gl.getProgramInfoLog(prog)));
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     state.program = prog;
     gl.useProgram(prog);
 
@@ -682,13 +700,14 @@
       aPosB: gl.getAttribLocation(prog, "aPosB"),
       aRand: gl.getAttribLocation(prog, "aRand")
     };
-    state.drawCount = COUNT;
+    state.enabledAttribs = [];
 
     gl.clearColor(0, 0, 0, 0);
     gl.disable(gl.DEPTH_TEST);
 
-    // post-processing pipeline (desktop): trails, bloom, aberration
-    if (!MOBILE) {
+    // post-processing pipeline (desktop, not under Save-Data): trails, bloom, aberration
+    state.post = false;
+    if (!MOBILE && !SAVEDATA) {
       try {
         var pf = makeProgram(gl, QUAD_VS, FADE_FS);
         state.progFade = { p: pf, aXY: gl.getAttribLocation(pf, "aXY"), uTex: gl.getUniformLocation(pf, "uTex"), uDecay: gl.getUniformLocation(pf, "uDecay") };
@@ -704,11 +723,55 @@
         state.post = false; // direct path still works
       }
     }
-
-    resize();
     if (state.post) {
       try { allocTargets(); } catch (e) { state.post = false; }
     }
+  }
+
+  function uploadCurrentPair() {
+    var gl = state.gl;
+    if (!state.curA || !state.curB) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.bufA);
+    gl.bufferData(gl.ARRAY_BUFFER, state.curA, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.bufB);
+    gl.bufferData(gl.ARRAY_BUFFER, state.curB, gl.DYNAMIC_DRAW);
+  }
+
+  function init(canvas, onMilestone) {
+    state.canvas = canvas;
+    state.ms = onMilestone || null;
+    var gl = canvas.getContext("webgl", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
+    if (!gl) return Promise.reject(new Error("no webgl"));
+    state.gl = gl;
+
+    try { buildGLResources(); } catch (e) { return Promise.reject(e); }
+    milestone("compile");
+    milestone("post", state.post);
+    state.drawCount = COUNT;
+
+    // context loss: pause; on restore, rebuild every GPU resource from
+    // the CPU-side formations and resume where we left off
+    canvas.addEventListener("webglcontextlost", function (e) {
+      e.preventDefault();
+      state.running = false;
+      if (window.console) console.warn("[DMDS] WebGL context lost — render paused");
+    });
+    canvas.addEventListener("webglcontextrestored", function () {
+      try {
+        buildGLResources();
+        gl.viewport(0, 0, state.canvas.width, state.canvas.height);
+        uploadCurrentPair();
+        state.running = true;
+        state.lastT = performance.now() * 0.001;
+        requestAnimationFrame(frame);
+        if (window.console) console.info("[DMDS] WebGL context restored");
+      } catch (err) {
+        state.running = false; // CSS gradient fallback remains
+        if (window.console) console.warn("[DMDS] context restore failed", err);
+      }
+    });
+
+    resize();
 
     var fontsReady = (document.fonts && document.fonts.load)
       ? document.fonts.load("600 250px 'Clash Display'").then(function () { return document.fonts.ready; })
@@ -716,17 +779,14 @@
 
     return fontsReady.then(function () {
       rebuildFormations();
+      milestone("seed", COUNT);
 
       // wire attribute pointers once buffers hold data
       var scattered = genAmbient();
       state.curA = scattered;
       state.curB = state.formations.logo;
       state.currentName = "logo";
-      var gl2 = state.gl;
-      gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufA);
-      gl2.bufferData(gl2.ARRAY_BUFFER, state.curA, gl2.DYNAMIC_DRAW);
-      gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufB);
-      gl2.bufferData(gl2.ARRAY_BUFFER, state.curB, gl2.DYNAMIC_DRAW);
+      uploadCurrentPair();
       // attribute binding happens per-pass via useAttribs()
 
       state.mix = 0;
@@ -777,6 +837,8 @@
     setBudget: function (n) { state.drawCount = Math.min(COUNT, n | 0); state.govLocked = true; },
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); },
     fps: function () { return state.fps; },
-    isReady: function () { return state.ready; }
+    isReady: function () { return state.ready; },
+    // honest self-report: the footer status line reads this
+    status: function () { return { tier: "gl1", post: state.post, count: state.drawCount, max: COUNT, running: state.running }; }
   };
 })();

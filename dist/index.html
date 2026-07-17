@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-ZJv5e1B04g4Ueolqt51HU+Nln6bT/t9V3WPzBGSjfug=' 'sha256-wWUDxnJcK94CFPmb7LgOM76VBShCSHuYL4iWWsqqHEk=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -85,9 +86,12 @@ a { color: inherit; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
 .sig { color: var(--signal); }
 
-/* ═══ Virtual scroll shell ═══ */
-.scroll-wrap { position: relative; width: 100%; will-change: transform; }
-html.js.smooth .scroll-wrap { position: fixed; inset: 0 auto auto 0; width: 100%; overflow: visible; }
+/* ═══ Scroll shell ═══
+   Native scroll IS the scroll mechanism — content stays in normal flow.
+   Desktop smoothing animates window.scrollTo from wheel input (main.js),
+   so find-in-page, tab-focus, anchors, history restoration and the
+   scrollbar all keep native behavior. */
+.scroll-wrap { position: relative; width: 100%; }
 
 /* ═══ Canvas + atmosphere ═══ */
 #gl {
@@ -218,7 +222,7 @@ html.loaded .nav { opacity: 1; transform: none; }
 .nav__snd {
   background: none; border: none; padding: 0; cursor: pointer;
   font: inherit; letter-spacing: inherit; text-transform: inherit;
-  color: var(--bone-faint); transition: color 0.25s;
+  color: var(--bone-dim); transition: color 0.25s;
 }
 .nav__snd:hover { color: var(--bone); }
 .nav__snd.on { color: var(--signal); }
@@ -233,11 +237,12 @@ html.loaded .nav { opacity: 1; transform: none; }
 }
 @media (max-width: 900px) { .nav__meta { display: none; } }
 @media (max-width: 560px) {
-  /* keep every jump link on phones — shrink instead of hiding */
-  .nav { padding: 1.1rem 1rem; }
-  .nav__logo { font-size: 1rem; }
-  .nav__links { gap: 0.8rem; }
-  .nav__links a { font-size: 0.55rem; letter-spacing: 0.1em; }
+  /* keep every jump link on phones — shrink type a little, never the tap
+     target: each link keeps a ≥40px hit area via padding */
+  .nav { padding: 0.4rem 1rem; }
+  .nav__logo { font-size: 1rem; padding: 0.7rem 0; }
+  .nav__links { gap: 0.15rem; }
+  .nav__links a { font-size: 0.625rem; letter-spacing: 0.08em; padding: 0.9rem 0.4rem; }
   .nav__snd { display: none; }
 }
 
@@ -285,7 +290,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.18; letter-spacing: 0.005em;
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
-.hero__engine { color: var(--bone-faint); margin-top: 2.2rem; min-height: 1rem; }
+.hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
 #engine-input { color: var(--signal); letter-spacing: 0.2em; }
 #engine-buffer { color: var(--bone); }
 .engine-caret {
@@ -411,7 +416,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .proof__idx { color: var(--signal); }
 .proof__name { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.3rem, 2.4vw, 2rem); letter-spacing: 0.01em; }
 .proof__body { color: var(--bone-dim); max-width: 46rem; }
-.proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-faint); font-size: 0.56rem; }
+.proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-dim); font-size: 0.625rem; }
 .proof__row:hover > *, .proof__row:hover .proof__body, .proof__row:hover .proof__idx { color: var(--ink); }
 .proof__row:hover .proof__plain { color: rgba(11, 11, 12, 0.72); }
 @media (max-width: 860px) {
@@ -467,7 +472,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .dstat { background: var(--ink-2); padding: 1.1rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .dstat b { font-size: clamp(1.4rem, 2.4vw, 2.1rem); font-weight: 700; font-variant-numeric: tabular-nums; }
-.dstat span { color: var(--bone-dim); font-size: 0.56rem; }
+.dstat span { color: var(--bone-dim); font-size: 0.625rem; }
 .dossier__sum { color: var(--bone-dim); max-width: 44rem; margin-bottom: 1.6rem; }
 .dossier__log { list-style: none; border-top: 1px solid var(--line); margin-bottom: 1.8rem; }
 .dossier__log li {
@@ -487,27 +492,36 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .work__row.open .work__idx { color: var(--signal); }
 .work__row.open .work__arrow { transform: rotate(45deg); opacity: 1; color: var(--signal); }
 
+/* dossiers render for everyone without JS; JS collapses them behind the
+   disclosure button (aria-expanded lives on the button, state on the row) */
+html.js .work__row:not(.open) .dossier { display: none; }
+
 /* ═══ Work ═══ */
 .work { padding-top: 8rem; padding-bottom: 10rem; }
 .work__list { border-top: 1px solid var(--line); }
 .work__row {
   position: relative; border-bottom: 1px solid var(--line);
-  overflow: hidden; outline-offset: -4px;
+  overflow: hidden;
 }
 .work__row::before {
   content: ""; position: absolute; inset: 0; background: var(--signal);
   transform: translateY(101%); transition: transform 0.5s var(--ease-inout);
 }
-.work__row:hover::before, .work__row:focus::before { transform: translateY(0); }
+.work__row:hover::before, .work__row:focus-within::before { transform: translateY(0); }
+.work__heading { margin: 0; font-size: 1rem; font-weight: 400; }
 .work__line {
-  position: relative; display: grid;
+  position: relative; display: grid; width: 100%;
   grid-template-columns: 4.5rem 1fr auto auto 3rem;
   gap: 2rem; align-items: center;
   padding: 2.6rem 0.8rem;
+  background: none; border: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
 }
+button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offset: -4px; }
 .work__line > *, .work__detail { position: relative; z-index: 1; transition: color 0.3s; }
 .work__idx { color: var(--signal); }
 .work__name {
+  display: block;
   font-family: var(--font-display); font-weight: 600;
   font-size: clamp(1.9rem, 5.4vw, 4.6rem); line-height: 1; letter-spacing: 0.005em;
   transition: transform 0.5s var(--ease-out), color 0.3s;
@@ -527,12 +541,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   overflow: hidden; color: var(--bone-dim); max-width: 44rem;
   padding: 0 0.8rem 0 7.3rem;
 }
-.work__row:hover .work__detail, .work__row:focus .work__detail { grid-template-rows: 1fr; }
+.work__row:hover .work__detail, .work__row:focus-within .work__detail { grid-template-rows: 1fr; }
 .work__row:hover .work__detail p { padding-bottom: 2.2rem; }
 .work__row:hover .work__line > *, .work__row:hover .work__detail p,
 .work__row:hover .work__idx, .work__row:hover .work__cat,
 .work__row:hover .work__year, .work__row:hover .work__arrow,
-.work__row:focus .work__line > * { color: var(--ink); }
+.work__row:focus-within .work__line > * { color: var(--ink); }
 @media (max-width: 720px) {
   .work__line { grid-template-columns: 3rem 1fr auto; }
   .work__year, .work__arrow { display: none; }
@@ -564,7 +578,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .transmit__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; }
 @media (max-width: 560px) { .transmit__grid { grid-template-columns: 1fr; } }
 .transmit__field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
-.transmit__field .mono { color: var(--signal); font-size: 0.56rem; }
+.transmit__field .mono { color: var(--signal); font-size: 0.625rem; }
 .transmit__field input, .transmit__field textarea {
   background: var(--ink-2); border: 1px solid var(--line); color: var(--bone);
   font-family: var(--font-body); font-size: 0.95rem;
@@ -572,13 +586,13 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   transition: border-color 0.25s;
   width: 100%; resize: vertical;
 }
-.transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-faint); }
+.transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-dim); }
 .transmit__field input:focus, .transmit__field textarea:focus {
   outline: none; border-color: var(--signal);
 }
 .transmit__field input:user-invalid { border-color: #d4452c; }
 .transmit__chips { border: none; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.transmit__chips legend { color: var(--signal); font-size: 0.56rem; margin-bottom: 0.7rem; }
+.transmit__chips legend { color: var(--signal); font-size: 0.625rem; margin-bottom: 0.7rem; }
 .transmit__chips label { cursor: pointer; }
 .transmit__chips input { position: absolute; opacity: 0; pointer-events: none; }
 .transmit__chips span {
@@ -588,12 +602,19 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .transmit__chips input:checked + span { border-color: var(--signal); color: var(--signal); background: rgba(255, 74, 0, 0.08); }
 .transmit__chips input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
 .transmit__hp { position: absolute; left: -5000px; width: 1px; height: 1px; opacity: 0; }
-.transmit__micro { color: var(--bone-faint); text-align: center; }
+.transmit__micro { color: var(--bone-dim); text-align: center; }
 .transmit__micro a { color: var(--bone-dim); }
 .transmit__done {
   border: 1px solid var(--signal); color: var(--signal);
   padding: 1.6rem 2rem; margin-top: 1rem;
 }
+.transmit__recover { color: var(--bone-dim); text-align: center; line-height: 2.2; }
+.transmit__recover button {
+  background: none; border: 1px solid var(--signal); color: var(--signal);
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  padding: 0.45rem 0.9rem; cursor: pointer; margin: 0 0.3rem;
+}
+.transmit__recover button:hover { background: var(--signal); color: var(--ink); }
 
 .contact__cta {
   display: inline-flex; align-items: center; gap: 1.1rem;
@@ -620,7 +641,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .footer {
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
   padding: 1.4rem var(--pad); border-top: 1px solid var(--line);
-  color: var(--bone-faint);
+  color: var(--bone-dim);
 }
 
 /* ═══ Reduced motion ═══ */
@@ -633,7 +654,20 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   .manifesto__text .w { opacity: 1; }
 }
 
+/* ═══ Forced colors (Windows High Contrast / forced-colors: active) ═══
+   Atmosphere layers off, native cursor back, system colors do the work.
+   Hover floods rely on background paint the UA strips — hide them so
+   text never sits on an invisible state. */
+@media (forced-colors: active) {
+  .grain, .cursor, #gl, .hero__scroll-line { display: none; }
+  html.js body, html.js a, html.js [data-cursor] { cursor: auto; }
+  .proof__row::before, .work__row::before, .contact__cta::before { display: none; }
+  .manifesto__text .w { opacity: 1; }
+  .cap__ghost { -webkit-text-stroke: 1px CanvasText; }
+}
+
 </style>
+<meta name="dmds-build" content="2df1bf1-dirty 2026-07-17T16:29:29Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -669,7 +703,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   <a class="nav__logo" href="#hero" data-cursor>DMDS<span class="nav__reg">®</span></a>
   <div class="nav__meta mono">
     <span class="nav__loc">LONG&nbsp;ISLAND,&nbsp;NY</span>
-    <span class="nav__clock" id="clock">00:00:00 EST</span>
+    <span class="nav__clock" id="clock">00:00:00 ET</span>
   </div>
   <nav class="nav__links mono" aria-label="Primary">
     <button class="nav__snd" id="snd-toggle" aria-pressed="false" data-cursor>SND&nbsp;·&nbsp;OFF</button>
@@ -699,6 +733,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
         <span id="engine-hint">[ KEYBOARD LIVE ]&nbsp;&nbsp;TYPE ANYTHING — THE ENGINE WILL SET IT</span>
         <span id="engine-input" hidden>&gt;&nbsp;<span id="engine-buffer"></span><i class="engine-caret"></i></span>
       </p>
+      <span id="engine-live" class="visually-hidden" role="status"></span>
     </div>
     <div class="hero__coords mono reveal" aria-hidden="true">
       40.7891°&nbsp;N&nbsp;&nbsp;73.1350°&nbsp;W<br>
@@ -828,10 +863,10 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       </div>
     </div>
     <div class="proof__stats mono">
-      <div class="stat reveal"><span class="stat__num" data-count="20">0</span><span class="stat__plus">+</span><span class="stat__label">AI PROVIDERS ROUTED</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="3">0</span><span class="stat__label">PLATFORMS IN PRODUCTION</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="0">0</span><span class="stat__label">TEMPLATES USED</span></div>
-      <div class="stat reveal"><span class="stat__num" data-count="100">0</span><span class="stat__plus">%</span><span class="stat__label">BUILT IN-HOUSE</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="20" data-claim="providers-routed">20</span><span class="stat__plus">+</span><span class="stat__label">AI PROVIDERS ROUTED</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="3" data-claim="platforms-production">3</span><span class="stat__label">PLATFORMS IN PRODUCTION</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="0" data-claim="templates-used">0</span><span class="stat__label">TEMPLATES USED</span></div>
+      <div class="stat reveal"><span class="stat__num" data-count="100" data-claim="built-in-house">100</span><span class="stat__plus">%</span><span class="stat__label">BUILT IN-HOUSE</span></div>
     </div>
   </section>
 
@@ -849,10 +884,10 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
         between the person you brief and the person who builds.
       </p>
       <div class="operator__stats mono">
-        <div class="stat reveal"><span class="stat__num" data-count="34">0</span><span class="stat__label">PULL REQUESTS AUTHORED</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="12">0</span><span class="stat__label">MERGED INTO PUBLIC AI TOOLING</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="38">0</span><span class="stat__label">ISSUES FILED &amp; TRIAGED</span></div>
-        <div class="stat reveal"><span class="stat__num" data-count="1">0</span><span class="stat__label">PERSON. ZERO HANDOFFS.</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="34" data-claim="prs-authored">34</span><span class="stat__label">PULL REQUESTS AUTHORED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="12" data-claim="prs-upstream">12</span><span class="stat__label">MERGED INTO PUBLIC AI TOOLING</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="38" data-claim="issues-triaged">38</span><span class="stat__label">ISSUES FILED &amp; TRIAGED</span></div>
+        <div class="stat reveal"><span class="stat__num" data-count="1" data-claim="operators">1</span><span class="stat__label">PERSON. ZERO HANDOFFS.</span></div>
       </div>
     </div>
   </section>
@@ -861,22 +896,22 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   <section class="work section" id="work" data-formation="ambient" data-dim="0.32" data-index="006">
     <div class="section-head mono"><span>[ SEC.05 / SELECTED WORK — EVIDENCE ON FILE ]</span><span class="section-head__rule"></span></div>
     <div class="work__list">
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="ZOO CODE">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w01">
           <span class="work__idx mono">W-01</span>
-          <h3 class="work__name">ZOO CODE</h3>
+          <span class="work__name">ZOO CODE</span>
           <span class="work__cat mono">AI PLATFORM</span>
           <span class="work__year mono">2025—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>Credit-based AI gateway routing 20+ model providers — VS Code extension auth, fraud detection, usage analytics, Stripe billing.</p></div>
-        <div class="dossier" hidden>
+        <div class="dossier" id="dossier-w01" role="region" aria-label="Dossier W-01: Zoo Code evidence">
           <div class="dossier__head mono">[ DOSSIER W-01 · FACTS VERIFIABLE VIA GITHUB ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>1,266</b><span class="mono">GITHUB STARS</span></div>
-            <div class="dstat"><b>7</b><span class="mono">PRS MERGED</span></div>
-            <div class="dstat"><b>7</b><span class="mono">PRS REVIEWED</span></div>
-            <div class="dstat"><b>85,900</b><span class="mono">LOC AUDITED — POWER OF TEN</span></div>
+            <div class="dstat"><b data-claim="zoo-stars">1,266</b><span class="mono">GITHUB STARS</span></div>
+            <div class="dstat"><b data-claim="zoo-prs-merged">7</b><span class="mono">PRS MERGED</span></div>
+            <div class="dstat"><b data-claim="zoo-prs-reviewed">7</b><span class="mono">PRS REVIEWED</span></div>
+            <div class="dstat"><b data-claim="zoo-loc-audited">85,900</b><span class="mono">LOC AUDITED — POWER OF TEN</span></div>
           </div>
           <p class="dossier__sum">
             Core maintainer of the community-maintained VS Code AI coding extension
@@ -900,22 +935,22 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           </div>
         </div>
       </article>
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="MINK">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w02">
           <span class="work__idx mono">W-02</span>
-          <h3 class="work__name">INSURE WITH MINK</h3>
+          <span class="work__name">INSURE WITH MINK</span>
           <span class="work__cat mono">GROWTH ENGINE</span>
           <span class="work__year mono">2025—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>Brand, site, lead API and an AI-assisted content engine for a licensed insurance practice — compliance-reviewed at every step.</p></div>
-        <div class="dossier" hidden>
+        <div class="dossier" id="dossier-w02" role="region" aria-label="Dossier W-02: Insure With Mink evidence">
           <div class="dossier__head mono">[ DOSSIER W-02 · GROWTH SYSTEM ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>1</b><span class="mono">BRAND SYSTEM</span></div>
-            <div class="dstat"><b>4</b><span class="mono">CHANNELS INSTRUMENTED</span></div>
-            <div class="dstat"><b>100%</b><span class="mono">COMPLIANCE-GATED CONTENT</span></div>
-            <div class="dstat"><b>T-65</b><span class="mono">CAMPAIGN OPS SPEC</span></div>
+            <div class="dstat"><b data-claim="iwm-brand-systems">1</b><span class="mono">BRAND SYSTEM</span></div>
+            <div class="dstat"><b data-claim="iwm-channels">4</b><span class="mono">CHANNELS INSTRUMENTED</span></div>
+            <div class="dstat"><b data-claim="iwm-compliance">100%</b><span class="mono">COMPLIANCE-GATED CONTENT</span></div>
+            <div class="dstat"><b data-claim="iwm-t65">T-65</b><span class="mono">CAMPAIGN OPS SPEC</span></div>
           </div>
           <p class="dossier__sum">
             Full growth system for a licensed insurance practice: brand, website,
@@ -934,22 +969,22 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           </div>
         </div>
       </article>
-      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ" tabindex="0">
-        <div class="work__line">
+      <article class="work__row reveal" data-cursor data-cursor-label="VIEW" data-particles="AIRZ">
+        <h3 class="work__heading"><button type="button" class="work__line" aria-expanded="false" aria-controls="dossier-w03">
           <span class="work__idx mono">W-03</span>
-          <h3 class="work__name">COMFORT AIRZ</h3>
+          <span class="work__name">COMFORT AIRZ</span>
           <span class="work__cat mono">FIELD SERVICE</span>
           <span class="work__year mono">2026—</span>
           <span class="work__arrow" aria-hidden="true">↗</span>
-        </div>
+        </button></h3>
         <div class="work__detail"><p>React Native customer app and a zero-trust backend — mutual-TLS service mesh, formally reviewed critical paths.</p></div>
-        <div class="dossier" hidden>
-          <div class="dossier__head mono">[ DOSSIER W-03 · PRIVATE ENGAGEMENT — REFERENCES ON REQUEST ]</div>
+        <div class="dossier" id="dossier-w03" role="region" aria-label="Dossier W-03: Comfort Airz evidence — private engagement">
+          <div class="dossier__head mono">[ DOSSIER W-03 · PRIVATE ENGAGEMENT — PRIVATELY VERIFIABLE, REFERENCES ON REQUEST ]</div>
           <div class="dossier__stats">
-            <div class="dstat"><b>412</b><span class="mono">COMMITS, SOLE ENGINEER</span></div>
-            <div class="dstat"><b>4</b><span class="mono">PROVERIF MODELS</span></div>
-            <div class="dstat"><b>3</b><span class="mono">TLA+ SPECS, MODEL-CHECKED</span></div>
-            <div class="dstat"><b>2</b><span class="mono">PLATFORMS — RUST + REACT NATIVE</span></div>
+            <div class="dstat"><b data-claim="airz-commits">412</b><span class="mono">COMMITS, SOLE ENGINEER</span></div>
+            <div class="dstat"><b data-claim="airz-proverif">4</b><span class="mono">PROVERIF MODELS</span></div>
+            <div class="dstat"><b data-claim="airz-tla">3</b><span class="mono">TLA+ SPECS, MODEL-CHECKED</span></div>
+            <div class="dstat"><b data-claim="airz-platforms">2</b><span class="mono">PLATFORMS — RUST + REACT NATIVE</span></div>
           </div>
           <p class="dossier__sum">
             Field-service platform for an HVAC operation: a Rust backend with a
@@ -1008,11 +1043,17 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
         </label>
         <input type="text" name="_gotcha" class="transmit__hp" tabindex="-1" autocomplete="off" aria-hidden="true">
         <button type="submit" class="contact__cta" data-cursor data-cursor-label="TRANSMIT" data-magnetic>
-          <span class="contact__cta-text" id="transmit-label">START A PROJECT</span>
+          <span class="contact__cta-text" id="transmit-label" aria-live="polite">START A PROJECT</span>
           <span class="contact__cta-arrow" aria-hidden="true">↗</span>
         </button>
         <p class="transmit__micro mono">NO SPAM, NO DRIP SEQUENCE. ONE HUMAN READS THIS — AND REPLIES, USUALLY WITHIN A DAY.</p>
+        <p class="transmit__micro mono">YOUR DETAILS GO TO ONE INBOX. NO THIRD-PARTY ANALYTICS, NO TRACKING, NO LIST. UNSENT TEXT IS KEPT ON YOUR DEVICE ONLY, FOR 7 DAYS.</p>
         <p class="transmit__micro mono">PREFER EMAIL? <a href="mailto:dennis@shorevapesli.com?subject=Project%20inquiry%20—%20DMDS" data-cursor>DIRECT LINE&nbsp;↗</a></p>
+        <div class="transmit__recover mono" id="transmit-recover" hidden role="status">
+          MAIL CLIENT DIDN'T OPEN? YOUR MESSAGE IS STILL HERE —
+          <button type="button" id="copy-brief" data-cursor>COPY MESSAGE</button>
+          AND SEND IT TO DENNIS@SHOREVAPESLI.COM
+        </div>
       </form>
       <div class="transmit__done mono" id="transmit-done" hidden role="status">
         [ SIGNAL RECEIVED ] — MESSAGE LOGGED. DENNIS REPLIES DIRECTLY, USUALLY WITHIN A DAY.
@@ -1024,15 +1065,1239 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       </div>
     </div>
     <footer class="footer mono">
-      <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;ALL&nbsp;SYSTEMS&nbsp;NOMINAL</span>
-      <span>LONG&nbsp;ISLAND,&nbsp;NY&nbsp;·&nbsp;<span id="clock-2">EST</span></span>
-      <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS</span>
+      <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;<span id="sys-status">STATIC&nbsp;RENDER&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span></span>
+      <span>LONG&nbsp;ISLAND,&nbsp;NY&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
+      <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
     </footer>
   </section>
 
 </main>
 </div>
 
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DMDS® — claim registry
+   Single source of truth for every quantitative claim on the page.
+   The build fails if the page disagrees with this file or if a
+   claim is past its review date (scripts/check.py). The loader's
+   VERIFY claims step re-checks it at runtime in the visitor's DOM.
+
+   Fields:
+     page        exact string the page must display (data-claim wiring)
+     dom         true → an element with data-claim="<id>" must exist
+     text        the claim as worded on the page
+     definition  precise meaning — what would make this true or false
+     source      where the underlying fact lives
+     verify      how a third party (or future maintainer) checks it
+     verified    date the value was last confirmed (YYYY-MM-DD)
+     review_by   build fails after this date until re-verified
+     visibility  "public" (visitor-verifiable) | "attestable"
+                 (privately verifiable — references on request)
+
+   The JSON between the markers must stay strict JSON: the build
+   check parses it.
+   ═══════════════════════════════════════════════════════════════ */
+window.DMDS_CLAIMS = /* claims-json-start */ {
+  "version": "1.0.0",
+  "updated": "2026-07-12",
+  "owner": "Dennis Mink (@0xMink)",
+  "claims": {
+    "providers-routed": {
+      "page": "20", "dom": true,
+      "text": "20+ AI PROVIDERS ROUTED",
+      "definition": "Distinct model providers routable through the Zoo Code AI gateway the operator maintains.",
+      "source": "Zoo Code provider registry",
+      "verify": "Count provider integrations in the Zoo Code repo settings UI or provider directory.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "platforms-production": {
+      "page": "3", "dom": true,
+      "text": "3 PLATFORMS IN PRODUCTION",
+      "definition": "Zoo Code, insurewithmink.com, and the Comfort Airz platform — live or in active production use.",
+      "source": "Live URLs / client engagement",
+      "verify": "Zoo Code and insurewithmink.com are publicly reachable; Comfort Airz by reference.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "templates-used": {
+      "page": "0", "dom": true,
+      "text": "0 TEMPLATES USED",
+      "definition": "No purchased or third-party page templates, themes, or site builders in any listed deliverable. Open-source libraries and scaffolding CLIs are not templates under this definition.",
+      "source": "Project repositories",
+      "verify": "Repo inspection — no theme/template packages in any dependency manifest.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "built-in-house": {
+      "page": "100", "dom": true,
+      "text": "100% BUILT IN-HOUSE",
+      "definition": "All listed work authored by the operator. Excludes open-source dependencies, licensed typefaces, and platform services, which are disclosed where used.",
+      "source": "Commit authorship",
+      "verify": "git shortlog on project repositories.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "prs-authored": {
+      "page": "34", "dom": true,
+      "text": "34 PULL REQUESTS AUTHORED",
+      "definition": "Pull requests authored by @0xMink across the Zoo Code and Roo Code organizations, any state.",
+      "source": "GitHub",
+      "verify": "GitHub search: is:pr author:0xMink org:Zoo-Code-Org org:RooCodeInc",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "prs-upstream": {
+      "page": "12", "dom": true,
+      "text": "12 MERGED INTO PUBLIC AI TOOLING",
+      "definition": "Pull requests authored by @0xMink and merged into public AI-tooling repositories (Zoo Code and Roo Code).",
+      "source": "GitHub",
+      "verify": "GitHub search: is:pr is:merged author:0xMink",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "issues-triaged": {
+      "page": "38", "dom": true,
+      "text": "38 ISSUES FILED & TRIAGED",
+      "definition": "GitHub issues filed by or triaged by @0xMink on public repositories.",
+      "source": "GitHub",
+      "verify": "GitHub search: is:issue involves:0xMink",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "operators": {
+      "page": "1", "dom": true,
+      "text": "1 PERSON. ZERO HANDOFFS.",
+      "definition": "One engineer owns every engagement end to end — brief, build, and delivery. No account managers or subcontracted execution.",
+      "source": "Studio structure",
+      "verify": "Ask — the person who replies is the person who builds.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "zoo-stars": {
+      "page": "1,266", "dom": true,
+      "text": "1,266 GITHUB STARS",
+      "definition": "Star count of Zoo-Code-Org/Zoo-Code at the verification date. Drifts daily; short review window on purpose.",
+      "source": "https://github.com/Zoo-Code-Org/Zoo-Code",
+      "verify": "Open the repo.",
+      "verified": "2026-07-08", "review_by": "2026-09-08", "visibility": "public"
+    },
+    "zoo-prs-merged": {
+      "page": "7", "dom": true,
+      "text": "7 PRS MERGED",
+      "definition": "PRs authored by @0xMink merged into Zoo-Code-Org/Zoo-Code.",
+      "source": "https://github.com/Zoo-Code-Org/Zoo-Code/pulls",
+      "verify": "GitHub search: repo:Zoo-Code-Org/Zoo-Code is:pr is:merged author:0xMink",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "zoo-prs-reviewed": {
+      "page": "7", "dom": true,
+      "text": "7 PRS REVIEWED",
+      "definition": "PRs in Zoo-Code-Org/Zoo-Code reviewed by @0xMink as maintainer.",
+      "source": "https://github.com/Zoo-Code-Org/Zoo-Code/pulls",
+      "verify": "GitHub search: repo:Zoo-Code-Org/Zoo-Code is:pr reviewed-by:0xMink",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "zoo-loc-audited": {
+      "page": "85,900", "dom": true,
+      "text": "85,900 LOC AUDITED — POWER OF TEN",
+      "definition": "Lines of production source covered by the NASA Power-of-Ten rules audit over Zoo Code (396 files).",
+      "source": "Audit report in the Zoo Code engagement records",
+      "verify": "Audit artifact on request; file count reproducible from the repo tree.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "zoo-files-audited": {
+      "page": "396", "dom": false,
+      "text": "…audit over all 396 production source files (dossier prose)",
+      "definition": "Production source files in scope for the Power-of-Ten audit.",
+      "source": "Audit report",
+      "verify": "Reproducible from the repo tree at the audited commit.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "zoo-upstream-fixes": {
+      "page": "5", "dom": false,
+      "text": "Five fixes merged upstream into Roo Code itself (dossier prose)",
+      "definition": "PRs authored by @0xMink merged into RooCodeInc/Roo-Code.",
+      "source": "https://github.com/RooCodeInc/Roo-Code/pulls",
+      "verify": "GitHub search: repo:RooCodeInc/Roo-Code is:pr is:merged author:0xMink",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "iwm-brand-systems": {
+      "page": "1", "dom": true,
+      "text": "1 BRAND SYSTEM",
+      "definition": "Complete identity system shipped for Insure With Mink: logo, cards, print collateral, site.",
+      "source": "insurewithmink.com + client records",
+      "verify": "Live site; collateral on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+    },
+    "iwm-channels": {
+      "page": "4", "dom": true,
+      "text": "4 CHANNELS INSTRUMENTED",
+      "definition": "Marketing channels with end-to-end measurement for Insure With Mink (site, search, social content, email).",
+      "source": "Client engagement records",
+      "verify": "References on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "iwm-compliance": {
+      "page": "100%", "dom": true,
+      "text": "100% COMPLIANCE-GATED CONTENT",
+      "definition": "Every published marketing asset for the insurance practice passed a human compliance review before shipping.",
+      "source": "Content calendar + review log",
+      "verify": "Review log on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "iwm-t65": {
+      "page": "T-65", "dom": true,
+      "text": "T-65 CAMPAIGN OPS SPEC",
+      "definition": "Medicare turning-65 campaign operations specification — designer and ops briefs, on file.",
+      "source": "Client engagement records",
+      "verify": "Spec on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "airz-commits": {
+      "page": "412", "dom": true,
+      "text": "412 COMMITS, SOLE ENGINEER",
+      "definition": "Commits in the Comfort Airz platform repository, all authored by the operator, at the verification date.",
+      "source": "Private repository",
+      "verify": "References on request — private engagement.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "airz-proverif": {
+      "page": "4", "dom": true,
+      "text": "4 PROVERIF MODELS",
+      "definition": "ProVerif models with machine-checked results in the Comfort Airz repo (ratchet forward secrecy, capability chain, and supporting models).",
+      "source": "Private repository",
+      "verify": "Model files and prover output on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "airz-tla": {
+      "page": "3", "dom": true,
+      "text": "3 TLA+ SPECS, MODEL-CHECKED",
+      "definition": "TLA+ specifications with TLC traces on file (ForwardSecretRatchet, CellMigration, SchemaCoordinator).",
+      "source": "Private repository",
+      "verify": "Specs and TLC output on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "airz-platforms": {
+      "page": "2", "dom": true,
+      "text": "2 PLATFORMS — RUST + REACT NATIVE",
+      "definition": "Rust backend plus a React Native customer app.",
+      "source": "Private repository",
+      "verify": "References on request.",
+      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
+    },
+    "particle-budget": {
+      "page": "262,144", "dom": false,
+      "text": "262,144 particles simulated (loader + console report the actual seeded count)",
+      "definition": "Tier-1 desktop budget: the WebGL2 GPGPU engine simulates 262,144 particles (a 512² state texture); mobile and save-data contexts seed 65,536 (256²). The WebGL1 fallback tier seeds 42,000 / 16,000. The boot log and console print the count actually seeded at runtime, not this constant.",
+      "source": "src/gl2.js N; src/gl.js COUNT",
+      "verify": "Read the source; watch the boot log.",
+      "verified": "2026-07-17", "review_by": "2027-07-17", "visibility": "public"
+    },
+    "draw-calls": {
+      "page": "1", "dom": false,
+      "text": "1 draw call (console)",
+      "definition": "The particle field itself renders in a single GL_POINTS draw call in both engine tiers. Tier 1 adds one MRT simulation pass per frame, and the desktop post pipeline adds four fullscreen-quad passes; those are the dominant fill-rate cost, and this claim does not pretend otherwise.",
+      "source": "src/gl2.js frame(); src/gl.js frame()",
+      "verify": "Read the source or capture a frame in a GPU debugger.",
+      "verified": "2026-07-17", "review_by": "2027-07-17", "visibility": "public"
+    },
+    "external-requests": {
+      "page": "0", "dom": false,
+      "text": "0 external requests (console + footer)",
+      "definition": "Zero network requests during initial page load — fonts, styles, scripts, and favicon are inline. A configured lead endpoint makes one HTTPS POST on form submission; submitting is an explicit visitor action, not page load.",
+      "source": "dist/index.html",
+      "verify": "DevTools network panel on load.",
+      "verified": "2026-07-12", "review_by": "2027-07-12", "visibility": "public"
+    }
+  }
+} /* claims-json-end */;
+
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DMDS® — particle engine, tier 1 (WebGL2 GPGPU physical sim)
+   Positions and velocities live in RGBA32F textures; a fragment
+   pass integrates real forces every frame. One MRT sim pass, one
+   render draw. Spec: docs/superpowers/specs/2026-07-17-gpgpu-
+   physical-engine-design.md. Tier 2 (gl.js) is the fallback.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
+  var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
+  var DPR_CAP = MOBILE ? 1.5 : 1.75;
+  var DEPTH_FREE = -2.0; // position.w sentinel (spec: grab depth channel)
+
+  // ── debug/test configuration: only honored under ?debug=1 ──
+  var DEBUG = /[?&]debug=1/.test(location.search);
+  var N = (MOBILE || SAVEDATA) ? 256 : 512; // sim texture side; count = N*N
+  if (DEBUG) {
+    var m = location.search.match(/[?&]gl2n=(\d+)/);
+    if (m) N = Math.max(8, Math.min(1024, parseInt(m[1], 10)));
+  }
+
+  var CAM_Z = 26, FOV = 35 * Math.PI / 180;
+
+  // ── physics constants (models fixed by spec; numbers tuned by review) ──
+  var K_SPRING = 26.0;   // formation spring gain (scaled per-particle)
+  var K_DRAG = 5.2;      // time-based damping: v *= exp(-K_DRAG*dt)
+  var F_MAX = 900.0;     // force cap, world units/s²
+  var V_MAX = 90.0;      // velocity cap, world units/s
+  var DT_MAX = 1 / 30;   // dt clamp
+  var OOB = 60.0;        // out-of-bounds radius → reset to target
+  var EPS_SNAP = 0.012;  // settle deadband, world units (≈0.5 device px)
+  var V_SNAP = 0.06;
+
+  /* ═══ shaders ═══ */
+  var SIM_VS = "#version 300 es\nvoid main(){vec2 v=vec2(gl_VertexID==1?3.0:-1.0,gl_VertexID==2?3.0:-1.0);gl_Position=vec4(v,0.,1.);}";
+
+  var SIM_FS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uPos, uVel, uTargA, uTargB;",
+    "uniform float uDt, uTime, uMix, uNoise, uTurb, uExcite;",
+    "uniform vec3 uCursor;",
+    "uniform float uCursorStr;",
+    "uniform int uN;",
+    "layout(location=0) out vec4 oPos;",
+    "layout(location=1) out vec4 oVel;",
+    // particle identity from the output texel — gl_VertexID does not exist here
+    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "void main(){",
+    "  ivec2 c = ivec2(gl_FragCoord.xy);",
+    "  float id = float(c.y * uN + c.x);",
+    "  vec4 P = texelFetch(uPos, c, 0);",
+    "  vec4 V = texelFetch(uVel, c, 0);",
+    "  vec3 p = P.xyz, v = V.xyz;",
+    "  float r1 = hash11(id * 0.1031 + 0.13), r2 = hash11(id * 0.2711 + 0.53),",
+    "        r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
+    // staggered morph: each particle chases its own blend of the two targets
+    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
+    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  vec3 target = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stag);",
+    // forces: formation spring (per-particle gain), turbulence, cursor, then drag
+    "  vec3 F = " + K_SPRING.toFixed(1) + " * (0.55 + r2 * 0.9) * (target - p);",
+    "  float sw = uMix * (1.0 - uMix) * 4.0;",
+    "  float amp = (uTurb + uNoise * (0.5 + r3) * uExcite + sw * 2.1) * 34.0;",
+    "  F += vec3(",
+    "    sin(p.y * 0.35 + uTime * 0.9 + r4 * 6.283),",
+    "    sin(p.z * 0.30 + uTime * 0.8 + r1 * 6.283),",
+    "    sin(p.x * 0.32 + uTime * 0.7 + r2 * 6.283)",
+    "  ) * amp * (0.6 + r3 * 1.4);",
+    "  vec3 d = p - uCursor;",
+    "  float d2 = dot(d.xy, d.xy);",
+    "  F.xy += normalize(d.xy + 0.0001) * exp(-d2 * 0.14) * uCursorStr * 140.0;",
+    "  float fl = length(F);",
+    "  if (fl > " + F_MAX.toFixed(1) + ") F *= " + F_MAX.toFixed(1) + " / fl;",
+    // semi-implicit Euler with time-based damping (60/120/144 Hz identical)
+    "  v += F * uDt;",
+    "  v *= exp(-" + K_DRAG.toFixed(1) + " * uDt);",
+    "  float vl = length(v);",
+    "  if (vl > " + V_MAX.toFixed(1) + ") v *= " + V_MAX.toFixed(1) + " / vl;",
+    "  p += v * uDt;",
+    // settle deadband: at rest the formation actually converges (crisp-lock)
+    "  if (uExcite < 0.05 && distance(p, target) < " + EPS_SNAP.toFixed(3) + " && length(v) < " + V_SNAP.toFixed(2) + ") {",
+    "    p = target; v = vec3(0.0);",
+    "  }",
+    // finite-value recovery: reassembly always wins
+    "  bvec3 bad = bvec3(isnan(p.x) || isinf(p.x), isnan(p.y) || isinf(p.y), isnan(p.z) || isinf(p.z));",
+    "  if (any(bad) || length(p) > " + OOB.toFixed(1) + ") { p = target; v = vec3(0.0); }",
+    "  oPos = vec4(p, P.w);",
+    "  oVel = vec4(v, V.w);",
+    "}"
+  ].join("\n");
+
+  var REN_VS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uPos;",
+    "uniform int uN;",
+    "uniform mat4 uProj, uView;",
+    "uniform float uTime, uSize;",
+    "out float vMix;",
+    "out float vTwinkle;",
+    "out float vDepth;",
+    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "void main(){",
+    "  ivec2 c = ivec2(gl_VertexID % uN, gl_VertexID / uN);",
+    "  float id = float(gl_VertexID);",
+    "  vec3 pos = texelFetch(uPos, c, 0).xyz;",
+    "  float r2 = hash11(id * 0.2711 + 0.53), r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
+    "  vec4 mv = uView * vec4(pos, 1.0);",
+    "  gl_Position = uProj * mv;",
+    "  float att = clamp(18.0 / -mv.z, 0.2, 2.2);",
+    "  gl_PointSize = uSize * (0.55 + r3 * 0.9) * att;",
+    "  vMix = r2;",
+    "  vTwinkle = 0.62 + 0.38 * sin(uTime * 1.7 + r4 * 6.283);",
+    "  vDepth = clamp((-mv.z - 14.0) / 26.0, 0.0, 1.0);",
+    "}"
+  ].join("\n");
+
+  var REN_FS = [
+    "#version 300 es",
+    "precision mediump float;",
+    "uniform vec3 uBone, uSignal;",
+    "uniform float uDim;",
+    "in float vMix;",
+    "in float vTwinkle;",
+    "in float vDepth;",
+    "out vec4 outColor;",
+    "void main(){",
+    "  vec2 c = gl_PointCoord - 0.5;",
+    "  float a = smoothstep(0.5, 0.08, length(c));",
+    "  vec3 col = mix(uBone, uSignal, step(0.88, vMix));",
+    "  a *= vTwinkle * mix(1.0, 0.35, vDepth) * uDim;",
+    "  outColor = vec4(col * a, a);",
+    "}"
+  ].join("\n");
+
+  // post shaders: GLSL ES 1.00 ports from gl.js — valid on a WebGL2 context
+  var QUAD_VS = [
+    "precision mediump float;",
+    "attribute vec2 aXY;",
+    "varying vec2 vUv;",
+    "void main(){ vUv = aXY * 0.5 + 0.5; gl_Position = vec4(aXY, 0.0, 1.0); }"
+  ].join("\n");
+  var FADE_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uTex;",
+    "uniform float uDecay;",
+    "varying vec2 vUv;",
+    "void main(){ gl_FragColor = texture2D(uTex, vUv) * uDecay; }"
+  ].join("\n");
+  var BLUR_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uTex;",
+    "uniform vec2 uDir;",
+    "varying vec2 vUv;",
+    "void main(){",
+    "  vec4 c = texture2D(uTex, vUv) * 0.227;",
+    "  c += (texture2D(uTex, vUv + uDir * 1.384) + texture2D(uTex, vUv - uDir * 1.384)) * 0.316;",
+    "  c += (texture2D(uTex, vUv + uDir * 3.230) + texture2D(uTex, vUv - uDir * 3.230)) * 0.070;",
+    "  gl_FragColor = c;",
+    "}"
+  ].join("\n");
+  var COMP_FS = [
+    "precision mediump float;",
+    "uniform sampler2D uField;",
+    "uniform sampler2D uGlow;",
+    "uniform float uPostMix;",
+    "varying vec2 vUv;",
+    "void main(){",
+    "  vec2 c = vUv - 0.5;",
+    "  float r = length(c);",
+    "  float k = 0.0045 * r * uPostMix;",
+    "  vec3 field;",
+    "  field.r = texture2D(uField, vUv + c * k).r;",
+    "  field.g = texture2D(uField, vUv).g;",
+    "  field.b = texture2D(uField, vUv - c * k).b;",
+    "  vec3 glow = texture2D(uGlow, vUv).rgb;",
+    "  vec3 bg = mix(vec3(0.082, 0.080, 0.088), vec3(0.043, 0.043, 0.047), smoothstep(0.0, 1.0, distance(vUv, vec2(0.72, 0.92))));",
+    "  vec3 col = bg + field + glow * (0.35 + 0.8 * uPostMix);",
+    "  col *= 1.0 - 0.38 * smoothstep(0.5, 1.1, r);",
+    "  col += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;",
+    "  gl_FragColor = vec4(col, 1.0);",
+    "}"
+  ].join("\n");
+
+  /* ═══ small kit ═══ */
+  function perspective(fovy, aspect, near, far) {
+    var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  }
+  function viewMatrix(rx, ry, z) {
+    var cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
+    return [cy, sx * sy, -cx * sy, 0, 0, cx, sx, 0, sy, -sx * cy, cx * cy, 0, 0, 0, -z, 1];
+  }
+  function compile(gl, type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function makeProgram(gl, vs, fs) {
+    var p = gl.createProgram();
+    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  var state = {
+    gl: null, canvas: null, ready: false, running: false, destroyed: false,
+    // GPGPU
+    posT: [null, null], velT: [null, null], simFbo: [null, null], cur: 0,
+    targA: null, targB: null, simProg: null, simLoc: {}, vao: null,
+    renProg: null, renLoc: {},
+    // formations (CPU xyz arrays at current N)
+    formations: {}, currentName: null, pairA: null, pairB: null,
+    mix: 1, mode: "tween", tweenDur: 1.5, morphStart: 0, morphDur: REDUCED ? 0.01 : 1.5,
+    time: 0, lastT: 0, turb: 0, turbTarget: 0, excite: 1,
+    mouse: { x: 0, y: 0, wx: 0, wy: 0, str: 0, strTarget: 0 },
+    dim: 1, dimTarget: 1, rot: { x: 0, y: 0 },
+    fps: 60, frames: 0, fpsT: 0, hw: 8, hh: 8,
+    post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
+    trailA: null, trailB: null, glowA: null, glowB: null, enabledAttribs: [],
+    ms: null, firstFrame: false,
+    listeners: [], raf: 0
+  };
+
+  function milestone(kind, detail) {
+    if (state.ms) { try { state.ms(kind, detail); } catch (e) {} }
+  }
+  function listen(target, ev, fn) {
+    target.addEventListener(ev, fn);
+    state.listeners.push([target, ev, fn]);
+  }
+  function worldExtents() {
+    var hh = CAM_Z * Math.tan(FOV / 2);
+    state.hh = hh;
+    state.hw = hh * (state.canvas.width / state.canvas.height);
+  }
+
+  /* ═══ formation generators — identical world-space math to gl.js,
+     COUNT = N*N; ported so the two tiers speak the same shapes ═══ */
+  var COUNT = N * N;
+  var R = (function () { var s = 1234567; return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })();
+  function gauss() { return (R() + R() + R() - 1.5) * 0.82; }
+
+  function genAmbient() {
+    var a = new Float32Array(COUNT * 3);
+    for (var i = 0; i < COUNT; i++) {
+      a[i * 3] = (R() * 2 - 1) * state.hw * 1.15;
+      a[i * 3 + 1] = (R() * 2 - 1) * state.hh * 1.15;
+      a[i * 3 + 2] = (R() * 2 - 1) * 9;
+    }
+    return a;
+  }
+  function genLogo(pts) {
+    var a = new Float32Array(COUNT * 3);
+    var targetW = Math.min(state.hw * 1.5, state.hw * 2 * 0.78);
+    var targetH = targetW / pts.aspect;
+    var maxH = state.hh * 1.1;
+    if (targetH > maxH) { targetH = maxH; targetW = targetH * pts.aspect; }
+    var n = pts.xy.length / 2;
+    for (var i = 0; i < COUNT; i++) {
+      var j = (i % n) * 2;
+      a[i * 3] = (pts.xy[j] - 0.5) * targetW + gauss() * 0.045;
+      a[i * 3 + 1] = (pts.xy[j + 1] - 0.5) * targetH + gauss() * 0.045 + state.hh * 0.06;
+      a[i * 3 + 2] = gauss() * 0.7;
+    }
+    return a;
+  }
+  function shiftX(kind) {
+    if (MOBILE || state.hw < state.hh) return 0;
+    return (kind === "left" ? -0.42 : 0.42) * state.hw;
+  }
+  function genGrid() {
+    var a = new Float32Array(COUNT * 3);
+    var cx = shiftX("right");
+    var cols = Math.floor(Math.sqrt(COUNT));
+    var w = Math.min(state.hw * 0.95, 13), d = 16;
+    for (var i = 0; i < COUNT; i++) {
+      var gx = (i % cols) / (cols - 1), gz = Math.floor(i / cols) / (cols - 1);
+      var x = (gx - 0.5) * w, z = (gz - 0.5) * d;
+      var y = -3.2 + Math.sin(x * 0.9) * Math.cos(z * 0.7) * 1.1 + Math.sin(z * 1.3) * 0.5;
+      a[i * 3] = x + cx; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+    }
+    return a;
+  }
+  function genDevice() {
+    var a = new Float32Array(COUNT * 3);
+    var cx = shiftX("left");
+    var W = 5.6, H = 11.2, r = 1.3;
+    var perim = 2 * (W - 2 * r) + 2 * (H - 2 * r) + 2 * Math.PI * r;
+    for (var i = 0; i < COUNT; i++) {
+      var pick = R(), x, y, z;
+      if (pick < 0.52) {
+        var t = R() * perim, hw2 = W / 2, hh2 = H / 2;
+        var straightW = W - 2 * r, straightH = H - 2 * r, arc = Math.PI * r / 2;
+        if (t < straightW) { x = -straightW / 2 + t; y = hh2; }
+        else if ((t -= straightW) < arc) { var a1 = t / r; x = straightW / 2 + Math.sin(a1) * r; y = hh2 - r + Math.cos(a1) * r; }
+        else if ((t -= arc) < straightH) { x = hw2; y = hh2 - r - t; }
+        else if ((t -= straightH) < arc) { var a2 = t / r; x = hw2 - r + Math.cos(a2) * r; y = -hh2 + r - Math.sin(a2) * r; }
+        else if ((t -= arc) < straightW) { x = hw2 - r - t; y = -hh2; }
+        else if ((t -= straightW) < arc) { var a3 = t / r; x = -straightW / 2 - Math.sin(a3) * r; y = -hh2 + r - Math.cos(a3) * r; }
+        else if ((t -= arc) < straightH) { x = -hw2; y = -hh2 + r + t; }
+        else { var a4 = (t - straightH) / r; x = -hw2 + r - Math.cos(a4) * r; y = hh2 - r + Math.sin(a4) * r; }
+        z = (Math.floor(R() * 3) - 1) * 0.35;
+        x += gauss() * 0.03; y += gauss() * 0.03;
+      } else if (pick < 0.62) {
+        x = (R() - 0.5) * 1.6; y = H / 2 - 1.05 + (R() - 0.5) * 0.22; z = 0.2;
+      } else if (pick < 0.9) {
+        var row = Math.floor(R() * 4);
+        var bw = [3.8, 4.4, 2.9, 4.1][row];
+        x = (R() - 0.5) * bw;
+        y = 2.2 - row * 1.7 + (R() - 0.5) * 0.42;
+        z = 0.1;
+      } else {
+        if (R() < 0.5) { x = (R() - 0.5) * 2.2; y = -H / 2 + 0.7; z = 0.15; }
+        else { x = (R() - 0.5) * (W - 1); y = (R() - 0.5) * (H - 1); z = -0.3; }
+      }
+      a[i * 3] = x + cx; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+    }
+    return a;
+  }
+  function genNeural() {
+    var a = new Float32Array(COUNT * 3);
+    var cx = shiftX("right");
+    var NN = 34, nodes = [];
+    for (var k = 0; k < NN; k++) {
+      var ph = Math.acos(1 - 2 * (k + 0.5) / NN), th = Math.PI * (1 + Math.sqrt(5)) * k;
+      var rad = 5.4;
+      nodes.push([rad * Math.sin(ph) * Math.cos(th), rad * Math.cos(ph), rad * Math.sin(ph) * Math.sin(th)]);
+    }
+    var edges = [];
+    for (var mI = 0; mI < NN; mI++) {
+      var dists = [];
+      for (var n2 = 0; n2 < NN; n2++) if (n2 !== mI) {
+        var dx = nodes[mI][0] - nodes[n2][0], dy = nodes[mI][1] - nodes[n2][1], dz = nodes[mI][2] - nodes[n2][2];
+        dists.push([dx * dx + dy * dy + dz * dz, n2]);
+      }
+      dists.sort(function (p, q) { return p[0] - q[0]; });
+      edges.push([mI, dists[0][1]], [mI, dists[1][1]], [mI, dists[2][1]]);
+    }
+    for (var i = 0; i < COUNT; i++) {
+      var x, y, z;
+      if (R() < 0.42) {
+        var nd = nodes[Math.floor(R() * NN)];
+        x = nd[0] + gauss() * 0.34; y = nd[1] + gauss() * 0.34; z = nd[2] + gauss() * 0.34;
+      } else {
+        var e = edges[Math.floor(R() * edges.length)];
+        var t2 = R(), p1 = nodes[e[0]], p2 = nodes[e[1]];
+        x = p1[0] + (p2[0] - p1[0]) * t2 + gauss() * 0.06;
+        y = p1[1] + (p2[1] - p1[1]) * t2 + gauss() * 0.06;
+        z = p1[2] + (p2[2] - p1[2]) * t2 + gauss() * 0.06;
+      }
+      a[i * 3] = x + cx; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+    }
+    return a;
+  }
+  function genCurve() {
+    var a = new Float32Array(COUNT * 3);
+    var cx = shiftX("left");
+    var W = Math.min(state.hw * 0.9, 13);
+    for (var i = 0; i < COUNT; i++) {
+      var pick = R(), x, y, z;
+      var curveY = function (t) { return -4 + 8.4 / (1 + Math.exp(-(t - 0.55) * 6.5)); };
+      if (pick < 0.5) {
+        var bar = Math.floor(R() * 7);
+        var bx = (bar / 6 - 0.5) * W * 0.92;
+        var bh = 0.8 + Math.pow(bar / 6, 1.6) * 6.4;
+        x = bx + (R() - 0.5) * (W / 11);
+        y = -4.3 + R() * bh;
+        z = (R() - 0.5) * 1.4;
+      } else if (pick < 0.9) {
+        var t = R();
+        x = (t - 0.5) * W;
+        y = curveY(t) + gauss() * 0.16 + 0.6;
+        z = (R() - 0.5) * 0.8;
+      } else {
+        var s = R(), branch = R() < 0.5 ? 1 : -1;
+        var tipX = W / 2 + 0.2, tipY = curveY(1) + 0.75;
+        x = tipX - s * 1.5;
+        y = tipY - s * 1.5 * branch * (branch > 0 ? 0.15 : 1);
+        if (branch > 0) { y = tipY - s * 0.25; x = tipX - s * 1.7; y = tipY - s * 1.55; }
+        else { x = tipX - s * 1.9; y = tipY - s * 0.35; }
+        x += gauss() * 0.05; y += gauss() * 0.05; z = (R() - 0.5) * 0.5;
+      }
+      a[i * 3] = x + cx; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
+    }
+    return a;
+  }
+
+  var textCache = {};
+  function sampleText(str) {
+    if (textCache[str]) return textCache[str];
+    var ch = 360, fontSpec = "600 250px 'Clash Display', Arial";
+    var probe = document.createElement("canvas").getContext("2d");
+    probe.font = fontSpec;
+    var cw = Math.max(200, Math.ceil(probe.measureText(str).width) + 100);
+    var c = document.createElement("canvas");
+    c.width = cw; c.height = ch;
+    var ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.fillStyle = "#fff";
+    ctx.font = fontSpec;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(str, cw / 2, ch / 2 + 14);
+    var img = ctx.getImageData(0, 0, cw, ch).data;
+    var step = Math.max(2, Math.round(Math.sqrt((cw * ch) / 55000)));
+    var xy = [];
+    var minX = cw, maxX = 0, minY = ch, maxY = 0;
+    for (var y = 0; y < ch; y += step) {
+      for (var x = 0; x < cw; x += step) {
+        if (img[(y * cw + x) * 4 + 3] > 128) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    var bw = maxX - minX || 1, bh = maxY - minY || 1;
+    for (var y2 = 0; y2 < ch; y2 += step) {
+      for (var x2 = 0; x2 < cw; x2 += step) {
+        if (img[(y2 * cw + x2) * 4 + 3] > 128) {
+          xy.push((x2 - minX) / bw, 1 - (y2 - minY) / bh);
+        }
+      }
+    }
+    var out = { xy: xy, aspect: bw / bh };
+    if (xy.length) textCache[str] = out;
+    return out;
+  }
+
+  /* ═══ GPGPU resources ═══ */
+  function makeStateTex(gl, data) {
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, N, N, 0, gl.RGBA, gl.FLOAT, data || null);
+    return t;
+  }
+  function makeTargetTex(gl) {
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, N, N, 0, gl.RGBA, gl.FLOAT, null);
+    return t;
+  }
+  var targScratch = null; // reused RGBA staging array
+  function uploadTarget(gl, tex, xyz) {
+    if (!targScratch) targScratch = new Float32Array(COUNT * 4);
+    for (var i = 0; i < COUNT; i++) {
+      targScratch[i * 4] = xyz[i * 3];
+      targScratch[i * 4 + 1] = xyz[i * 3 + 1];
+      targScratch[i * 4 + 2] = xyz[i * 3 + 2];
+      targScratch[i * 4 + 3] = 0;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, targScratch);
+  }
+
+  function makeFBO(gl, w, h) {
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!ok) throw new Error("fbo incomplete");
+    return { tex: tex, fb: fb, w: w, h: h };
+  }
+  function destroyFBO(gl, f) {
+    if (!f) return;
+    gl.deleteTexture(f.tex);
+    gl.deleteFramebuffer(f.fb);
+  }
+  function allocPostTargets() {
+    var gl = state.gl, w = state.canvas.width, h = state.canvas.height;
+    ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
+    state.trailA = makeFBO(gl, w, h);
+    state.trailB = makeFBO(gl, w, h);
+    var qw = Math.max(2, w >> 2), qh = Math.max(2, h >> 2);
+    state.glowA = makeFBO(gl, qw, qh);
+    state.glowB = makeFBO(gl, qw, qh);
+  }
+
+  function buildGLResources() {
+    var gl = state.gl;
+
+    // sim: two RGBA32F ping-pong pairs behind two MRT FBOs
+    var seed = new Float32Array(COUNT * 4);
+    // seeded from an ambient scatter so first assembly is physical
+    var scattered = genAmbient();
+    for (var i = 0; i < COUNT; i++) {
+      seed[i * 4] = scattered[i * 3];
+      seed[i * 4 + 1] = scattered[i * 3 + 1];
+      seed[i * 4 + 2] = scattered[i * 3 + 2];
+      seed[i * 4 + 3] = DEPTH_FREE;
+    }
+    state.posT = [makeStateTex(gl, seed), makeStateTex(gl, null)];
+    state.velT = [makeStateTex(gl, null), makeStateTex(gl, null)];
+    for (var d = 0; d < 2; d++) {
+      var fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.posT[d], 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, state.velT[d], 0);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("sim fbo incomplete");
+      state.simFbo[d] = fb;
+    }
+    state.cur = 0;
+    state.targA = makeTargetTex(gl);
+    state.targB = makeTargetTex(gl);
+
+    state.vao = gl.createVertexArray();
+    state.simProg = makeProgram(gl, SIM_VS, SIM_FS);
+    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uN"].forEach(function (n) {
+      state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
+    });
+    state.renProg = makeProgram(gl, REN_VS, REN_FS);
+    ["uPos", "uN", "uProj", "uView", "uTime", "uSize", "uBone", "uSignal", "uDim"].forEach(function (n) {
+      state.renLoc[n] = gl.getUniformLocation(state.renProg, n);
+    });
+    gl.useProgram(state.renProg);
+    gl.uniform3f(state.renLoc.uBone, 0.93, 0.92, 0.89);
+    gl.uniform3f(state.renLoc.uSignal, 1.0, 0.29, 0.0);
+
+    gl.clearColor(0, 0, 0, 0);
+    gl.disable(gl.DEPTH_TEST);
+
+    // post pipeline (desktop, not Save-Data)
+    state.post = false;
+    if (!MOBILE && !SAVEDATA) {
+      try {
+        var pf = makeProgram(gl, QUAD_VS, FADE_FS);
+        state.progFade = { p: pf, aXY: gl.getAttribLocation(pf, "aXY"), uTex: gl.getUniformLocation(pf, "uTex"), uDecay: gl.getUniformLocation(pf, "uDecay") };
+        var pb = makeProgram(gl, QUAD_VS, BLUR_FS);
+        state.progBlur = { p: pb, aXY: gl.getAttribLocation(pb, "aXY"), uTex: gl.getUniformLocation(pb, "uTex"), uDir: gl.getUniformLocation(pb, "uDir") };
+        var pc = makeProgram(gl, QUAD_VS, COMP_FS);
+        state.progComp = { p: pc, aXY: gl.getAttribLocation(pc, "aXY"), uTex: gl.getUniformLocation(pc, "uField"), uGlow: gl.getUniformLocation(pc, "uGlow"), uPostMix: gl.getUniformLocation(pc, "uPostMix") };
+        state.quadBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, state.quadBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        state.post = true;
+        allocPostTargets();
+      } catch (e) {
+        state.post = false;
+      }
+    }
+  }
+
+  function useAttribs(list) {
+    var gl = state.gl;
+    var want = {};
+    list.forEach(function (a) { want[a.loc] = true; });
+    state.enabledAttribs.forEach(function (l) { if (!want[l]) gl.disableVertexAttribArray(l); });
+    list.forEach(function (a) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, a.buf);
+      gl.enableVertexAttribArray(a.loc);
+      gl.vertexAttribPointer(a.loc, a.size, gl.FLOAT, false, 0, 0);
+    });
+    state.enabledAttribs = list.map(function (a) { return a.loc; });
+  }
+  function drawQuad(prog, tex, uniforms) {
+    var gl = state.gl;
+    gl.useProgram(prog.p);
+    useAttribs([{ loc: prog.aXY, buf: state.quadBuf, size: 2 }]);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(prog.uTex, 0);
+    if (uniforms) uniforms();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  function resize() {
+    var c = state.canvas, dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    var w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+    if (c.width !== w || c.height !== h) {
+      c.width = w; c.height = h;
+      state.gl.viewport(0, 0, w, h);
+      if (state.post) {
+        try { allocPostTargets(); } catch (e) { state.post = false; }
+      }
+    }
+    worldExtents();
+  }
+
+  function rebuildFormations() {
+    state.formations = {
+      logo: genLogo(sampleText("DMDS")),
+      ambient: genAmbient(),
+      grid: genGrid(),
+      device: genDevice(),
+      neural: genNeural(),
+      curve: genCurve()
+    };
+    state.pairA = null; state.pairB = null;
+  }
+  function formationFor(name) {
+    if (state.formations[name]) return state.formations[name];
+    if (name && name.indexOf("text:") === 0) {
+      var pts = sampleText(name.slice(5));
+      if (!pts.xy.length) return null;
+      var f = genLogo(pts);
+      state.formations[name] = f;
+      return f;
+    }
+    return null;
+  }
+
+  function excite(v) { state.excite = Math.min(1, Math.max(state.excite, v)); }
+
+  function setFormation(name, instant, dur) {
+    if (!state.ready || name === state.currentName) return;
+    var target = formationFor(name);
+    if (!target) return;
+    var gl = state.gl;
+    // physical engine: particles are wherever they are — the outgoing
+    // blend becomes the new A so the spring path stays continuous
+    var prev = formationFor(state.currentName) || target;
+    uploadTarget(gl, state.targA, state.mix >= 1 ? prev : blendedTargets());
+    uploadTarget(gl, state.targB, target);
+    state.currentName = name;
+    state.pairA = null; state.pairB = null;
+    state.mode = "tween";
+    state.tweenDur = REDUCED ? 0.01 : (dur || state.morphDur);
+    state.mix = instant ? 1 : 0;
+    state.morphStart = state.time;
+    excite(1);
+  }
+  // CPU blend of the current pair at the current mix — used to freeze a
+  // mid-morph state into slot A when a new formation interrupts
+  var blendScratch = null;
+  function blendedTargets() {
+    if (!blendScratch) blendScratch = new Float32Array(COUNT * 3);
+    var a = formationFor(state.pairA || state.currentName) || state.formations.ambient;
+    var b = formationFor(state.pairB || state.currentName) || a;
+    var t = smooth01(state.mix);
+    for (var i = 0; i < COUNT * 3; i++) blendScratch[i] = a[i] + (b[i] - a[i]) * t;
+    return blendScratch;
+  }
+  function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
+
+  function setMorphPair(a, b, t) {
+    if (!state.ready) return;
+    if (state.pairA !== a || state.pairB !== b) {
+      var fa = formationFor(a), fb = formationFor(b);
+      if (!fa || !fb) return;
+      uploadTarget(state.gl, state.targA, fa);
+      uploadTarget(state.gl, state.targB, fb);
+      state.pairA = a; state.pairB = b;
+    }
+    state.mode = "scrub";
+    var prev = state.mix;
+    state.mix = Math.max(0, Math.min(1, t));
+    state.currentName = state.mix >= 0.5 ? b : a;
+    if (Math.abs(state.mix - prev) > 0.002) excite(Math.min(1, 0.4 + Math.abs(state.mix - prev) * 30));
+  }
+
+  function frame(now) {
+    if (!state.running) return;
+    state.raf = requestAnimationFrame(frame);
+    var gl = state.gl;
+    now *= 0.001;
+    var dt = Math.min(now - state.lastT, DT_MAX) || 0.016;
+    if (dt <= 0) dt = 0.016;
+    state.lastT = now;
+    state.time = now;
+
+    state.frames++;
+    if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
+    if (!state.firstFrame) { state.firstFrame = true; milestone("loop"); }
+
+    if (state.mode === "tween" && state.mix < 1) {
+      state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
+      excite(0.6 + state.mix * (1 - state.mix));
+    }
+
+    state.mouse.str += (state.mouse.strTarget - state.mouse.str) * (1 - Math.exp(-8 * dt));
+    state.dim += (state.dimTarget - state.dim) * (1 - Math.exp(-5 * dt));
+    state.turb += (state.turbTarget - state.turb) * (1 - Math.exp(-4 * dt));
+    state.turbTarget *= Math.exp(-2.2 * dt);
+    // excitement decays toward rest; crisp-lock rides this scalar
+    state.excite *= Math.exp(-dt / 1.2);
+    if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
+
+    var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
+    var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
+
+    // ── sim pass: one MRT draw ──
+    var nxt = 1 - state.cur;
+    gl.bindVertexArray(state.vao);
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[nxt]);
+    gl.viewport(0, 0, N, N);
+    gl.useProgram(state.simProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, state.targA);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, state.targB);
+    gl.uniform1i(state.simLoc.uPos, 0);
+    gl.uniform1i(state.simLoc.uVel, 1);
+    gl.uniform1i(state.simLoc.uTargA, 2);
+    gl.uniform1i(state.simLoc.uTargB, 3);
+    gl.uniform1f(state.simLoc.uDt, REDUCED ? Math.min(dt, 1 / 60) : dt);
+    gl.uniform1f(state.simLoc.uTime, now);
+    gl.uniform1f(state.simLoc.uMix, state.mode === "scrub" ? smooth01(state.mix) : state.mix);
+    gl.uniform1f(state.simLoc.uNoise, REDUCED ? 0 : 0.085);
+    gl.uniform1f(state.simLoc.uTurb, state.turb);
+    gl.uniform1f(state.simLoc.uExcite, REDUCED ? 0 : state.excite);
+    gl.uniform3f(state.simLoc.uCursor, state.mouse.wx, state.mouse.wy, 0);
+    gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
+    gl.uniform1i(state.simLoc.uN, N);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    state.cur = nxt;
+    gl.bindVertexArray(null);
+
+    // ── render pass ──
+    function drawPoints() {
+      gl.useProgram(state.renProg);
+      state.enabledAttribs.forEach(function (l) { gl.disableVertexAttribArray(l); });
+      state.enabledAttribs = [];
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+      gl.uniform1i(state.renLoc.uPos, 0);
+      gl.uniform1i(state.renLoc.uN, N);
+      gl.uniformMatrix4fv(state.renLoc.uProj, false, perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100));
+      gl.uniformMatrix4fv(state.renLoc.uView, false, viewMatrix(rx, ry, CAM_Z));
+      gl.uniform1f(state.renLoc.uTime, now);
+      gl.uniform1f(state.renLoc.uSize, (MOBILE ? 1.35 : 1.6) * Math.min(window.devicePixelRatio || 1, DPR_CAP));
+      gl.uniform1f(state.renLoc.uDim, state.dim);
+      gl.drawArrays(gl.POINTS, 0, COUNT);
+    }
+
+    // crisp-lock: post intensity follows excitement
+    var postMix = Math.min(1, state.excite * 1.6);
+
+    if (state.post) {
+      var W = state.canvas.width, H = state.canvas.height;
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.trailB.fb);
+      gl.viewport(0, 0, W, H);
+      drawQuad(state.progFade, state.trailA.tex, function () {
+        // trails die fast at rest (decay rate rises as excitement falls)
+        gl.uniform1f(state.progFade.uDecay, REDUCED ? 0.0 : Math.exp(-dt * (9 + (1 - postMix) * 30)));
+      });
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      drawPoints();
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.glowA.fb);
+      gl.viewport(0, 0, state.glowA.w, state.glowA.h);
+      drawQuad(state.progBlur, state.trailB.tex, function () {
+        gl.uniform2f(state.progBlur.uDir, 1 / state.glowA.w, 0);
+      });
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.glowB.fb);
+      gl.viewport(0, 0, state.glowB.w, state.glowB.h);
+      drawQuad(state.progBlur, state.glowA.tex, function () {
+        gl.uniform2f(state.progBlur.uDir, 0, 1 / state.glowB.h);
+      });
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+      drawQuad(state.progComp, state.trailB.tex, function () {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, state.glowB.tex);
+        gl.uniform1i(state.progComp.uGlow, 1);
+        gl.uniform1f(state.progComp.uPostMix, postMix);
+        gl.activeTexture(gl.TEXTURE0);
+      });
+      var t = state.trailA; state.trailA = state.trailB; state.trailB = t;
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, state.canvas.width, state.canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      drawPoints();
+    }
+  }
+
+  /* ═══ capability probe — throwaway canvas, production shape ═══ */
+  function probe() {
+    try {
+      var c = document.createElement("canvas");
+      c.width = 8; c.height = 8;
+      var gl = c.getContext("webgl2", { antialias: false });
+      if (!gl) return false;
+      if (!gl.getExtension("EXT_color_buffer_float")) return false;
+      var PN = 4;
+      var mk = function (fmt) {
+        var t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, fmt, PN, PN, 0, gl.RGBA, gl.FLOAT, null);
+        return t;
+      };
+      var a = mk(gl.RGBA32F), b = mk(gl.RGBA32F);
+      var fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, a, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, b, 0);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      // 16F sampled target
+      var t16 = mk(gl.RGBA16F);
+      ok = ok && gl.getError() === gl.NO_ERROR;
+      gl.deleteTexture(a); gl.deleteTexture(b); gl.deleteTexture(t16);
+      gl.deleteFramebuffer(fb);
+      var lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* ═══ lifecycle ═══ */
+  function destroy() {
+    var gl = state.gl;
+    state.running = false;
+    state.ready = false;
+    state.destroyed = true;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
+    state.listeners = [];
+    if (gl) {
+      try {
+        [state.posT[0], state.posT[1], state.velT[0], state.velT[1], state.targA, state.targB].forEach(function (t) { if (t) gl.deleteTexture(t); });
+        state.simFbo.forEach(function (f) { if (f) gl.deleteFramebuffer(f); });
+        [state.simProg, state.renProg].forEach(function (p) { if (p) gl.deleteProgram(p); });
+        [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
+        if (state.quadBuf) gl.deleteBuffer(state.quadBuf);
+        if (state.vao) gl.deleteVertexArray(state.vao);
+        ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
+      } catch (e) {}
+    }
+    state.gl = null;
+  }
+
+  var RESTORE_TIMEOUT = 4000;
+  var restoreTimer = 0;
+
+  function init(canvas, onMilestone) {
+    state.canvas = canvas;
+    state.ms = onMilestone || null;
+
+    // test hook: injected compile failure must reach the fallback path
+    if (DEBUG && window.__DMDS_GL2_BREAK__) return Promise.reject(new Error("injected failure"));
+
+    if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
+
+    var gl = canvas.getContext("webgl2", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
+    if (!gl) return Promise.reject(new Error("no webgl2 on visible canvas"));
+    state.gl = gl;
+    if (!gl.getExtension("EXT_color_buffer_float")) return Promise.reject(new Error("no float render"));
+
+    resize();
+    try { buildGLResources(); } catch (e) { destroy(); return Promise.reject(e); }
+    milestone("compile", "sim");
+    milestone("post", state.post);
+
+    listen(canvas, "webglcontextlost", function (e) {
+      e.preventDefault();
+      state.running = false;
+      if (window.console) console.warn("[DMDS] gl2 context lost — render paused");
+      // spec: no restoration within 4s → the page's engine boot chain
+      // owns replacement; we surface it via status().running + onLost
+      restoreTimer = setTimeout(function () {
+        if (!state.running && state.onLostTimeout) state.onLostTimeout();
+      }, RESTORE_TIMEOUT);
+    });
+    listen(canvas, "webglcontextrestored", function () {
+      clearTimeout(restoreTimer);
+      try {
+        state.enabledAttribs = [];
+        buildGLResources();
+        state.gl.viewport(0, 0, state.canvas.width, state.canvas.height);
+        // rebuild directly into the current formation at current size
+        var curF = formationFor(state.currentName) || state.formations.ambient;
+        uploadTarget(state.gl, state.targA, curF);
+        uploadTarget(state.gl, state.targB, curF);
+        state.mix = 1;
+        state.running = true;
+        state.lastT = performance.now() * 0.001;
+        state.raf = requestAnimationFrame(frame);
+        if (window.console) console.info("[DMDS] gl2 context restored");
+      } catch (err) {
+        state.running = false;
+        if (state.onLostTimeout) state.onLostTimeout();
+      }
+    });
+
+    var fontsReady = (document.fonts && document.fonts.load)
+      ? document.fonts.load("600 250px 'Clash Display'").then(function () { return document.fonts.ready; })
+      : Promise.resolve();
+
+    return fontsReady.then(function () {
+      if (state.destroyed) throw new Error("destroyed during init");
+      rebuildFormations();
+      milestone("seed", COUNT);
+
+      uploadTarget(gl, state.targA, state.formations.ambient);
+      uploadTarget(gl, state.targB, state.formations.logo);
+      state.currentName = "logo";
+      state.mix = 0;
+      state.morphStart = 0;
+      state.mode = "tween";
+      state.tweenDur = state.morphDur = REDUCED ? 0.01 : 2.2;
+      state.excite = 1;
+      state.ready = true;
+      state.running = true;
+
+      listen(window, "resize", function () {
+        resize();
+        Object.keys(state.formations).forEach(function (k) {
+          if (k.indexOf("text:") === 0) delete state.formations[k];
+        });
+        rebuildFormations();
+        var name = state.currentName;
+        state.currentName = null;
+        setFormation(name, true);
+      });
+      listen(window, "mousemove", function (e) {
+        state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        state.mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+        state.mouse.wx = state.mouse.x * state.hw;
+        state.mouse.wy = -state.mouse.y * state.hh;
+        state.mouse.strTarget = REDUCED ? 0 : 2.4;
+      });
+      listen(window, "mouseout", function () { state.mouse.strTarget = 0; });
+      listen(document, "visibilitychange", function () {
+        if (document.hidden) { state.running = false; }
+        else if (!state.running && !state.destroyed) {
+          state.running = true;
+          state.lastT = performance.now() * 0.001; // dt clamp handles the gap
+          state.raf = requestAnimationFrame(frame);
+        }
+      });
+
+      state.raf = requestAnimationFrame(frame);
+      setTimeout(function () { state.morphDur = REDUCED ? 0.01 : 1.5; }, 2400);
+    });
+  }
+
+  /* ═══ test-only readback ═══ */
+  function debugReadState() {
+    if (!DEBUG) throw new Error("debugReadState requires ?debug=1");
+    if (N > 64) throw new Error("debugReadState limited to N<=64 (use gl2n=)");
+    var gl = state.gl;
+    var pos = new Float32Array(COUNT * 4), vel = new Float32Array(COUNT * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[state.cur]);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.FLOAT, pos);
+    gl.readBuffer(gl.COLOR_ATTACHMENT1);
+    gl.readPixels(0, 0, N, N, gl.RGBA, gl.FLOAT, vel);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { n: N, positions: pos, velocities: vel };
+  }
+
+  window.DMDS_GL2 = {
+    probe: probe,
+    init: init,
+    destroy: destroy,
+    setFormation: function (n, dur) { setFormation(n, false, dur); },
+    setMorphPair: setMorphPair,
+    setDim: function (v) { state.dimTarget = v; },
+    kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); excite(0.7); },
+    fps: function () { return state.fps; },
+    isReady: function () { return state.ready; },
+    onLostTimeout: function (fn) { state.onLostTimeout = fn; },
+    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, excite: Math.round(state.excite * 100) / 100 }; },
+    debugReadState: debugReadState
+  };
+})();
+
+</script>
 <script>
 /* ═══════════════════════════════════════════════════════════════
    DMDS® — particle engine
@@ -1044,7 +2309,9 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
-  var COUNT = MOBILE ? 16000 : 42000;
+  // honor Save-Data: mobile particle budget, no post pipeline
+  var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
+  var COUNT = (MOBILE || SAVEDATA) ? 16000 : 42000;
   var DPR_CAP = MOBILE ? 1.5 : 1.75;
 
   var VERT = [
@@ -1196,9 +2463,15 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
     trailA: null, trailB: null, glowA: null, glowB: null,
     locPoints: null, enabledAttribs: [],
-    // adaptive quality governor
-    drawCount: 0, govT: 0
+    // adaptive quality governor (hysteresis: drop fast, restore slow)
+    drawCount: 0, govT: 0, govGood: 0,
+    // boot milestone reporter (main.js wires the loader log to this)
+    ms: null, firstFrame: false
   };
+
+  function milestone(kind, detail) {
+    if (state.ms) { try { state.ms(kind, detail); } catch (e) {} }
+  }
 
   function worldExtents() {
     var hh = CAM_Z * Math.tan(FOV / 2);
@@ -1591,6 +2864,8 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     state.frames++;
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
 
+    if (!state.firstFrame) { state.firstFrame = true; milestone("loop"); }
+
     // morph progress (scrub mode is driven externally)
     if (state.mode === "tween" && state.mix < 1) state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
 
@@ -1603,14 +2878,24 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    // adaptive quality governor: protect frame rate before aesthetics
+    // adaptive quality governor: protect frame rate before aesthetics.
+    // drops immediately on a slow window; restores only after two
+    // consecutive fast windows so it can't oscillate at a tier boundary
     if (!state.govLocked && now - state.govT > 2 && state.fpsT > 3) {
       state.govT = now;
       if (state.fps < 40 && state.drawCount > COUNT / 4) {
+        state.govGood = 0;
         state.drawCount = Math.floor(state.drawCount / 2);
         if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
       } else if (state.fps > 56 && state.drawCount < COUNT) {
-        state.drawCount = Math.min(COUNT, state.drawCount * 2);
+        state.govGood++;
+        if (state.govGood >= 2) {
+          state.govGood = 0;
+          state.drawCount = Math.min(COUNT, state.drawCount * 2);
+          if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
+        }
+      } else {
+        state.govGood = 0;
       }
     }
 
@@ -1682,17 +2967,15 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     }
   }
 
-  function init(canvas) {
-    state.canvas = canvas;
-    var gl = canvas.getContext("webgl", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
-    if (!gl) return Promise.reject(new Error("no webgl"));
-    state.gl = gl;
-
+  // every GPU-side resource, in one place, so a restored context can
+  // rebuild the world from the CPU-side state it still holds
+  function buildGLResources() {
+    var gl = state.gl;
     var prog = gl.createProgram();
     gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
     gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return Promise.reject(new Error(gl.getProgramInfoLog(prog)));
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     state.program = prog;
     gl.useProgram(prog);
 
@@ -1718,13 +3001,14 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       aPosB: gl.getAttribLocation(prog, "aPosB"),
       aRand: gl.getAttribLocation(prog, "aRand")
     };
-    state.drawCount = COUNT;
+    state.enabledAttribs = [];
 
     gl.clearColor(0, 0, 0, 0);
     gl.disable(gl.DEPTH_TEST);
 
-    // post-processing pipeline (desktop): trails, bloom, aberration
-    if (!MOBILE) {
+    // post-processing pipeline (desktop, not under Save-Data): trails, bloom, aberration
+    state.post = false;
+    if (!MOBILE && !SAVEDATA) {
       try {
         var pf = makeProgram(gl, QUAD_VS, FADE_FS);
         state.progFade = { p: pf, aXY: gl.getAttribLocation(pf, "aXY"), uTex: gl.getUniformLocation(pf, "uTex"), uDecay: gl.getUniformLocation(pf, "uDecay") };
@@ -1740,11 +3024,55 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
         state.post = false; // direct path still works
       }
     }
-
-    resize();
     if (state.post) {
       try { allocTargets(); } catch (e) { state.post = false; }
     }
+  }
+
+  function uploadCurrentPair() {
+    var gl = state.gl;
+    if (!state.curA || !state.curB) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.bufA);
+    gl.bufferData(gl.ARRAY_BUFFER, state.curA, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.bufB);
+    gl.bufferData(gl.ARRAY_BUFFER, state.curB, gl.DYNAMIC_DRAW);
+  }
+
+  function init(canvas, onMilestone) {
+    state.canvas = canvas;
+    state.ms = onMilestone || null;
+    var gl = canvas.getContext("webgl", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
+    if (!gl) return Promise.reject(new Error("no webgl"));
+    state.gl = gl;
+
+    try { buildGLResources(); } catch (e) { return Promise.reject(e); }
+    milestone("compile");
+    milestone("post", state.post);
+    state.drawCount = COUNT;
+
+    // context loss: pause; on restore, rebuild every GPU resource from
+    // the CPU-side formations and resume where we left off
+    canvas.addEventListener("webglcontextlost", function (e) {
+      e.preventDefault();
+      state.running = false;
+      if (window.console) console.warn("[DMDS] WebGL context lost — render paused");
+    });
+    canvas.addEventListener("webglcontextrestored", function () {
+      try {
+        buildGLResources();
+        gl.viewport(0, 0, state.canvas.width, state.canvas.height);
+        uploadCurrentPair();
+        state.running = true;
+        state.lastT = performance.now() * 0.001;
+        requestAnimationFrame(frame);
+        if (window.console) console.info("[DMDS] WebGL context restored");
+      } catch (err) {
+        state.running = false; // CSS gradient fallback remains
+        if (window.console) console.warn("[DMDS] context restore failed", err);
+      }
+    });
+
+    resize();
 
     var fontsReady = (document.fonts && document.fonts.load)
       ? document.fonts.load("600 250px 'Clash Display'").then(function () { return document.fonts.ready; })
@@ -1752,17 +3080,14 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
     return fontsReady.then(function () {
       rebuildFormations();
+      milestone("seed", COUNT);
 
       // wire attribute pointers once buffers hold data
       var scattered = genAmbient();
       state.curA = scattered;
       state.curB = state.formations.logo;
       state.currentName = "logo";
-      var gl2 = state.gl;
-      gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufA);
-      gl2.bufferData(gl2.ARRAY_BUFFER, state.curA, gl2.DYNAMIC_DRAW);
-      gl2.bindBuffer(gl2.ARRAY_BUFFER, state.bufB);
-      gl2.bufferData(gl2.ARRAY_BUFFER, state.curB, gl2.DYNAMIC_DRAW);
+      uploadCurrentPair();
       // attribute binding happens per-pass via useAttribs()
 
       state.mix = 0;
@@ -1813,7 +3138,9 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     setBudget: function (n) { state.drawCount = Math.min(COUNT, n | 0); state.govLocked = true; },
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); },
     fps: function () { return state.fps; },
-    isReady: function () { return state.ready; }
+    isReady: function () { return state.ready; },
+    // honest self-report: the footer status line reads this
+    status: function () { return { tier: "gl1", post: state.post, count: state.drawCount, max: COUNT, running: state.running }; }
   };
 })();
 
@@ -1832,45 +3159,60 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var TOUCH = "ontouchstart" in window || navigator.maxTouchPoints > 0;
   var SMOOTH = !REDUCED && !TOUCH;
-  if (SMOOTH) doc.classList.add("smooth");
 
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
-  /* ═══ Preloader — boot sequence ═══ */
+  /* ═══ Claim verification — the registry is the source of truth ═══ */
+  function verifyClaims() {
+    var reg = window.DMDS_CLAIMS && window.DMDS_CLAIMS.claims;
+    var failures = [], checked = 0;
+    if (!reg) return { ok: false, checked: 0, failures: ["claim registry missing"] };
+    $$("[data-claim]").forEach(function (el) {
+      var id = el.dataset.claim, c = reg[id];
+      if (!c) { failures.push(id + ": on page, not in registry"); return; }
+      checked++;
+      var dom = (el.dataset.count !== undefined ? el.dataset.count : el.textContent).trim();
+      if (dom !== String(c.page)) failures.push(id + ": page says “" + dom + "”, registry says “" + c.page + "”");
+    });
+    Object.keys(reg).forEach(function (id) {
+      if (reg[id].dom && !document.querySelector("[data-claim='" + id + "']")) {
+        failures.push(id + ": in registry, missing from page");
+      }
+    });
+    return { ok: !failures.length, checked: checked, failures: failures };
+  }
+
+  /* ═══ Preloader — boot sequence ═══
+     The bar is a time-paced animation (it makes no factual claim);
+     every LOG LINE is fired by the event it names, or not at all. */
   var loader = $("#loader"), pctEl = $("#loader-pct"), barEl = $("#loader-bar"), statusEl = $("#loader-status");
   var logEl = $("#loader-log");
-  var progress = 0, target = 0, loadDone = false;
-  var STATUSES = ["INITIALIZING RENDER", "EMBEDDING TYPEFACES", "COMPILING SHADERS", "SEEDING 42,000 PARTICLES", "ALL SYSTEMS NOMINAL"];
-  var BOOT_LOG = [
-    [4,  "MOUNT /typefaces", "OK"],
-    [22, "COMPILE vertex + fragment", "OK"],
-    [42, "SEED particles", "42,000"],
-    [62, "LINK render loop", "60 FPS"],
-    [82, "VERIFY claims", "PASS"],
-    [97, "BOOT dmds.sys", "READY"]
-  ];
-  var logIdx = 0;
+  var progress = 0, target = 0, loadDone = false, booted = false;
+  var RAMP = REDUCED ? 500 : 1800;
+
+  function bootLog(label, value, opts) {
+    opts = opts || {};
+    var line = document.createElement("div");
+    line.className = "loader__log-line" + (opts.last ? " loader__log-line--last" : "");
+    var dots = new Array(Math.max(2, 30 - label.length)).join(".");
+    line.innerHTML = "<span>" + label + " " + dots + "</span><span>" + value + "</span>";
+    logEl.appendChild(line);
+    statusEl.textContent = (opts.status || label).toUpperCase();
+  }
 
   var loaderT0 = performance.now();
   function tickLoader() {
     // time-driven so blocked frames (shader compile) can't stall the count
     var elapsed = performance.now() - loaderT0;
-    target = Math.max(target, Math.min(loadDone ? 100 : 92, (elapsed / 1800) * 100));
-    progress += (target - progress) * 0.2;
+    target = Math.max(target, Math.min(loadDone ? 100 : 92, (elapsed / RAMP) * 100));
+    // eased, but with a floor once ready so low frame rates can't
+    // stretch the asymptotic tail — the bar always closes promptly
+    progress += Math.max((target - progress) * 0.2, loadDone ? 0.75 : 0);
+    progress = Math.min(progress, target);
     var p = Math.min(100, Math.round(progress));
     pctEl.textContent = ("00" + p).slice(-3);
     barEl.style.width = p + "%";
-    statusEl.textContent = STATUSES[Math.min(Math.floor(p / 22), STATUSES.length - 1)];
-    while (logIdx < BOOT_LOG.length && p >= BOOT_LOG[logIdx][0]) {
-      var entry = BOOT_LOG[logIdx];
-      var line = document.createElement("div");
-      line.className = "loader__log-line" + (logIdx === BOOT_LOG.length - 1 ? " loader__log-line--last" : "");
-      var dots = new Array(Math.max(2, 30 - entry[1].length)).join(".");
-      line.innerHTML = "<span>" + entry[1] + " " + dots + "</span><span>" + entry[2] + "</span>";
-      logEl.appendChild(line);
-      logIdx++;
-    }
     if (p < 100) requestAnimationFrame(tickLoader);
     else finishLoader();
   }
@@ -1886,11 +3228,84 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     setTimeout(function () { manualLock = false; }, 2300);
   }
 
-  /* ═══ GL boot ═══ */
+  // the loader never holds usable content hostage: click or Escape skips it
+  function skipLoader() { loadDone = true; progress = target = 100; }
+  loader.addEventListener("click", skipLoader);
+  window.addEventListener("keydown", function (e) {
+    if (!finished && e.key === "Escape") skipLoader();
+  });
+
+  // fonts.ready settles even when a face fails — load each required face
+  // and report the real count, so the OK is earned per-face
+  if (document.fonts && document.fonts.load) {
+    var FACES = [
+      '500 1em "Clash Display"', '600 1em "Clash Display"',
+      '400 1em "General Sans"', '500 1em "General Sans"',
+      '400 1em "Space Mono"', '700 1em "Space Mono"'
+    ];
+    Promise.all(FACES.map(function (f) {
+      return document.fonts.load(f, "DMDS").then(
+        function (m) { return m.length > 0; },
+        function () { return false; }
+      );
+    })).then(function (r) {
+      var ok = r.filter(Boolean).length;
+      bootLog("MOUNT /typefaces (" + ok + "/" + FACES.length + ")",
+        ok === FACES.length ? "OK" : "DEGRADED");
+    });
+  }
+
+  /* ═══ GL boot — tier chain: gl2 (GPGPU sim) → gl1 → CSS ═══
+     A canvas that ever held a WebGL2 context can't hand out WebGL1,
+     so a failed tier-1 init tears down and replaces the canvas node
+     before tier 2 boots. */
   var glOK = false;
-  var glInit = (window.DMDS_GL ? window.DMDS_GL.init($("#gl")) : Promise.reject())
+  var GL = null;
+  function onMilestone(kind, detail) {
+    if (kind === "compile") bootLog(detail === "sim" ? "COMPILE sim + render" : "COMPILE vertex + fragment", "OK");
+    else if (kind === "post") bootLog("PIPELINE post-fx", detail ? "ON" : "DIRECT");
+    else if (kind === "seed") bootLog("SEED particles", Number(detail).toLocaleString("en-US"));
+    else if (kind === "loop") bootLog("LINK render loop", "OK");
+  }
+  function replaceCanvas(old) {
+    var fresh = old.cloneNode(false);
+    old.parentNode.replaceChild(fresh, old);
+    return fresh;
+  }
+  function bootTier2(canvas) {
+    if (!window.DMDS_GL) return Promise.reject(new Error("no engine"));
+    return window.DMDS_GL.init(canvas, onMilestone).then(function () { GL = window.DMDS_GL; });
+  }
+  var glInit = (function () {
+    var canvas = $("#gl");
+    if (window.DMDS_GL2 && window.DMDS_GL2.probe()) {
+      return window.DMDS_GL2.init(canvas, onMilestone).then(function () {
+        GL = window.DMDS_GL2;
+        GL.onLostTimeout(function () {
+          // context gone >4s: tear down tier 1, boot tier 2 on a fresh canvas
+          try { window.DMDS_GL2.destroy(); } catch (e) {}
+          bootTier2(replaceCanvas($("#gl"))).catch(function () {});
+        });
+      }, function (err) {
+        if (window.console) console.warn("[DMDS] gl2 init failed → tier 2:", err && err.message);
+        try { window.DMDS_GL2.destroy(); } catch (e) {}
+        return bootTier2(replaceCanvas(canvas));
+      });
+    }
+    return bootTier2(canvas);
+  })()
     .then(function () { glOK = true; })
-    .catch(function () { $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */ });
+    .catch(function () {
+      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
+      bootLog("COMPILE render engine", "FAIL");
+      bootLog("FALLBACK static field", "ACTIVE");
+    });
+
+  // a consistency check — the DOM against the embedded registry — not a
+  // re-proof of the underlying facts; those live behind the evidence links
+  var claimReport = verifyClaims();
+  bootLog("VERIFY claims↔DOM (" + claimReport.checked + ")", claimReport.ok ? "PASS" : "FAIL");
+  if (!claimReport.ok && window.console) console.warn("[DMDS] claim verification failed:", claimReport.failures);
 
   Promise.all([
     glInit,
@@ -1898,20 +3313,28 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       if (document.readyState === "complete") res();
       else window.addEventListener("load", res);
     })
-  ]).then(function () { loadDone = true; });
+  ]).then(function () {
+    if (!booted) { booted = true; bootLog("BOOT dmds.sys", "READY", { last: true, status: "ALL CHECKS COMPLETE" }); }
+    loadDone = true;
+  });
 
   // hard timeout so a stalled asset never traps the visitor
-  setTimeout(function () { loadDone = true; }, 2600);
+  setTimeout(function () {
+    if (!booted) { booted = true; bootLog("BOOT dmds.sys", "TIMEOUT — CONTINUING", { last: true }); }
+    loadDone = true;
+  }, 2600);
   requestAnimationFrame(tickLoader);
 
-  /* ═══ Virtual scroll ═══ */
-  var wrap = $("#scroll-wrap");
+  /* ═══ Smooth scroll — native scroll is the source of truth ═══
+     Wheel input retargets `targetY`; a rAF loop eases the REAL scroll
+     position toward it with window.scrollTo. Anything else that moves
+     the page (keys, find-in-page, tab focus, scrollbar, history) is
+     detected as an external scroll and adopted, never fought. */
   var cur = 0, targetY = 0, contentH = 0, vh = window.innerHeight;
 
   function measure() {
     vh = window.innerHeight;
-    contentH = wrap.scrollHeight;
-    if (SMOOTH) document.body.style.height = contentH + "px";
+    contentH = document.documentElement.scrollHeight;
     measureSections();
   }
 
@@ -1952,8 +3375,8 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     if (glOK && !manualLock && sections.length) {
       if (REDUCED) {
         if (active.formation !== lastFormation) {
-          window.DMDS_GL.setFormation(active.formation);
-          window.DMDS_GL.setDim(active.dim);
+          GL.setFormation(active.formation);
+          GL.setDim(active.dim);
           lastFormation = active.formation;
         }
       } else {
@@ -1966,8 +3389,8 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
           else break;
         }
         var a = sections[cur], b = sections[Math.min(cur + 1, sections.length - 1)];
-        window.DMDS_GL.setMorphPair(a.formation, b.formation, t);
-        window.DMDS_GL.setDim(a.dim + (b.dim - a.dim) * smooth01(t));
+        GL.setMorphPair(a.formation, b.formation, t);
+        GL.setDim(a.dim + (b.dim - a.dim) * smooth01(t));
         var nowFormation = t >= 0.5 ? b.formation : a.formation;
         if (nowFormation !== lastFormation) sfx("morph");
         lastFormation = nowFormation;
@@ -1986,7 +3409,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
     // scroll velocity → particle turbulence + drone swell
     var v = Math.abs(y - lastY);
-    if (v > 2 && glOK) window.DMDS_GL.kick(v * 0.004);
+    if (v > 2 && glOK) GL.kick(v * 0.004);
     if (snd.on && snd.droneGain) {
       var dg = 0.05 + Math.min(v * 0.005, 0.11);
       if (Math.abs(dg - snd.droneTarget) > 0.012) {
@@ -2004,15 +3427,35 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   }
 
   var nav = $("#nav"), navScrolled = false;
+  var lastSetY = -1;
+  var maxScroll = function () { return Math.max(0, contentH - vh); };
+
+  if (SMOOTH) {
+    window.addEventListener("wheel", function (e) {
+      if (e.ctrlKey || e.metaKey) return; // pinch-zoom / modifier gestures stay native
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal swipes stay native
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * vh : e.deltaY;
+      targetY = Math.max(0, Math.min(maxScroll(), targetY + dy));
+    }, { passive: false });
+  }
+
   function raf() {
     requestAnimationFrame(raf);
-    targetY = window.scrollY || window.pageYOffset;
+    var y = window.scrollY || window.pageYOffset;
     if (SMOOTH) {
-      cur += (targetY - cur) * 0.085;
-      if (Math.abs(targetY - cur) < 0.1) cur = targetY;
-      wrap.style.transform = "translate3d(0," + -cur + "px,0)";
+      // external movement (keys, find, focus, scrollbar, history) wins
+      if (Math.abs(y - lastSetY) > 1.5) cur = targetY = y;
+      if (Math.abs(targetY - cur) > 0.15) {
+        cur += (targetY - cur) * 0.085;
+        lastSetY = cur;
+        window.scrollTo(0, cur);
+      } else {
+        cur = targetY;
+        lastSetY = y;
+      }
     } else {
-      cur = targetY;
+      cur = y;
     }
     var scrolled = cur > vh * 0.7;
     if (scrolled !== navScrolled) {
@@ -2023,14 +3466,16 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     updateCursor();
   }
 
-  /* anchor navigation works against native scroll position */
+  /* anchor navigation: retarget the eased scroll (desktop) or hand the
+     jump to native smooth scrolling (touch / reduced motion) */
   $$("a[href^='#']").forEach(function (a) {
     a.addEventListener("click", function (e) {
       var id = a.getAttribute("href");
       var el = id.length > 1 && $(id);
       if (!el) return;
       e.preventDefault();
-      window.scrollTo({ top: el.offsetTop, behavior: SMOOTH ? "auto" : "smooth" });
+      if (SMOOTH) targetY = Math.max(0, Math.min(maxScroll(), el.offsetTop));
+      else window.scrollTo({ top: el.offsetTop, behavior: REDUCED ? "auto" : "smooth" });
     });
   });
 
@@ -2055,7 +3500,9 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   }, { rootMargin: "0px 0px -12% 0px", threshold: 0.05 });
   $$(".reveal, .reveal-lines").forEach(function (el) { io.observe(el); });
 
-  /* ═══ Stat counters ═══ */
+  /* ═══ Stat counters ═══
+     Markup carries the real value (no-JS readers see the truth);
+     the animation resets to 0 and counts back up to data-count. */
   function countUp(stat) {
     var numEl = $(".stat__num", stat);
     if (!numEl) return;
@@ -2068,7 +3515,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       numEl.textContent = Math.round(end * eased);
       if (p < 1) requestAnimationFrame(step);
     }
-    if (REDUCED) { numEl.textContent = end; } else { requestAnimationFrame(step); }
+    if (REDUCED) { numEl.textContent = end; } else { numEl.textContent = "0"; requestAnimationFrame(step); }
   }
 
   /* ═══ Scramble text ═══ */
@@ -2098,9 +3545,16 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     el.addEventListener("focus", function () { scramble(el); });
   });
 
-  /* ═══ Hero: live typesetting — the engine takes dictation ═══ */
+  /* ═══ Hero: live typesetting — the engine takes dictation ═══
+     Ambient capture is deliberately narrow: hero on stage only, no
+     modifier keys, no IME composition, never when focus is inside an
+     interactive element, preventDefault only on keys it consumes.
+     Activation and exit are announced to assistive technology. */
   var engineHint = $("#engine-hint"), engineInput = $("#engine-input"), engineBuffer = $("#engine-buffer");
+  var engineLive = $("#engine-live");
   var typeBuffer = "", typeTimer = null, typeIdleTimer = null, typingActive = false;
+
+  function announce(msg) { if (engineLive) engineLive.textContent = msg; }
 
   function updateReadout() {
     if (!engineInput) return;
@@ -2116,13 +3570,16 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     clearTimeout(typeTimer);
     clearTimeout(typeIdleTimer);
     updateReadout();
-    if (!silent && glOK) window.DMDS_GL.setFormation("logo", 1.1);
+    announce("Type mode exited.");
+    if (!silent && glOK) GL.setFormation("logo", 1.1);
     manualLock = false;
   }
 
   if (!TOUCH && !REDUCED) {
     window.addEventListener("keydown", function (e) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      var tgt = e.target;
+      if (tgt && tgt.closest && tgt.closest("input, textarea, select, button, a, [contenteditable]")) return;
       if (!glOK || !doc.classList.contains("loaded")) return;
       if (cur > vh * 0.6) return; // keyboard is live only while the hero is on stage
       var k = e.key;
@@ -2136,6 +3593,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
         typeBuffer += k.toUpperCase();
       } else return;
       e.preventDefault();
+      if (!typingActive) announce("Type mode active — the particle field is typesetting your input. Press Escape to exit.");
       typingActive = true;
       manualLock = true;
       manualY0 = cur;
@@ -2144,7 +3602,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       clearTimeout(typeTimer);
       typeTimer = setTimeout(function () {
         var s = typeBuffer.trim();
-        window.DMDS_GL.setFormation(s ? "text:" + s : "logo", 0.9);
+        GL.setFormation(s ? "text:" + s : "logo", 0.9);
         sfx("morph");
       }, 200);
       clearTimeout(typeIdleTimer);
@@ -2152,28 +3610,18 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     });
   }
 
-  /* ═══ Dossiers: click a work row to open the evidence ═══ */
+  /* ═══ Dossiers: native disclosure buttons open the evidence ═══
+     aria-expanded lives on the button, visibility on the row class;
+     without JS the dossiers simply render expanded. */
   $$(".work__row").forEach(function (row) {
-    var dossier = $(".dossier", row);
-    if (!dossier) return;
-    row.setAttribute("aria-expanded", "false");
-    function toggle() {
+    var btn = $("button.work__line", row), dossier = $(".dossier", row);
+    if (!btn || !dossier) return;
+    btn.addEventListener("click", function () {
       var open = row.classList.toggle("open");
-      dossier.hidden = !open;
-      row.setAttribute("aria-expanded", String(open));
+      btn.setAttribute("aria-expanded", String(open));
       sfx("blip");
       measure();               // dossier changes page height — virtual scroll must know
       setTimeout(measure, 400);
-    }
-    row.addEventListener("click", function (e) {
-      if (e.target.closest("a") || e.target.closest(".dossier")) return;
-      toggle();
-    });
-    row.addEventListener("keydown", function (e) {
-      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) {
-        e.preventDefault();
-        toggle();
-      }
     });
   });
 
@@ -2184,14 +3632,14 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       if (!glOK || typingActive) return;
       manualLock = true;
       manualY0 = cur;
-      window.DMDS_GL.setDim(0.95);
-      window.DMDS_GL.setFormation("text:" + row.dataset.particles, 1.0);
+      GL.setDim(0.95);
+      GL.setFormation("text:" + row.dataset.particles, 1.0);
       sfx("morph");
     });
     row.addEventListener("mouseleave", function () {
       if (!glOK || typingActive) return;
-      window.DMDS_GL.setDim(0.32);
-      window.DMDS_GL.setFormation("ambient", 1.0);
+      GL.setDim(0.32);
+      GL.setFormation("ambient", 1.0);
       manualLock = false;
     });
   });
@@ -2243,14 +3691,87 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     });
   });
 
-  /* ═══ Transmit form ═══ */
+  /* ═══ Transmit form ═══
+     Success shows only after the endpoint confirms (HTTP 2xx). On any
+     failure the filled form stays on screen, the draft is in
+     localStorage, and a copy-to-clipboard recovery path appears —
+     losing the visitor's message is the one unforgivable failure. */
   (function () {
     var form = $("#transmit"), done = $("#transmit-done"), label = $("#transmit-label");
+    var recover = $("#transmit-recover"), copyBtn = $("#copy-brief");
     if (!form) return;
+    var els = form.elements;
+    var formT0 = 0; // stamped on first real interaction, not page load
+    var lastComposed = "";
+    var DRAFT_KEY = "dmds-draft";
+    var DRAFT_TTL = 7 * 86400000; // drafts expire — this is a recovery net, not storage
+
+    form.addEventListener("focusin", function () { if (!formT0) formT0 = performance.now(); });
+
+    // draft preservation: survive reloads, crashes, and mailto detours
+    try {
+      var draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (draft && (!draft.t || Date.now() - draft.t > DRAFT_TTL)) {
+        localStorage.removeItem(DRAFT_KEY);
+        draft = null;
+      }
+      if (draft) {
+        if (draft.name) els.namedItem("name").value = draft.name;
+        if (draft.email) els.namedItem("email").value = draft.email;
+        if (draft.brief) els.namedItem("brief").value = draft.brief;
+        if (draft.project) {
+          var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
+          if (radio) radio.checked = true;
+        }
+      }
+    } catch (e) {}
+    var draftTimer = null;
+    form.addEventListener("input", function () {
+      if (!formT0) formT0 = performance.now();
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(function () {
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({
+            t: Date.now(),
+            name: els.namedItem("name").value,
+            email: els.namedItem("email").value,
+            project: (form.querySelector("input[name=project]:checked") || {}).value,
+            brief: els.namedItem("brief").value
+          }));
+        } catch (e) {}
+      }, 400);
+    });
+
+    if (copyBtn) copyBtn.addEventListener("click", function () {
+      function flash(ok) {
+        copyBtn.textContent = ok ? "COPIED" : "SELECT + COPY MANUALLY";
+        setTimeout(function () { copyBtn.textContent = "COPY MESSAGE"; }, 2200);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastComposed).then(function () { flash(true); }, function () { flash(false); });
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = lastComposed;
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        flash(ok);
+      }
+    });
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      var els = form.elements;
-      if (els.namedItem("_gotcha").value) return; // bot
+      if (els.namedItem("_gotcha").value) return;               // bot: honeypot
+      // instant fill (autofill, paste, bot) is a risk signal, not proof —
+      // never silently eat the submission: ask for one confirming press
+      if (!formT0 || performance.now() - formT0 < 2000) {
+        formT0 = performance.now() - 2000; // the next press goes through
+        label.textContent = "QUICK CHECK — PRESS TRANSMIT AGAIN TO SEND";
+        setTimeout(function () { label.textContent = "START A PROJECT"; }, 3000);
+        return;
+      }
       if (!form.reportValidity()) return;
       var data = {
         name: els.namedItem("name").value.trim(),
@@ -2261,6 +3782,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       };
       var endpoint = form.dataset.endpoint;
       function succeed() {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
         form.hidden = true;
         done.hidden = false;
         sfx("morph");
@@ -2269,10 +3791,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nBuilding: " + data.project + "\n\nBrief:\n" + data.brief;
+        lastComposed = "To: dennis@shorevapesli.com\nSubject: Project inquiry — DMDS (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@shorevapesli.com?subject=" +
           encodeURIComponent("Project inquiry — DMDS (" + data.project + ")") +
           "&body=" + encodeURIComponent(body);
         label.textContent = "OPENING YOUR MAIL CLIENT…";
+        if (recover) { recover.hidden = false; measure(); }
         setTimeout(function () { label.textContent = "START A PROJECT"; }, 2500);
       }
       if (endpoint) {
@@ -2387,10 +3911,20 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   window.addEventListener("blur", function () { document.title = "[ SIGNAL LOST ] — DMDS®"; });
   window.addEventListener("focus", function () { document.title = baseTitle; });
 
-  /* ═══ Clocks + FPS ═══ */
-  var clockFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  /* ═══ Clocks + FPS ═══
+     The zone label comes from Intl, so it reads EST or EDT truthfully
+     across daylight-saving transitions. */
+  var clockFmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hourCycle: "h23",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short"
+  });
   function tickClock() {
-    var t = clockFmt.format(new Date()) + " EST";
+    var t = "", zone = "ET";
+    clockFmt.formatToParts(new Date()).forEach(function (p) {
+      if (p.type === "hour" || p.type === "minute" || p.type === "second") t += (t ? ":" : "") + p.value;
+      else if (p.type === "timeZoneName") zone = p.value;
+    });
+    t += " " + zone;
     var c1 = $("#clock"), c2 = $("#clock-2");
     if (c1) c1.textContent = t;
     if (c2) c2.textContent = t;
@@ -2400,8 +3934,21 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
   var fpsEl = $("#fps");
   setInterval(function () {
-    if (fpsEl && glOK) fpsEl.textContent = window.DMDS_GL.fps();
+    if (fpsEl && glOK) fpsEl.textContent = GL.fps();
   }, 800);
+
+  /* ═══ Footer status: says what the renderer is actually doing ═══ */
+  var sysStatus = $("#sys-status");
+  function updateSysStatus() {
+    if (!sysStatus) return;
+    if (!glOK) { sysStatus.textContent = "STATIC RENDER · CONTENT NOMINAL"; return; }
+    var s = GL.status();
+    sysStatus.textContent = s.count < s.max
+      ? "RENDER DEGRADED · CORE NOMINAL"
+      : "ALL SYSTEMS NOMINAL";
+  }
+  glInit.then(updateSysStatus);
+  setInterval(updateSysStatus, 4000);
 
   /* ═══ Boot ═══ */
   window.addEventListener("resize", measure);
@@ -2412,16 +3959,20 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   raf();
 
   /* eslint-disable no-console */
-  console.log(
-    "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
-    "%c 42,000 particles · 1 draw call · 0 external requests.\n" +
-    " We audit our console too. → dennis@shorevapesli.com",
-    "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
-    "background:#0b0b0c;color:#edeae3;padding:4px 8px;",
-    "color:#8a8781;"
-  );
+  glInit.then(function () {
+    var count = glOK ? GL.status().max.toLocaleString("en-US") + " particles · 1 draw call" : "static render";
+    console.log(
+      "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
+      "%c " + count + " · 0 external requests on load.\n" +
+      " We audit our console too. → dennis@shorevapesli.com",
+      "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
+      "background:#0b0b0c;color:#edeae3;padding:4px 8px;",
+      "color:#8a8781;"
+    );
+  });
 })();
 
 </script>
 </body>
 </html>
+<!-- dmds build 2df1bf1-dirty 2026-07-17T16:29:29Z -->
