@@ -400,11 +400,19 @@
   }
 
   function makeProgram(gl, vs, fs) {
+    var v = compile(gl, gl.VERTEX_SHADER, vs), f;
+    try { f = compile(gl, gl.FRAGMENT_SHADER, fs); }
+    catch (e) { gl.deleteShader(v); throw e; }
     var p = gl.createProgram();
-    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+    gl.attachShader(p, v);
+    gl.attachShader(p, f);
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    var ok = gl.getProgramParameter(p, gl.LINK_STATUS);
+    // shaders are only needed to link; freeing them keeps repeated
+    // lifecycle cycles from accumulating GL objects
+    gl.detachShader(p, v); gl.detachShader(p, f);
+    gl.deleteShader(v); gl.deleteShader(f);
+    if (!ok) { var log = gl.getProgramInfoLog(p); gl.deleteProgram(p); throw new Error(log); }
     return p;
   }
 
@@ -677,11 +685,7 @@
   // rebuild the world from the CPU-side state it still holds
   function buildGLResources() {
     var gl = state.gl;
-    var prog = gl.createProgram();
-    gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    var prog = makeProgram(gl, VERT, FRAG);
     state.program = prog;
     gl.useProgram(prog);
 

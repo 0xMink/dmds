@@ -23,9 +23,52 @@ function resolveChromium() {
 }
 
 const DIST = 'file://' + path.resolve(__dirname, '..', 'dist', 'index.html');
-const OOB_BOUND = 60; // must equal src/gl2.js OOB (spec rev 3.1 world scale)
 const results = [];
 function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail || '' }); }
+
+// exact-tuple listener registry + RAF ownership accounting: net counts can
+// false-balance (a leak + a remove-of-nonexistent cancel out), so removal
+// only unregisters on an exact (target, type, callback, capture) match —
+// mirroring EventTarget semantics
+const LIFECYCLE_INSTRUMENTS = () => {
+  window.__LREG = [];
+  const capOf = o => (typeof o === 'object' && o !== null) ? !!o.capture : !!o;
+  const ae = EventTarget.prototype.addEventListener, re = EventTarget.prototype.removeEventListener;
+  EventTarget.prototype.addEventListener = function (type, fn, o) {
+    if (!window.__LREG.some(r => r.t === this && r.type === type && r.fn === fn && r.cap === capOf(o))) {
+      window.__LREG.push({ t: this, type, fn, cap: capOf(o) });
+    }
+    return ae.call(this, type, fn, o);
+  };
+  EventTarget.prototype.removeEventListener = function (type, fn, o) {
+    const i = window.__LREG.findIndex(r => r.t === this && r.type === type && r.fn === fn && r.cap === capOf(o));
+    if (i > -1) window.__LREG.splice(i, 1);
+    return re.call(this, type, fn, o);
+  };
+  window.__LSNAP = () => {
+    const m = {};
+    window.__LREG.forEach(r => {
+      const k = ((r.t === window) ? 'window' : (r.t === document) ? 'document' : (r.t.tagName || '?')) + ':' + r.type;
+      m[k] = (m[k] || 0) + 1;
+    });
+    return JSON.stringify(m, Object.keys(m).sort());
+  };
+  window.__RAF = { pending: new Set() };
+  const oraf = window.requestAnimationFrame.bind(window), ocaf = window.cancelAnimationFrame.bind(window);
+  window.requestAnimationFrame = cb => {
+    let id;
+    id = oraf(ts => { window.__RAF.pending.delete(id); cb(ts); });
+    window.__RAF.pending.add(id);
+    return id;
+  };
+  window.cancelAnimationFrame = id => { window.__RAF.pending.delete(id); ocaf(id); };
+  // steady-state loop count: median pending size over several samples
+  window.__RAFCOUNT = async () => {
+    const s = [];
+    for (let i = 0; i < 9; i++) { await new Promise(r => setTimeout(r, 60)); s.push(window.__RAF.pending.size); }
+    return s.sort((a, b) => a - b)[4];
+  };
+};
 
 (async () => {
   const browser = await chromium.launch({
@@ -94,10 +137,11 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
       }
       return { finite, maxR, sentinelOK };
     });
+    const bound = await page.evaluate(() => window.DMDS_GL2.debugGLHealth().oob);
     check('num:all-finite', hygiene.finite);
-    // the reset bound itself, not a looser stand-in; legit motion also
-    // stays far inside it (formations span ≲20)
-    check('num:inside-reset-bound', hygiene.maxR <= OOB_BOUND, 'maxR=' + hygiene.maxR.toFixed(1));
+    // the runtime-derived reset bound itself, not a stand-in; legit motion
+    // also stays far inside it at 16:9 (formations span ≲20 here)
+    check('num:inside-reset-bound', hygiene.maxR <= bound, 'maxR=' + hygiene.maxR.toFixed(1) + ' bound=' + bound.toFixed(1));
     check('num:legit-motion-far-inside', hygiene.maxR < 25, 'maxR=' + hygiene.maxR.toFixed(1));
     check('num:sentinel-free', hygiene.sentinelOK);
 
@@ -165,8 +209,38 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     });
     check('morph:population-moved', morph.moved > morph.total * 0.5, morph.moved + '/' + morph.total);
     check('morph:formation-name', morph.nameRightAfter === 'grid', morph.nameRightAfter);
-    check('morph:stays-finite-in-bounds', morph.finite && morph.maxR <= OOB_BOUND, 'maxR=' + morph.maxR.toFixed(1));
+    check('morph:stays-finite-in-bounds', morph.finite && morph.maxR <= bound, 'maxR=' + morph.maxR.toFixed(1));
     check('num:no-page-errors', page.errs.length === 0, page.errs.join('; '));
+    await page.close();
+  }
+
+  // ── 2b. viewport safety: the reset bound must be derived, not fixed —
+  //       ultrawide's ambient corner would cross a fixed 60 ──
+  for (const [label, vw, vh] of [['ultrawide-32x9', 3440, 1080], ['portrait', 390, 844]]) {
+    const page = await newPage();
+    await page.setViewportSize({ width: vw, height: vh });
+    await page.goto(DIST + '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(async () => {
+      const h = window.DMDS_GL2.debugGLHealth();
+      const s = window.DMDS_GL2.debugReadState();
+      let maxR = 0, finite = true;
+      for (let i = 0; i < s.positions.length; i += 4) {
+        maxR = Math.max(maxR, Math.hypot(s.positions[i], s.positions[i + 1], s.positions[i + 2]));
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(s.positions[i + k])) finite = false;
+      }
+      // recovery still works against the derived bound
+      window.DMDS_GL2.debugPoke(0, h.oob * 4, 0, 0);
+      await new Promise(r2 => setTimeout(r2, 1000));
+      const s2 = window.DMDS_GL2.debugReadState();
+      const rec = Math.hypot(s2.positions[0], s2.positions[1], s2.positions[2]);
+      return { oob: h.oob, maxR, finite, rec };
+    });
+    // the bound must clear the legit envelope by the excursion margin
+    check('aspect:' + label + ':bound-covers-envelope', r.oob >= r.maxR + 31, 'oob=' + r.oob.toFixed(1) + ' maxR=' + r.maxR.toFixed(1));
+    check('aspect:' + label + ':finite-in-bounds', r.finite && r.maxR <= r.oob, 'maxR=' + r.maxR.toFixed(1));
+    check('aspect:' + label + ':recovery-works', r.rec < r.maxR + 10, 'rec=' + r.rec.toFixed(1));
     await page.close();
   }
 
@@ -259,6 +333,7 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
     const r = await page.evaluate(async () => {
       const before = window.DMDS_GL2.status();
+      const targBefore = Array.from(window.DMDS_GL2.debugReadTargets(8).b);
       const ctx = document.querySelector('#gl').getContext('webgl2');
       const lose = ctx.getExtension('WEBGL_lose_context');
       lose.loseContext();
@@ -277,17 +352,33 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
         drift = Math.max(drift, Math.abs(s2.positions[i] - s1.positions[i]));
         for (let k = 0; k < 3; k++) if (!Number.isFinite(s2.positions[i + k])) finite = false;
       }
+      // GPU-backed preservation: the REBUILT target texture must carry the
+      // same data as before the loss — the name alone is not evidence
+      const targAfter = window.DMDS_GL2.debugReadTargets(8).b;
+      let targDiff = 0;
+      for (let i = 0; i < targBefore.length; i++) targDiff = Math.max(targDiff, Math.abs(targAfter[i] - targBefore[i]));
+      // and particles must converge toward that restored target: displace
+      // one deterministically, step the paused sim, watch the spring work
+      window.DMDS_GL2.pause();
+      const ti = 3 * 4;
+      window.DMDS_GL2.debugPoke(3, targAfter[ti] + 10, targAfter[ti + 1], targAfter[ti + 2]);
+      window.DMDS_GL2.debugStep(90); // 1.5 sim-seconds
+      const sc = window.DMDS_GL2.debugReadState();
+      const convDist = Math.hypot(sc.positions[ti] - targAfter[ti], sc.positions[ti + 1] - targAfter[ti + 1], sc.positions[ti + 2] - targAfter[ti + 2]);
+      window.DMDS_GL2.resume();
       // the 4s demotion timer must be cancelled — outlive its window
       await new Promise(r2 => setTimeout(r2, 4600));
       const late = window.DMDS_GL2.status();
       const demoted = !!(window.DMDS_GL && window.DMDS_GL.isReady());
-      return { paused, after, health, drift, finite, formationKept: after.formation === before.formation, late, demoted };
+      return { paused, after, health, drift, finite, formationKept: after.formation === before.formation, targDiff, convDist, late, demoted };
     });
     check('fb:loss-pauses', r.paused === true);
     check('fb:restore-resumes-gl2', r.after.running === true && r.after.tier === 'gl2', JSON.stringify(r.after));
     check('fb:restore-gl-healthy', r.health.error === 0 && r.health.fbo.every(s => s === 0x8CD5), JSON.stringify(r.health));
     check('fb:restore-sim-alive-finite', r.drift > 1e-5 && r.finite, 'drift=' + r.drift);
     check('fb:restore-formation-kept', r.formationKept);
+    check('fb:restore-target-texture-preserved', r.targDiff < 1e-3, 'maxDiff=' + r.targDiff);
+    check('fb:restore-converges-to-target', r.convDist < 1.0, 'dist=' + r.convDist.toFixed(3));
     check('fb:restore-timer-cancelled', r.late.running === true && r.late.tier === 'gl2' && !r.demoted, JSON.stringify({ late: r.late, demoted: r.demoted }));
     await page.close();
   }
@@ -311,13 +402,33 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     await page.close();
   }
   // 3e3. failure after PARTIAL resource build (textures+FBOs+programs
-  //      already exist) → destroy() cleans up → tier 2
+  //      already exist) → destroy() cleans up EVERY created object → tier 2
   {
-    const page = await newPage(() => { window.__DMDS_GL2_BREAK_LATE__ = true; });
+    const page = await newPage(() => {
+      window.__DMDS_GL2_BREAK_LATE__ = true;
+      window.__GLACC = { created: [], deleted: [] };
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) {
+        const ctx = orig.call(this, t, o);
+        if (t === 'webgl2' && ctx && this.id === 'gl') {
+          ['Texture', 'Framebuffer', 'Program', 'Buffer', 'VertexArray', 'Shader'].forEach(kind => {
+            const c = ctx['create' + kind].bind(ctx), d = ctx['delete' + kind].bind(ctx);
+            ctx['create' + kind] = function () { const obj = c.apply(null, arguments); window.__GLACC.created.push(obj); return obj; };
+            ctx['delete' + kind] = function (obj) { if (obj) window.__GLACC.deleted.push(obj); return d(obj); };
+          });
+        }
+        return ctx;
+      };
+    });
     await page.goto(DIST + '?debug=1');
     await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
-    const r = await page.evaluate(() => window.DMDS_GL.status());
-    check('fb:partial-build-failure → gl1', r.tier === 'gl1' && r.running === true, JSON.stringify(r));
+    const r = await page.evaluate(() => {
+      const del = new Set(window.__GLACC.deleted);
+      const leaked = window.__GLACC.created.filter(o => !del.has(o)).length;
+      return { status: window.DMDS_GL.status(), created: window.__GLACC.created.length, leaked };
+    });
+    check('fb:partial-build-failure → gl1', r.status.tier === 'gl1' && r.status.running === true, JSON.stringify(r.status));
+    check('fb:partial-build-all-objects-deleted', r.created > 0 && r.leaked === 0, 'created=' + r.created + ' leaked=' + r.leaked);
     await page.close();
   }
   // 3f. context loss with NO restore within 4s → demote to tier 2 on fresh canvas
@@ -364,70 +475,67 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     await page.close();
   }
 
-  // ── 4. lifecycle: init → destroy → init ×3, listener-balanced, reusable ──
-  {
-    const page = await newPage(() => {
-      window.__LT = {};
-      const key = (t, type) => ((t === window) ? 'window' : (t === document) ? 'document' : (t.tagName || '?')) + ':' + type;
-      const ae = EventTarget.prototype.addEventListener, re = EventTarget.prototype.removeEventListener;
-      EventTarget.prototype.addEventListener = function (type, fn, o) { window.__LT[key(this, type)] = (window.__LT[key(this, type)] || 0) + 1; return ae.call(this, type, fn, o); };
-      EventTarget.prototype.removeEventListener = function (type, fn, o) { window.__LT[key(this, type)] = (window.__LT[key(this, type)] || 0) - 1; return re.call(this, type, fn, o); };
-    });
-    await page.goto(DIST + '?debug=1&gl2n=64');
-    await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
-    const r = await page.evaluate(async () => {
-      const snap = () => JSON.stringify(window.__LT);
-      window.DMDS_GL2.destroy();
-      const stopped = window.DMDS_GL2.status().running === false && window.DMDS_GL2.isReady() === false;
-      let readbackThrows = false;
-      try { window.DMDS_GL2.debugReadState(); } catch (e) { readbackThrows = true; }
-      const afterFirstDestroy = snap();
+  // ── 4. lifecycle: init → destroy → init ×3, exact-tuple listener registry
+  //       + RAF ownership, both tiers ──
+  for (const tier of ['gl2', 'gl1']) {
+    const page = await newPage(LIFECYCLE_INSTRUMENTS);
+    if (tier === 'gl1') {
+      await page.addInitScript(() => {
+        const orig = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+      });
+    }
+    await page.goto(DIST + (tier === 'gl2' ? '?debug=1&gl2n=64' : ''));
+    await page.waitForFunction(t => window['DMDS_' + t.toUpperCase()] && window['DMDS_' + t.toUpperCase()].isReady(), tier === 'gl2' ? 'gl2' : 'gl', { timeout: 60000 });
+    // the loader's own RAF (tickLoader) must finish before the baseline
+    // sample, or it gets misattributed to the engine
+    await page.waitForSelector('#loader', { state: 'detached', timeout: 60000 });
+    const r = await page.evaluate(async (engineName) => {
+      const E = window[engineName];
+      const rafWithEngine = await window.__RAFCOUNT();
+      E.destroy();
+      const stopped = E.status().running === false && E.isReady() === false;
+      const afterFirstDestroy = window.__LSNAP();
+      const rafAfterDestroy = await window.__RAFCOUNT();
       const canvas = document.querySelector('#gl');
       for (let c = 0; c < 2; c++) {
-        await window.DMDS_GL2.init(canvas, null);
-        window.DMDS_GL2.destroy();
+        await E.init(canvas, null);
+        E.destroy();
       }
-      const afterCycles = snap();
-      await window.DMDS_GL2.init(canvas, null);
-      await new Promise(r2 => setTimeout(r2, 800));
-      const s1 = window.DMDS_GL2.debugReadSample();
-      await new Promise(r2 => setTimeout(r2, 800));
-      const s2 = window.DMDS_GL2.debugReadSample();
-      let drift = 0, finite = true;
-      for (let i = 0; i < s1.positions.length; i += 4) {
-        drift = Math.max(drift, Math.abs(s2.positions[i] - s1.positions[i]));
-        for (let k = 0; k < 3; k++) if (!Number.isFinite(s2.positions[i + k])) finite = false;
-      }
+      const afterCycles = window.__LSNAP();
+      const rafAfterCycles = await window.__RAFCOUNT();
+      await E.init(canvas, null);
+      await new Promise(r2 => setTimeout(r2, 900));
+      const rafAfterReinit = await window.__RAFCOUNT();
       return {
-        stopped, readbackThrows,
+        stopped,
         balanced: afterFirstDestroy === afterCycles, afterFirstDestroy, afterCycles,
-        reinitReady: window.DMDS_GL2.isReady(), simAlive: drift > 1e-5 && finite, drift,
+        // engine owns exactly one loop: destroyed states match, reinit adds one back
+        rafOwnership: rafAfterDestroy === rafWithEngine - 1 && rafAfterCycles === rafAfterDestroy && rafAfterReinit === rafWithEngine,
+        rafs: [rafWithEngine, rafAfterDestroy, rafAfterCycles, rafAfterReinit].join(','),
+        reinitReady: E.isReady(),
+        running: E.status().running,
       };
-    });
-    check('life:destroy-stops-engine', r.stopped);
-    check('life:destroy-releases-state', r.readbackThrows);
-    check('life:3-cycles-listener-balanced', r.balanced, r.balanced ? '' : r.afterFirstDestroy + ' vs ' + r.afterCycles);
-    check('life:reinit-ready', r.reinitReady);
-    check('life:reinit-sim-alive', r.simAlive, 'drift=' + r.drift);
-    check('life:no-errors-after-cycles', page.errs.length === 0, page.errs.join('; '));
+    }, tier === 'gl2' ? 'DMDS_GL2' : 'DMDS_GL');
+    check('life:' + tier + ':destroy-stops-engine', r.stopped);
+    check('life:' + tier + ':3-cycles-listener-balanced', r.balanced, r.balanced ? '' : r.afterFirstDestroy + ' vs ' + r.afterCycles);
+    check('life:' + tier + ':raf-ownership', r.rafOwnership, 'rafs=' + r.rafs);
+    check('life:' + tier + ':reinit-ready-running', r.reinitReady && r.running === true);
+    check('life:' + tier + ':no-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }
-  // 4b. tier-2 lifecycle: destroy → reinit on the same canvas
+  // 4c. destroyed gl2 releases readback state (kept from earlier suite)
   {
-    const page = await newPage(() => {
-      const orig = HTMLCanvasElement.prototype.getContext;
-      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    const page = await newPage();
+    await page.goto(DIST + '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => {
+      window.DMDS_GL2.destroy();
+      let readbackThrows = false;
+      try { window.DMDS_GL2.debugReadState(); } catch (e) { readbackThrows = true; }
+      return { readbackThrows };
     });
-    await page.goto(DIST);
-    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
-    const r = await page.evaluate(async () => {
-      window.DMDS_GL.destroy();
-      const stopped = !window.DMDS_GL.isReady() && window.DMDS_GL.status().running === false;
-      await window.DMDS_GL.init(document.querySelector('#gl'), null);
-      await new Promise(r2 => setTimeout(r2, 600));
-      return { stopped, reinitReady: window.DMDS_GL.isReady(), running: window.DMDS_GL.status().running };
-    });
-    check('life:gl1-destroy-reinit', r.stopped && r.reinitReady && r.running === true, JSON.stringify(r));
+    check('life:destroy-releases-state', r.readbackThrows);
     await page.close();
   }
 

@@ -30,7 +30,7 @@
   var F_MAX = 900.0;     // force cap, world units/s²
   var V_MAX = 90.0;      // velocity cap, world units/s
   var DT_MAX = 1 / 30;   // dt clamp
-  var OOB = 60.0;        // out-of-bounds radius → reset to target
+  var OOB_MIN = 60.0;    // floor for the runtime-derived reset bound (see worldExtents)
   var EPS_SNAP = 0.012;  // settle deadband, world units (≈0.5 device px)
   var V_SNAP = 0.06;
 
@@ -44,6 +44,7 @@
     "uniform float uDt, uTime, uMix, uNoise, uTurb, uExcite;",
     "uniform vec3 uCursor;",
     "uniform float uCursorStr;",
+    "uniform float uOob;",
     "uniform int uN;",
     "layout(location=0) out vec4 oPos;",
     "layout(location=1) out vec4 oVel;",
@@ -87,7 +88,7 @@
     "  }",
     // finite-value recovery: reassembly always wins
     "  bvec3 bad = bvec3(isnan(p.x) || isinf(p.x), isnan(p.y) || isinf(p.y), isnan(p.z) || isinf(p.z));",
-    "  if (any(bad) || length(p) > " + OOB.toFixed(1) + ") { p = target; v = vec3(0.0); }",
+    "  if (any(bad) || length(p) > uOob) { p = target; v = vec3(0.0); }",
     "  oPos = vec4(p, P.w);",
     "  oVel = vec4(v, V.w);",
     "}"
@@ -202,11 +203,19 @@
     return s;
   }
   function makeProgram(gl, vs, fs) {
+    var v = compile(gl, gl.VERTEX_SHADER, vs), f;
+    try { f = compile(gl, gl.FRAGMENT_SHADER, fs); }
+    catch (e) { gl.deleteShader(v); throw e; }
     var p = gl.createProgram();
-    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs));
+    gl.attachShader(p, v);
+    gl.attachShader(p, f);
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    var ok = gl.getProgramParameter(p, gl.LINK_STATUS);
+    // shader objects are only needed to link — freeing them here keeps
+    // repeated lifecycle cycles from accumulating GL objects
+    gl.detachShader(p, v); gl.detachShader(p, f);
+    gl.deleteShader(v); gl.deleteShader(f);
+    if (!ok) { var log = gl.getProgramInfoLog(p); gl.deleteProgram(p); throw new Error(log); }
     return p;
   }
 
@@ -240,6 +249,11 @@
     var hh = CAM_Z * Math.tan(FOV / 2);
     state.hh = hh;
     state.hw = hh * (state.canvas.width / state.canvas.height);
+    // viewport-safe reset bound: a fixed radius fails on ultrawide, where
+    // the ambient field's corner alone can pass 34 wu. Derived per resize:
+    // ambient corner + interaction excursion (31, force balance) + safety
+    var corner = Math.sqrt(Math.pow(state.hw * 1.15, 2) + Math.pow(state.hh * 1.15, 2) + 81);
+    state.oob = Math.max(OOB_MIN, corner + 31 + 10);
   }
 
   /* ═══ formation generators — identical world-space math to gl.js,
@@ -531,7 +545,7 @@
 
     state.vao = gl.createVertexArray();
     state.simProg = makeProgram(gl, SIM_VS, SIM_FS);
-    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uN"].forEach(function (n) {
+    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uOob", "uN"].forEach(function (n) {
       state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
     });
     state.renProg = makeProgram(gl, REN_VS, REN_FS);
@@ -705,6 +719,7 @@
     gl.uniform1f(state.simLoc.uExcite, REDUCED ? 0 : state.excite);
     gl.uniform3f(state.simLoc.uCursor, state.mouse.wx, state.mouse.wy, 0);
     gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
+    gl.uniform1f(state.simLoc.uOob, state.oob);
     gl.uniform1i(state.simLoc.uN, N);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     state.cur = nxt;
@@ -1004,7 +1019,7 @@
   function debugGLHealth() {
     if (!DEBUG) throw new Error("debugGLHealth requires ?debug=1");
     var gl = state.gl;
-    var out = { error: gl.getError(), fbo: [] };
+    var out = { error: gl.getError(), oob: state.oob, fbo: [] };
     for (var d = 0; d < 2; d++) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[d]);
       out.fbo.push(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
@@ -1025,19 +1040,23 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return { n: N, positions: pos, velocities: vel };
   }
-  // deterministic 32×32 texel subset — works at ANY N, so production-size
-  // behavior is measured, not inferred from small-N runs
+  // deterministic strided texel sample spread across the FULL N×N state —
+  // works at any N without spatial bias toward one corner
   function debugReadSample() {
     if (!DEBUG) throw new Error("debugReadSample requires ?debug=1");
-    var gl = state.gl, w = Math.min(32, N);
-    var pos = new Float32Array(w * w * 4), vel = new Float32Array(w * w * 4);
+    var gl = state.gl, w = Math.min(32, N), strips = 32;
+    var pos = new Float32Array(strips * w * 4), vel = new Float32Array(strips * w * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[state.cur]);
-    gl.readBuffer(gl.COLOR_ATTACHMENT0);
-    gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, pos);
-    gl.readBuffer(gl.COLOR_ATTACHMENT1);
-    gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, vel);
+    for (var k = 0; k < strips; k++) {
+      var y = Math.floor(k * N / strips);
+      var x = (k * 7919) % Math.max(1, N - w);
+      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+      gl.readPixels(x, y, w, 1, gl.RGBA, gl.FLOAT, pos.subarray(k * w * 4, (k + 1) * w * 4));
+      gl.readBuffer(gl.COLOR_ATTACHMENT1);
+      gl.readPixels(x, y, w, 1, gl.RGBA, gl.FLOAT, vel.subarray(k * w * 4, (k + 1) * w * 4));
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { n: N, w: w, positions: pos, velocities: vel };
+    return { n: N, w: w, strips: strips, positions: pos, velocities: vel };
   }
   // read the target textures themselves, so tests compare state against
   // the actual GPU-side targets rather than re-deriving them on the CPU

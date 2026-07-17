@@ -208,9 +208,9 @@ units, wu; formation half-height ≈ 8 wu is the reference scale):
 
 | Quantity | Value | Why |
 |---|---|---|
-| Formation envelope | ≤ r ≈ 20 | largest generator (grid depth 16, ambient 1.15× viewport) |
-| Interaction excursion bound | ≈ r ≈ 51 | force balance: max non-spring force (turb ≈ 110 + cursor ≈ 340) ÷ min spring gain (≈ 14/s²·wu) ≈ 31 wu beyond the envelope — the spring, not the velocity cap, is what bounds position |
-| OOB recovery bound | 60 | above the excursion bound with margin |
+| Formation envelope | viewport-dependent | largest generator is the ambient field at 1.15× the visible extents — half-width scales with aspect ratio (≈ 15 wu at 16:9, ≈ 34 wu at 32:9 ultrawide) |
+| Interaction excursion margin | ≈ 31 wu beyond the envelope | force balance: max non-spring force (turb ≈ 110 + cursor ≈ 340) ÷ min spring gain (≈ 14/s²·wu) — an approximate static equilibrium, so a safety margin rides on top; the spring, not the velocity cap, is what bounds position |
+| OOB recovery bound | **derived at runtime**: max(60, ambient corner radius + 31 excursion + 10 safety) | a fixed bound is not viewport-safe — at 32:9 the ambient corner alone reaches ≈ 36 wu and legitimate interaction would cross a fixed 60; recomputed on resize, uniform to the sim shader; verified at portrait / 16:9 / ultrawide |
 | V_max / F_max | 90 wu/s / 900 wu/s² | caps ≈ 4.5×/2× the strongest legitimate demand |
 | ε_snap | 0.012 | ≈ 0.5 device px at default camera |
 | Parallax amplitude | TBD at M3, ≈ 0.6 wu | old spec's 0.08 was unit-cube-relative |
@@ -225,7 +225,8 @@ adopt — sharing generator space with tier 2 keeps the two tiers'
 formations identical.
 
 Perspective camera; parallax lerped from scroll +
-pointer, amplitude ≤ 0.08 world units. Wordmark/type text near-planar
+pointer, amplitude per the unit-audit table (fixed at M3 — the retired
+unit-cube 0.08 does not apply). Wordmark/type text near-planar
 with shallow deterministic z jitter; terrain/sphere/phone/curve
 volumetric. Point size attenuates with depth. Reduced-motion: fixed
 camera.

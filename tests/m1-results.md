@@ -1,8 +1,8 @@
 # M1 results — tier-1 GPGPU core
 
 Run: `node tests/m1-core.js` · Environment: headless SwiftShader ·
-Date: 2026-07-17 · **PASS — 46/46 checks** (two correction passes
-after external review; runs were 13 → 31 → 46 checks).
+Date: 2026-07-17 · **PASS — 59/59 checks** (three correction passes
+after external review; runs were 13 → 31 → 46 → 59 checks).
 
 ## Milestone state
 
@@ -43,6 +43,37 @@ gate belongs to M2+ review, not M1).
   source on the visible canvas only) and partial-build failure
   (injected after textures/FBOs/programs exist) both reach cleanup +
   tier 2.
+
+## Third correction pass
+
+- **Viewport-safe OOB (real latent bug)**: the fixed reset bound of 60
+  fails on ultrawide — at 32:9 the ambient field's corner reaches
+  ≈ 34 wu and legitimate interaction (+31 excursion) would cross it,
+  teleporting particles at screen edges. The bound is now **derived at
+  runtime** (max(60, ambient corner + 31 + 10), recomputed on resize,
+  shader uniform) and verified at 16:9 (60.9), 32:9 (73.7, envelope
+  29.0), and portrait (floor 60, envelope 12.3), with recovery
+  re-proven against the derived bound at each aspect.
+- **Spec parallax contradiction removed** (the retired unit-cube 0.08
+  survived a paragraph below the table that retired it).
+- **Exact-tuple listener registry** (remove-of-nonexistent can no
+  longer mask a leak; capture flag and callback identity tracked) +
+  **RAF ownership accounting** (engine owns exactly one loop:
+  2→1→1→2 across destroy/reinit) — both tiers now get identical
+  3-cycle lifecycle treatment. First run exposed a test artifact:
+  the loader's own RAF was still live at the baseline sample.
+- **GPU-backed restoration evidence**: the rebuilt target texture is
+  compared texel-for-texel against its pre-loss sample (maxDiff 0),
+  and a displaced particle converges onto the restored target under
+  single-stepping (0.39 wu after 1.5 sim-s) — formation preservation
+  no longer rests on the status string.
+- **Partial-build deletion accounting**: create/delete wrapped for
+  textures, framebuffers, programs, buffers, VAOs, and shaders —
+  15 objects created before the injected failure, 0 leaked. This
+  motivated fixing a real leak: neither engine ever deleted shader
+  objects after linking (both now detach + delete).
+- **Strided `debugReadSample`**: 32 strips spread across the full
+  N×N state instead of one corner.
 
 ## Known debt (accepted, tracked)
 
