@@ -219,7 +219,21 @@ NOTE: a per-frame displacement cap (V_max·dt ≤ 3 wu) bounds *speed*,
 not position — recovery-time arguments must integrate over the window
 (V_max × t), and spatial-bound arguments must use the force balance
 above. M2's fling constants are chosen against this table, not the
-retired unit-cube numbers. The earlier "[−1,1]³ / ‖p‖>4" wording
+retired unit-cube numbers.
+
+**M2 acceptance condition — excursion margin recomputed with the grab
+model** (the 31 wu margin predates grab dynamics and must not silently
+become permanent): (a) *held* motion is first-order convergence toward
+`unproject(pointer, capturedDepth) + offset` — monotonic, no
+overshoot; the pointer is viewport-bounded, so a held clump stays
+within the ambient corner + capture offset (≤ ~5 wu) — inside the
+existing envelope. (b) *release* is ballistic under exponential drag:
+excursion = v₀/k_drag with v₀ clamped to 0.8·V_max = 72 wu/s →
+72/5.2 ≈ 13.9 wu, plus seed jitter ≤ ~1 wu, while the spring pulls
+inward concurrently — worst case ≈ 15 wu beyond the release point,
+< 31. **The 31 wu margin therefore remains sufficient under the M2
+model**; verified empirically by the fling-excursion test (max radius
+during fling stays under the derived bound). The earlier "[−1,1]³ / ‖p‖>4" wording
 described a normalization the implementation, correctly, did not
 adopt — sharing generator space with tier 2 keeps the two tiers'
 formations identical.
