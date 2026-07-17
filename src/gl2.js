@@ -9,7 +9,11 @@
   "use strict";
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
+  // device class, not window size: a touchscreen laptop is a desktop
+  // (primary pointer is fine), and a scaled/restored window is not a phone.
+  // Screen dimensions are stable; innerHeight lies under browser chrome.
+  var MOBILE = window.matchMedia("(pointer: coarse)").matches ||
+    Math.min(window.screen.width || 9999, window.screen.height || 9999) < 600;
   var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
   var DPR_CAP = MOBILE ? 1.5 : 1.75;
   var DEPTH_FREE = -2.0; // position.w sentinel (spec: grab depth channel)

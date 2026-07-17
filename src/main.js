@@ -146,7 +146,15 @@
     }
     return bootTier2(canvas);
   })()
-    .then(function () { glOK = true; })
+    .then(function () {
+      glOK = true;
+      // truthful affordance: advertise the grab only where it exists
+      // (tier-1 physical engine, non-touch pointer)
+      var hint = $("#engine-hint");
+      if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
+        hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
+      }
+    })
     .catch(function () {
       $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
       bootLog("COMPILE render engine", "FAIL");

@@ -7,7 +7,10 @@
   "use strict";
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 720 || "ontouchstart" in window;
+  // same device-class fix as gl2.js: touchscreen laptops and scaled
+  // windows were misclassified as mobile (quarter budget, no post)
+  var MOBILE = window.matchMedia("(pointer: coarse)").matches ||
+    Math.min(window.screen.width || 9999, window.screen.height || 9999) < 600;
   // honor Save-Data: mobile particle budget, no post pipeline
   var SAVEDATA = !!(navigator.connection && navigator.connection.saveData);
   var COUNT = (MOBILE || SAVEDATA) ? 16000 : 42000;

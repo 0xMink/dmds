@@ -265,6 +265,13 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
 .hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
+/* the signature interaction advertises itself — a chip, not a whisper */
+#engine-hint {
+  display: inline-block; padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line); color: var(--bone-dim);
+  font-size: 0.625rem; letter-spacing: 0.14em;
+}
+#engine-hint b { color: var(--signal); font-weight: 400; }
 #engine-input { color: var(--signal); letter-spacing: 0.2em; }
 #engine-buffer { color: var(--bone); }
 .engine-caret {
