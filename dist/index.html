@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-ZJv5e1B04g4Ueolqt51HU+Nln6bT/t9V3WPzBGSjfug=' 'sha256-wWUDxnJcK94CFPmb7LgOM76VBShCSHuYL4iWWsqqHEk=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-s5EhQYo4tIt2wMwNMKZaGamGC9TUOgmsebdaed3tKjw=' 'sha256-NmCBZYoaeF8X5J4EwpzMJuA9dIEg9N6XfBZ6NgeDgMg=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -667,7 +667,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="2df1bf1-dirty 2026-07-17T16:29:29Z">
+<meta name="dmds-build" content="e35b03a 2026-07-17T16:53:53Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1809,6 +1809,9 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   function buildGLResources() {
     var gl = state.gl;
+    // test hook (?debug=1 only): injected failure AFTER the visible canvas
+    // holds a WebGL2 context — the fallback MUST replace the canvas
+    if (DEBUG && window.__DMDS_GL2_BREAK__) throw new Error("injected build failure");
 
     // sim: two RGBA32F ping-pong pairs behind two MRT FBOs
     var seed = new Float32Array(COUNT * 4);
@@ -2168,9 +2171,6 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     state.canvas = canvas;
     state.ms = onMilestone || null;
 
-    // test hook: injected compile failure must reach the fallback path
-    if (DEBUG && window.__DMDS_GL2_BREAK__) return Promise.reject(new Error("injected failure"));
-
     if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
 
     var gl = canvas.getContext("webgl2", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
@@ -2197,6 +2197,9 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       clearTimeout(restoreTimer);
       try {
         state.enabledAttribs = [];
+        // a restored context forgets its extensions — re-enable float
+        // rendering or RGBA32F FBOs come back incomplete
+        if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");
         buildGLResources();
         state.gl.viewport(0, 0, state.canvas.width, state.canvas.height);
         // rebuild directly into the current formation at current size
@@ -2209,6 +2212,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         state.raf = requestAnimationFrame(frame);
         if (window.console) console.info("[DMDS] gl2 context restored");
       } catch (err) {
+        if (window.console) console.warn("[DMDS] gl2 context restore failed → demoting:", err && err.message);
         state.running = false;
         if (state.onLostTimeout) state.onLostTimeout();
       }
@@ -2266,7 +2270,27 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     });
   }
 
-  /* ═══ test-only readback ═══ */
+  /* ═══ test-only instruments ═══ */
+  // overwrite one particle's position texel — lets tests inject NaN /
+  // out-of-bounds states and prove the recovery branch, not argue it
+  function debugPoke(index, x, y, z) {
+    if (!DEBUG) throw new Error("debugPoke requires ?debug=1");
+    var gl = state.gl;
+    var data = new Float32Array([x, y, z, DEPTH_FREE]);
+    gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, index % N, Math.floor(index / N), 1, 1, gl.RGBA, gl.FLOAT, data);
+  }
+  function debugGLHealth() {
+    if (!DEBUG) throw new Error("debugGLHealth requires ?debug=1");
+    var gl = state.gl;
+    var out = { error: gl.getError(), fbo: [] };
+    for (var d = 0; d < 2; d++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[d]);
+      out.fbo.push(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return out;
+  }
   function debugReadState() {
     if (!DEBUG) throw new Error("debugReadState requires ?debug=1");
     if (N > 64) throw new Error("debugReadState limited to N<=64 (use gl2n=)");
@@ -2292,8 +2316,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     fps: function () { return state.fps; },
     isReady: function () { return state.ready; },
     onLostTimeout: function (fn) { state.onLostTimeout = fn; },
-    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, excite: Math.round(state.excite * 100) / 100 }; },
-    debugReadState: debugReadState
+    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, formation: state.currentName, excite: Math.round(state.excite * 100) / 100 }; },
+    debugReadState: debugReadState,
+    debugPoke: debugPoke,
+    debugGLHealth: debugGLHealth
   };
 })();
 
@@ -2466,11 +2492,18 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     // adaptive quality governor (hysteresis: drop fast, restore slow)
     drawCount: 0, govT: 0, govGood: 0,
     // boot milestone reporter (main.js wires the loader log to this)
-    ms: null, firstFrame: false
+    ms: null, firstFrame: false,
+    // lifecycle (the engine is a replaceable component in the tier chain)
+    listeners: [], raf: 0, destroyed: false
   };
 
   function milestone(kind, detail) {
     if (state.ms) { try { state.ms(kind, detail); } catch (e) {} }
+  }
+
+  function listen(target, ev, fn) {
+    target.addEventListener(ev, fn);
+    state.listeners.push([target, ev, fn]);
   }
 
   function worldExtents() {
@@ -2853,7 +2886,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   function frame(now) {
     if (!state.running) return;
-    requestAnimationFrame(frame);
+    state.raf = requestAnimationFrame(frame);
     var gl = state.gl;
     now *= 0.001;
     var dt = Math.min(now - state.lastT, 0.05) || 0.016;
@@ -3052,12 +3085,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
     // context loss: pause; on restore, rebuild every GPU resource from
     // the CPU-side formations and resume where we left off
-    canvas.addEventListener("webglcontextlost", function (e) {
+    listen(canvas, "webglcontextlost", function (e) {
       e.preventDefault();
       state.running = false;
       if (window.console) console.warn("[DMDS] WebGL context lost — render paused");
     });
-    canvas.addEventListener("webglcontextrestored", function () {
+    listen(canvas, "webglcontextrestored", function () {
       try {
         buildGLResources();
         gl.viewport(0, 0, state.canvas.width, state.canvas.height);
@@ -3097,7 +3130,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       state.ready = true;
       state.running = true;
 
-      window.addEventListener("resize", function () {
+      listen(window, "resize", function () {
         resize();
         // drop world-space text formations; normalized samples in textCache survive
         Object.keys(state.formations).forEach(function (k) {
@@ -3110,18 +3143,18 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         setFormation(name, true);
       });
 
-      window.addEventListener("mousemove", function (e) {
+      listen(window, "mousemove", function (e) {
         state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         state.mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
         state.mouse.wx = state.mouse.x * state.hw;
         state.mouse.wy = -state.mouse.y * state.hh;
         state.mouse.strTarget = REDUCED ? 0 : 2.4;
       });
-      window.addEventListener("mouseout", function () { state.mouse.strTarget = 0; });
+      listen(window, "mouseout", function () { state.mouse.strTarget = 0; });
 
-      document.addEventListener("visibilitychange", function () {
+      listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; }
-        else if (!state.running) { state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
+        else if (!state.running && !state.destroyed) { state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
 
       requestAnimationFrame(frame);
@@ -3130,8 +3163,28 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     });
   }
 
+  function destroy() {
+    var gl = state.gl;
+    state.running = false;
+    state.ready = false;
+    state.destroyed = true;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
+    state.listeners = [];
+    if (gl) {
+      try {
+        [state.bufA, state.bufB, state.bufR, state.quadBuf].forEach(function (b) { if (b) gl.deleteBuffer(b); });
+        if (state.program) gl.deleteProgram(state.program);
+        [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
+        ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
+      } catch (e) {}
+    }
+    state.gl = null;
+  }
+
   window.DMDS_GL = {
     init: init,
+    destroy: destroy,
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
@@ -3975,4 +4028,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 2df1bf1-dirty 2026-07-17T16:29:29Z -->
+<!-- dmds build e35b03a 2026-07-17T16:53:53Z -->
