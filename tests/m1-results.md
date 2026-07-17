@@ -1,8 +1,8 @@
 # M1 results — tier-1 GPGPU core
 
 Run: `node tests/m1-core.js` · Environment: headless SwiftShader ·
-Date: 2026-07-17 · **PASS — 31/31 checks** (correction pass applied
-after external review; initial run was 13 checks and provisional).
+Date: 2026-07-17 · **PASS — 46/46 checks** (two correction passes
+after external review; runs were 13 → 31 → 46 checks).
 
 ## Milestone state
 
@@ -10,6 +10,48 @@ after external review; initial run was 13 checks and provisional).
 everything SwiftShader can testify to. Real-GPU performance and
 interaction feel remain pending Dennis's hardware (as spec'd — that
 gate belongs to M2+ review, not M1).
+
+## Second correction pass (verification-debt closure)
+
+- **Unit audit added to spec (rev 3.1)** — the "unreachable at
+  V_max·dt" justification was mathematically wrong (a per-frame cap
+  bounds speed, not position); the spatial bound actually comes from
+  force balance (max non-spring force ÷ min spring gain ≈ 31 wu past
+  the ≤ r20 envelope → ~51 < 60). Every world-space constant is now
+  tabulated; M2 fling constants are chosen against that table.
+- **Exact reset contract proven at single-step granularity** via new
+  `pause()/debugStep()/debugReadTargets()`: poked particle, ONE sim
+  step → position equals the active GPU target texel (dp = 0),
+  velocity exactly zero, next step stable (drift 2e-4).
+- **512² morph measured** on a deterministic 32×32 texel sample
+  (`debugReadSample`, any N): 1024/1024 sampled particles moved,
+  finite — "formations render + morph at 512²" is now demonstrated
+  at 512², not inferred from 64².
+- **Lifecycle reusability**: init→destroy→init ×3 with an
+  add/removeEventListener tally — balanced across cycles, engine
+  ready and integrating after re-init; tier-2 destroy→reinit passes.
+  This caught a real bug: `init()` never reset `state.destroyed`, so
+  a destroyed engine could never re-initialize (both tiers fixed).
+  `destroy()` also now clears the pending restore timer.
+- **Restoration integrity beyond status**: post-restore GL health
+  (zero errors, FBOs complete), sim integrates finite, formation
+  preserved, demotion timer proven cancelled (outlived its window).
+  This caught bug #3 of the pass: the rebuild deleted *pre-loss* GL
+  objects on the restored context → sticky `INVALID_OPERATION`.
+  Stale references are now forgotten, not freed (both tiers).
+- **Failure matrix completed**: shader-compile failure (corrupted
+  source on the visible canvas only) and partial-build failure
+  (injected after textures/FBOs/programs exist) both reach cleanup +
+  tier 2.
+
+## Known debt (accepted, tracked)
+
+- Provenance is two-commit-honest but not tamper-evident (a hand-edit
+  to dist can survive if it dodges the CSP hashes) — M6 adds
+  rebuild-and-compare or an artifact hash.
+- Tier-2's `setBudget` remains; `setQualityBias` was never present
+  under that name (spec's deletion target was resolved as: no such
+  API shipped).
 
 ## What the correction pass changed
 

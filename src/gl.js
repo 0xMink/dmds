@@ -747,6 +747,12 @@
   function init(canvas, onMilestone) {
     state.canvas = canvas;
     state.ms = onMilestone || null;
+    // lifecycle reset: a destroyed engine must be fully re-initializable
+    state.destroyed = false;
+    state.ready = false;
+    state.running = false;
+    state.firstFrame = false;
+    state.enabledAttribs = [];
     var gl = canvas.getContext("webgl", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
     if (!gl) return Promise.reject(new Error("no webgl"));
     state.gl = gl;
@@ -765,6 +771,10 @@
     });
     listen(canvas, "webglcontextrestored", function () {
       try {
+        // pre-loss FBO objects are stale on the restored context — forget
+        // them so the rebuild doesn't delete dead-epoch names
+        ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { state[k] = null; });
+        state.enabledAttribs = [];
         buildGLResources();
         gl.viewport(0, 0, state.canvas.width, state.canvas.height);
         uploadCurrentPair();

@@ -203,11 +203,26 @@ the freeze rule's intended path)**: tier 1 reuses tier 2's formation
 generators at their native scale, not a unit cube. At CAM_Z = 26,
 FOV = 35°, the visible half-extents are ≈ 14.6 × 8.2 world units at
 16:9 (viewport-dependent); formations span radius ≲ 20. Derived
-constants scale accordingly: OOB recovery bound 60, ε_snap 0.012
-(≈ 0.5 device px), V_max 90, F_max 900. The earlier "[−1,1]³ / ‖p‖>4"
-wording described a normalization that the implementation, correctly,
-did not adopt — sharing generator space with tier 2 keeps the two
-tiers' formations identical.
+constants scale accordingly — **unit audit** (everything in world
+units, wu; formation half-height ≈ 8 wu is the reference scale):
+
+| Quantity | Value | Why |
+|---|---|---|
+| Formation envelope | ≤ r ≈ 20 | largest generator (grid depth 16, ambient 1.15× viewport) |
+| Interaction excursion bound | ≈ r ≈ 51 | force balance: max non-spring force (turb ≈ 110 + cursor ≈ 340) ÷ min spring gain (≈ 14/s²·wu) ≈ 31 wu beyond the envelope — the spring, not the velocity cap, is what bounds position |
+| OOB recovery bound | 60 | above the excursion bound with margin |
+| V_max / F_max | 90 wu/s / 900 wu/s² | caps ≈ 4.5×/2× the strongest legitimate demand |
+| ε_snap | 0.012 | ≈ 0.5 device px at default camera |
+| Parallax amplitude | TBD at M3, ≈ 0.6 wu | old spec's 0.08 was unit-cube-relative |
+
+NOTE: a per-frame displacement cap (V_max·dt ≤ 3 wu) bounds *speed*,
+not position — recovery-time arguments must integrate over the window
+(V_max × t), and spatial-bound arguments must use the force balance
+above. M2's fling constants are chosen against this table, not the
+retired unit-cube numbers. The earlier "[−1,1]³ / ‖p‖>4" wording
+described a normalization the implementation, correctly, did not
+adopt — sharing generator space with tier 2 keeps the two tiers'
+formations identical.
 
 Perspective camera; parallax lerped from scroll +
 pointer, amplitude ≤ 0.08 world units. Wordmark/type text near-planar

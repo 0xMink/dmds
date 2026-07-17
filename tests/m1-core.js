@@ -56,6 +56,23 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     check('prod:running', r.status.running === true && r.status.tier === 'gl2');
     check('prod:no-gl-error', r.health.error === 0, 'glError=' + r.health.error);
     check('prod:fbos-complete', r.health.fbo.every(s => s === 0x8CD5), JSON.stringify(r.health.fbo));
+    // morph AT production size, measured on a deterministic 32×32 texel
+    // sample — not inferred from the 64² numerical run
+    const morph512 = await page.evaluate(async () => {
+      const before = Array.from(window.DMDS_GL2.debugReadSample().positions);
+      window.DMDS_GL2.setFormation('grid', 0.6);
+      await new Promise(r2 => setTimeout(r2, 4000));
+      const s = window.DMDS_GL2.debugReadSample();
+      let changed = 0, finite = true;
+      for (let i = 0; i < s.positions.length; i += 4) {
+        const d = Math.hypot(s.positions[i] - before[i], s.positions[i + 1] - before[i + 1], s.positions[i + 2] - before[i + 2]);
+        if (d > 0.5) changed++;
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(s.positions[i + k])) finite = false;
+      }
+      return { changed, total: s.positions.length / 4, finite };
+    });
+    check('prod:morph-at-512', morph512.changed > morph512.total * 0.5, morph512.changed + '/' + morph512.total);
+    check('prod:morph-finite-at-512', morph512.finite);
     check('prod:no-page-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }
@@ -103,6 +120,30 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
       return { finite: [4, 5, 6].every(i => Number.isFinite(s.positions[i])), r: Math.hypot(s.positions[4], s.positions[5], s.positions[6]) };
     });
     check('num:nan-recovers-via-reset', nan.finite && nan.r < 25, 'r=' + nan.r.toFixed(1));
+
+    // EXACT reset contract via single-stepping: paused engine, one sim
+    // step → position equals the active GPU target texel, velocity is
+    // exactly zero, and the next step stays put
+    // must be fully settled (mix = 1) so the active target is exactly targB
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 30000 });
+    const exact = await page.evaluate(() => {
+      window.DMDS_GL2.pause();
+      window.DMDS_GL2.debugPoke(2, 150, 150, 150);
+      window.DMDS_GL2.debugStep(1);
+      const s = window.DMDS_GL2.debugReadState();
+      const t = window.DMDS_GL2.debugReadTargets(4);
+      const i = 2 * 4; // particle 2 = texel (2,0) in both layouts
+      const dp = Math.hypot(s.positions[i] - t.b[i], s.positions[i + 1] - t.b[i + 1], s.positions[i + 2] - t.b[i + 2]);
+      const dv = Math.hypot(s.velocities[i], s.velocities[i + 1], s.velocities[i + 2]);
+      window.DMDS_GL2.debugStep(1);
+      const s2 = window.DMDS_GL2.debugReadState();
+      const drift2 = Math.hypot(s2.positions[i] - s.positions[i], s2.positions[i + 1] - s.positions[i + 1], s2.positions[i + 2] - s.positions[i + 2]);
+      window.DMDS_GL2.resume();
+      return { dp, dv, drift2 };
+    });
+    check('num:reset-same-step-onto-target', exact.dp < 1e-3, 'dp=' + exact.dp);
+    check('num:reset-velocity-exactly-zero', exact.dv === 0, 'dv=' + exact.dv);
+    check('num:reset-stable-next-step', exact.drift2 < 0.1, 'drift2=' + exact.drift2);
 
     // morph: setFormation must actually move the population
     const morph = await page.evaluate(async () => {
@@ -210,12 +251,14 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     check('fb:new-canvas-runs-gl1', r.tier === 'gl1' && r.running && r.newHasWebgl1, JSON.stringify(r));
     await page.close();
   }
-  // 3e. runtime context loss → pause; restore within timeout → resume
+  // 3e. runtime context loss → pause; restore → resume with VERIFIED
+  //     integrity (status must not be its own evidence)
   {
     const page = await newPage();
     await page.goto(DIST + '?debug=1&gl2n=64');
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
     const r = await page.evaluate(async () => {
+      const before = window.DMDS_GL2.status();
       const ctx = document.querySelector('#gl').getContext('webgl2');
       const lose = ctx.getExtension('WEBGL_lose_context');
       lose.loseContext();
@@ -223,10 +266,58 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
       const paused = window.DMDS_GL2.status().running === false;
       lose.restoreContext();
       await new Promise(r2 => setTimeout(r2, 1500));
-      return { paused, resumed: window.DMDS_GL2.status().running === true, tier: window.DMDS_GL2.status().tier };
+      const after = window.DMDS_GL2.status();
+      const health = window.DMDS_GL2.debugGLHealth();
+      window.DMDS_GL2.kick(0.4); // a settled field is legally static — provoke motion
+      const s1 = window.DMDS_GL2.debugReadSample();
+      await new Promise(r2 => setTimeout(r2, 1000));
+      const s2 = window.DMDS_GL2.debugReadSample();
+      let drift = 0, finite = true;
+      for (let i = 0; i < s1.positions.length; i += 4) {
+        drift = Math.max(drift, Math.abs(s2.positions[i] - s1.positions[i]));
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(s2.positions[i + k])) finite = false;
+      }
+      // the 4s demotion timer must be cancelled — outlive its window
+      await new Promise(r2 => setTimeout(r2, 4600));
+      const late = window.DMDS_GL2.status();
+      const demoted = !!(window.DMDS_GL && window.DMDS_GL.isReady());
+      return { paused, after, health, drift, finite, formationKept: after.formation === before.formation, late, demoted };
     });
-    check('fb:loss-pauses', r.paused === true, JSON.stringify(r));
-    check('fb:restore-resumes-gl2', r.resumed === true && r.tier === 'gl2', JSON.stringify(r));
+    check('fb:loss-pauses', r.paused === true);
+    check('fb:restore-resumes-gl2', r.after.running === true && r.after.tier === 'gl2', JSON.stringify(r.after));
+    check('fb:restore-gl-healthy', r.health.error === 0 && r.health.fbo.every(s => s === 0x8CD5), JSON.stringify(r.health));
+    check('fb:restore-sim-alive-finite', r.drift > 1e-5 && r.finite, 'drift=' + r.drift);
+    check('fb:restore-formation-kept', r.formationKept);
+    check('fb:restore-timer-cancelled', r.late.running === true && r.late.tier === 'gl2' && !r.demoted, JSON.stringify({ late: r.late, demoted: r.demoted }));
+    await page.close();
+  }
+  // 3e2. shader compile failure on the visible canvas → cleanup → tier 2
+  {
+    const page = await newPage(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) {
+        const ctx = orig.call(this, t, o);
+        if (t === 'webgl2' && ctx && this.id === 'gl') {
+          const ss = ctx.shaderSource.bind(ctx);
+          ctx.shaderSource = (sh, src) => ss(sh, src + '\n#error injected-compile-failure');
+        }
+        return ctx;
+      };
+    });
+    await page.goto(DIST);
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => window.DMDS_GL.status());
+    check('fb:shader-compile-failure → gl1', r.tier === 'gl1' && r.running === true, JSON.stringify(r));
+    await page.close();
+  }
+  // 3e3. failure after PARTIAL resource build (textures+FBOs+programs
+  //      already exist) → destroy() cleans up → tier 2
+  {
+    const page = await newPage(() => { window.__DMDS_GL2_BREAK_LATE__ = true; });
+    await page.goto(DIST + '?debug=1');
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => window.DMDS_GL.status());
+    check('fb:partial-build-failure → gl1', r.tier === 'gl1' && r.running === true, JSON.stringify(r));
     await page.close();
   }
   // 3f. context loss with NO restore within 4s → demote to tier 2 on fresh canvas
@@ -273,21 +364,70 @@ function check(name, ok, detail) { results.push({ name, ok: !!ok, detail: detail
     await page.close();
   }
 
-  // ── 4. engine destroy/reinit: teardown leaves a working page ──
+  // ── 4. lifecycle: init → destroy → init ×3, listener-balanced, reusable ──
   {
-    const page = await newPage();
+    const page = await newPage(() => {
+      window.__LT = {};
+      const key = (t, type) => ((t === window) ? 'window' : (t === document) ? 'document' : (t.tagName || '?')) + ':' + type;
+      const ae = EventTarget.prototype.addEventListener, re = EventTarget.prototype.removeEventListener;
+      EventTarget.prototype.addEventListener = function (type, fn, o) { window.__LT[key(this, type)] = (window.__LT[key(this, type)] || 0) + 1; return ae.call(this, type, fn, o); };
+      EventTarget.prototype.removeEventListener = function (type, fn, o) { window.__LT[key(this, type)] = (window.__LT[key(this, type)] || 0) - 1; return re.call(this, type, fn, o); };
+    });
     await page.goto(DIST + '?debug=1&gl2n=64');
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
     const r = await page.evaluate(async () => {
+      const snap = () => JSON.stringify(window.__LT);
       window.DMDS_GL2.destroy();
       const stopped = window.DMDS_GL2.status().running === false && window.DMDS_GL2.isReady() === false;
       let readbackThrows = false;
       try { window.DMDS_GL2.debugReadState(); } catch (e) { readbackThrows = true; }
-      return { stopped, readbackThrows };
+      const afterFirstDestroy = snap();
+      const canvas = document.querySelector('#gl');
+      for (let c = 0; c < 2; c++) {
+        await window.DMDS_GL2.init(canvas, null);
+        window.DMDS_GL2.destroy();
+      }
+      const afterCycles = snap();
+      await window.DMDS_GL2.init(canvas, null);
+      await new Promise(r2 => setTimeout(r2, 800));
+      const s1 = window.DMDS_GL2.debugReadSample();
+      await new Promise(r2 => setTimeout(r2, 800));
+      const s2 = window.DMDS_GL2.debugReadSample();
+      let drift = 0, finite = true;
+      for (let i = 0; i < s1.positions.length; i += 4) {
+        drift = Math.max(drift, Math.abs(s2.positions[i] - s1.positions[i]));
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(s2.positions[i + k])) finite = false;
+      }
+      return {
+        stopped, readbackThrows,
+        balanced: afterFirstDestroy === afterCycles, afterFirstDestroy, afterCycles,
+        reinitReady: window.DMDS_GL2.isReady(), simAlive: drift > 1e-5 && finite, drift,
+      };
     });
-    check('life:destroy-stops-engine', r.stopped, JSON.stringify(r));
+    check('life:destroy-stops-engine', r.stopped);
     check('life:destroy-releases-state', r.readbackThrows);
-    check('life:no-errors-after-destroy', page.errs.length === 0, page.errs.join('; '));
+    check('life:3-cycles-listener-balanced', r.balanced, r.balanced ? '' : r.afterFirstDestroy + ' vs ' + r.afterCycles);
+    check('life:reinit-ready', r.reinitReady);
+    check('life:reinit-sim-alive', r.simAlive, 'drift=' + r.drift);
+    check('life:no-errors-after-cycles', page.errs.length === 0, page.errs.join('; '));
+    await page.close();
+  }
+  // 4b. tier-2 lifecycle: destroy → reinit on the same canvas
+  {
+    const page = await newPage(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    });
+    await page.goto(DIST);
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(async () => {
+      window.DMDS_GL.destroy();
+      const stopped = !window.DMDS_GL.isReady() && window.DMDS_GL.status().running === false;
+      await window.DMDS_GL.init(document.querySelector('#gl'), null);
+      await new Promise(r2 => setTimeout(r2, 600));
+      return { stopped, reinitReady: window.DMDS_GL.isReady(), running: window.DMDS_GL.status().running };
+    });
+    check('life:gl1-destroy-reinit', r.stopped && r.reinitReady && r.running === true, JSON.stringify(r));
     await page.close();
   }
 

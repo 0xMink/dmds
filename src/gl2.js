@@ -542,6 +542,10 @@
     gl.uniform3f(state.renLoc.uBone, 0.93, 0.92, 0.89);
     gl.uniform3f(state.renLoc.uSignal, 1.0, 0.29, 0.0);
 
+    // test hook (?debug=1): failure AFTER state textures, FBOs and both
+    // programs exist — destroy() must clean partially-built resources
+    if (DEBUG && window.__DMDS_GL2_BREAK_LATE__) throw new Error("injected late build failure");
+
     gl.clearColor(0, 0, 0, 0);
     gl.disable(gl.DEPTH_TEST);
 
@@ -674,6 +678,39 @@
     if (Math.abs(state.mix - prev) > 0.002) excite(Math.min(1, 0.4 + Math.abs(state.mix - prev) * 30));
   }
 
+  // one MRT sim draw — callable from the frame loop AND from the
+  // test-only manual stepper (exact state-transition tests need
+  // single-step granularity)
+  function simStep(dt, now) {
+    var gl = state.gl;
+    var nxt = 1 - state.cur;
+    gl.bindVertexArray(state.vao);
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[nxt]);
+    gl.viewport(0, 0, N, N);
+    gl.useProgram(state.simProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, state.targA);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, state.targB);
+    gl.uniform1i(state.simLoc.uPos, 0);
+    gl.uniform1i(state.simLoc.uVel, 1);
+    gl.uniform1i(state.simLoc.uTargA, 2);
+    gl.uniform1i(state.simLoc.uTargB, 3);
+    gl.uniform1f(state.simLoc.uDt, REDUCED ? Math.min(dt, 1 / 60) : dt);
+    gl.uniform1f(state.simLoc.uTime, now);
+    gl.uniform1f(state.simLoc.uMix, state.mode === "scrub" ? smooth01(state.mix) : state.mix);
+    gl.uniform1f(state.simLoc.uNoise, REDUCED ? 0 : 0.085);
+    gl.uniform1f(state.simLoc.uTurb, state.turb);
+    gl.uniform1f(state.simLoc.uExcite, REDUCED ? 0 : state.excite);
+    gl.uniform3f(state.simLoc.uCursor, state.mouse.wx, state.mouse.wy, 0);
+    gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
+    gl.uniform1i(state.simLoc.uN, N);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    state.cur = nxt;
+    gl.bindVertexArray(null);
+  }
+
   function frame(now) {
     if (!state.running) return;
     state.raf = requestAnimationFrame(frame);
@@ -704,33 +741,7 @@
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    // ── sim pass: one MRT draw ──
-    var nxt = 1 - state.cur;
-    gl.bindVertexArray(state.vao);
-    gl.disable(gl.BLEND);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[nxt]);
-    gl.viewport(0, 0, N, N);
-    gl.useProgram(state.simProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
-    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, state.targA);
-    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, state.targB);
-    gl.uniform1i(state.simLoc.uPos, 0);
-    gl.uniform1i(state.simLoc.uVel, 1);
-    gl.uniform1i(state.simLoc.uTargA, 2);
-    gl.uniform1i(state.simLoc.uTargB, 3);
-    gl.uniform1f(state.simLoc.uDt, REDUCED ? Math.min(dt, 1 / 60) : dt);
-    gl.uniform1f(state.simLoc.uTime, now);
-    gl.uniform1f(state.simLoc.uMix, state.mode === "scrub" ? smooth01(state.mix) : state.mix);
-    gl.uniform1f(state.simLoc.uNoise, REDUCED ? 0 : 0.085);
-    gl.uniform1f(state.simLoc.uTurb, state.turb);
-    gl.uniform1f(state.simLoc.uExcite, REDUCED ? 0 : state.excite);
-    gl.uniform3f(state.simLoc.uCursor, state.mouse.wx, state.mouse.wy, 0);
-    gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
-    gl.uniform1i(state.simLoc.uN, N);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    state.cur = nxt;
-    gl.bindVertexArray(null);
+    simStep(dt, now);
 
     // ── render pass ──
     function drawPoints() {
@@ -838,6 +849,7 @@
     state.running = false;
     state.ready = false;
     state.destroyed = true;
+    clearTimeout(restoreTimer); // a stale loss timer must never fire post-destroy
     if (state.raf) cancelAnimationFrame(state.raf);
     state.listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
     state.listeners = [];
@@ -861,6 +873,16 @@
   function init(canvas, onMilestone) {
     state.canvas = canvas;
     state.ms = onMilestone || null;
+    // lifecycle reset: a destroyed engine must be fully re-initializable
+    state.destroyed = false;
+    state.ready = false;
+    state.running = false;
+    state.firstFrame = false;
+    state.enabledAttribs = [];
+    state.cur = 0;
+    state.mix = 1;
+    state.currentName = null;
+    state.pairA = null; state.pairB = null;
 
     if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
 
@@ -888,7 +910,15 @@
       clearTimeout(restoreTimer);
       try {
         state.enabledAttribs = [];
-        // a restored context forgets its extensions — re-enable float
+        // pre-loss GL objects belong to a dead context epoch — deleting
+        // them on the restored context raises INVALID_OPERATION; forget,
+        // don't free
+        state.posT = [null, null]; state.velT = [null, null]; state.simFbo = [null, null];
+        state.targA = null; state.targB = null; state.simProg = null; state.renProg = null;
+        state.progFade = null; state.progBlur = null; state.progComp = null;
+        state.quadBuf = null; state.vao = null;
+        state.trailA = null; state.trailB = null; state.glowA = null; state.glowB = null;
+        // a restored context also forgets its extensions — re-enable float
         // rendering or RGBA32F FBOs come back incomplete
         if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");
         buildGLResources();
@@ -984,7 +1014,7 @@
   }
   function debugReadState() {
     if (!DEBUG) throw new Error("debugReadState requires ?debug=1");
-    if (N > 64) throw new Error("debugReadState limited to N<=64 (use gl2n=)");
+    if (N > 64) throw new Error("debugReadState limited to N<=64 (use debugReadSample at production N)");
     var gl = state.gl;
     var pos = new Float32Array(COUNT * 4), vel = new Float32Array(COUNT * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[state.cur]);
@@ -994,6 +1024,49 @@
     gl.readPixels(0, 0, N, N, gl.RGBA, gl.FLOAT, vel);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return { n: N, positions: pos, velocities: vel };
+  }
+  // deterministic 32×32 texel subset — works at ANY N, so production-size
+  // behavior is measured, not inferred from small-N runs
+  function debugReadSample() {
+    if (!DEBUG) throw new Error("debugReadSample requires ?debug=1");
+    var gl = state.gl, w = Math.min(32, N);
+    var pos = new Float32Array(w * w * 4), vel = new Float32Array(w * w * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[state.cur]);
+    gl.readBuffer(gl.COLOR_ATTACHMENT0);
+    gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, pos);
+    gl.readBuffer(gl.COLOR_ATTACHMENT1);
+    gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, vel);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { n: N, w: w, positions: pos, velocities: vel };
+  }
+  // read the target textures themselves, so tests compare state against
+  // the actual GPU-side targets rather than re-deriving them on the CPU
+  function debugReadTargets(w) {
+    if (!DEBUG) throw new Error("debugReadTargets requires ?debug=1");
+    var gl = state.gl;
+    w = Math.min(w || 32, N);
+    var fb = gl.createFramebuffer();
+    var out = {};
+    [["a", state.targA], ["b", state.targB]].forEach(function (pair) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pair[1], 0);
+      var data = new Float32Array(w * w * 4);
+      gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, data);
+      out[pair[0]] = data;
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    return out;
+  }
+  // advance the simulation manually with a fixed dt while paused —
+  // single-step granularity for exact state-transition contracts
+  function debugStep(steps, dt) {
+    if (!DEBUG) throw new Error("debugStep requires ?debug=1");
+    dt = dt || 1 / 60;
+    for (var i = 0; i < (steps || 1); i++) {
+      state.time += dt;
+      simStep(dt, state.time);
+    }
   }
 
   window.DMDS_GL2 = {
@@ -1006,9 +1079,20 @@
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); excite(0.7); },
     fps: function () { return state.fps; },
     isReady: function () { return state.ready; },
+    pause: function () { state.running = false; },
+    resume: function () {
+      if (!state.destroyed && !state.running && state.ready) {
+        state.running = true;
+        state.lastT = performance.now() * 0.001; // dt clamp covers the gap
+        state.raf = requestAnimationFrame(frame);
+      }
+    },
     onLostTimeout: function (fn) { state.onLostTimeout = fn; },
-    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, formation: state.currentName, excite: Math.round(state.excite * 100) / 100 }; },
+    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, formation: state.currentName, mix: state.mix, excite: Math.round(state.excite * 100) / 100 }; },
     debugReadState: debugReadState,
+    debugReadSample: debugReadSample,
+    debugReadTargets: debugReadTargets,
+    debugStep: debugStep,
     debugPoke: debugPoke,
     debugGLHealth: debugGLHealth
   };
