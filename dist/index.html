@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-5MK19Mp4Y9g5Af7FfAa5UMNEr2cs27svWmYd36eSQek=' 'sha256-XcxqvC6ZmU0svVjoQBTBtmZ69i3U3mNB/3xD1tVhXwI=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-PyELdmLXvYwXpap8+su7xSkVetx6to0q7yJ/JUMwBDs='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-+ahxnILTpbq9PNWwe5sKNVJWjBJK/ybtDuwFVekXyfY=' 'sha256-XcxqvC6ZmU0svVjoQBTBtmZ69i3U3mNB/3xD1tVhXwI=' 'sha256-qn1Alj2SLU9Qmgicrj/7TBCrAmw1oaCFA7uVUrjyJ1k='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -667,7 +667,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="0328069 2026-07-17T17:26:15Z">
+<meta name="dmds-build" content="709bb19 2026-07-17T17:57:10Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1342,6 +1342,11 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   var OOB_MIN = 60.0;    // floor for the runtime-derived reset bound (see worldExtents)
   var EPS_SNAP = 0.012;  // settle deadband, world units (≈0.5 device px)
   var V_SNAP = 0.06;
+  var EXCITE_TAU = 0.8;  // excitement decay; sized so the convergence invariant closes by 3s
+  var K_GRAB = 14.0;     // held-clump first-order convergence rate (τ ≈ 70ms grip)
+  var GRAB_R_CSS = 90;   // capture radius, CSS px
+  var RELEASE_VMAX = 72; // fling velocity clamp = 0.8·V_max (spec unit audit)
+  var JITTER = 6.0;      // per-axis seed jitter on release, wu/s
 
   /* ═══ shaders ═══ */
   var SIM_VS = "#version 300 es\nvoid main(){vec2 v=vec2(gl_VertexID==1?3.0:-1.0,gl_VertexID==2?3.0:-1.0);gl_Position=vec4(v,0.,1.);}";
@@ -1355,26 +1360,69 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     "uniform float uCursorStr;",
     "uniform float uOob;",
     "uniform int uN;",
+    "uniform mat4 uVP, uInvVP;",
+    "uniform vec2 uGrabPtr;",       // pointer, NDC
+    "uniform float uGrabActive;",   // pointer held?
+    "uniform float uGrabEdge;",     // 1 for exactly the capture step
+    "uniform float uGrabR;",        // capture radius, NDC y-units
+    "uniform float uAspect;",
+    "uniform vec3 uReleaseVel;",    // filtered pointer velocity, world/s
     "layout(location=0) out vec4 oPos;",
     "layout(location=1) out vec4 oVel;",
     // particle identity from the output texel — gl_VertexID does not exist here
     "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "vec3 unproj(vec2 xy, float z){ vec4 w = uInvVP * vec4(xy, z, 1.0); return w.xyz / w.w; }",
     "void main(){",
     "  ivec2 c = ivec2(gl_FragCoord.xy);",
     "  float id = float(c.y * uN + c.x);",
     "  vec4 P = texelFetch(uPos, c, 0);",
     "  vec4 V = texelFetch(uVel, c, 0);",
     "  vec3 p = P.xyz, v = V.xyz;",
+    "  float grabbed = V.w;",
     "  float r1 = hash11(id * 0.1031 + 0.13), r2 = hash11(id * 0.2711 + 0.53),",
     "        r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
     // staggered morph: each particle chases its own blend of the two targets
     "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
     "  stag = stag * stag * (3.0 - 2.0 * stag);",
     "  vec3 target = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stag);",
+    // ── grab state machine (spec: exact transition table) ──
+    // capture: pointerdown edge only — membership can never grow mid-drag
+    "  if (uGrabEdge > 0.5 && grabbed < 0.5) {",
+    "    vec4 clip = uVP * vec4(p, 1.0);",
+    "    vec3 ndc = clip.xyz / clip.w;",
+    "    vec2 d2 = vec2((ndc.x - uGrabPtr.x) * uAspect, ndc.y - uGrabPtr.y);",
+    "    if (length(d2) < uGrabR) {",
+    "      vec3 anchor = unproj(uGrabPtr, ndc.z);",
+    "      oPos = vec4(p, ndc.z);",            // position.w := captured NDC depth
+    "      oVel = vec4(p - anchor, 1.0);",     // velocity.xyz := world offset; w := grabbed
+    "      return;",
+    "    }",
+    "  }",
+    "  if (grabbed > 0.5) {",
+    "    if (uGrabActive > 0.5) {",
+    // held: first-order convergence (the offset occupies the velocity
+    // channels, so there is no velocity state to integrate a spring with)
+    "      vec3 gt = unproj(uGrabPtr, P.w) + v;",
+    "      p += (gt - p) * (1.0 - exp(-" + K_GRAB.toFixed(1) + " * uDt));",
+    "      bool badH = isnan(p.x) || isinf(p.x) || isnan(p.y) || isinf(p.y) || isnan(p.z) || isinf(p.z);",
+    "      if (badH) { oPos = vec4(target, -2.0); oVel = vec4(0.0); return; }",
+    "      oPos = vec4(p, P.w);",
+    "      oVel = vec4(v, 1.0);",
+    "      return;",
+    "    }",
+    // release: SAME step that observes active=0 with the flag set —
+    // the stored offset is never integrated as a physical velocity
+    "    v = uReleaseVel + (vec3(r2, r4, r3) - 0.5) * " + JITTER.toFixed(1) + ";",
+    "    grabbed = 0.0;",
+    "    P.w = -2.0;",
+    "  }",
     // forces: formation spring (per-particle gain), turbulence, cursor, then drag
     "  vec3 F = " + K_SPRING.toFixed(1) + " * (0.55 + r2 * 0.9) * (target - p);",
+    // crisp-lock MUST: below excitement 0.05 turbulence is EXACTLY zero,
+    // or idle noise sustains ~0.03 wu orbits that never converge or snap
+    "  float gate = smoothstep(0.05, 0.12, uExcite);",
     "  float sw = uMix * (1.0 - uMix) * 4.0;",
-    "  float amp = (uTurb + uNoise * (0.5 + r3) * uExcite + sw * 2.1) * 34.0;",
+    "  float amp = (uTurb * gate + uNoise * (0.5 + r3) * uExcite * gate + sw * 2.1) * 34.0;",
     "  F += vec3(",
     "    sin(p.y * 0.35 + uTime * 0.9 + r4 * 6.283),",
     "    sin(p.z * 0.30 + uTime * 0.8 + r1 * 6.283),",
@@ -1397,9 +1445,9 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     "  }",
     // finite-value recovery: reassembly always wins
     "  bvec3 bad = bvec3(isnan(p.x) || isinf(p.x), isnan(p.y) || isinf(p.y), isnan(p.z) || isinf(p.z));",
-    "  if (any(bad) || length(p) > uOob) { p = target; v = vec3(0.0); }",
+    "  if (any(bad) || length(p) > uOob) { p = target; v = vec3(0.0); P.w = -2.0; grabbed = 0.0; }",
     "  oPos = vec4(p, P.w);",
-    "  oVel = vec4(v, V.w);",
+    "  oVel = vec4(v, grabbed);",
     "}"
   ].join("\n");
 
@@ -1505,6 +1553,38 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     var cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
     return [cy, sx * sy, -cx * sy, 0, 0, cx, sx, 0, sy, -sx * cy, cx * cy, 0, 0, 0, -z, 1];
   }
+  // column-major a·b (apply b, then a) — matches the shader's uProj*uView order
+  function mat4Mul(a, b) {
+    var o = new Array(16);
+    for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) {
+      o[i * 4 + j] = a[j] * b[i * 4] + a[4 + j] * b[i * 4 + 1] + a[8 + j] * b[i * 4 + 2] + a[12 + j] * b[i * 4 + 3];
+    }
+    return o;
+  }
+  function mat4Invert(m) {
+    var inv = new Array(16);
+    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+    var det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+    if (!det) return inv;
+    det = 1 / det;
+    for (var k = 0; k < 16; k++) inv[k] *= det;
+    return inv;
+  }
   function compile(gl, type, src) {
     var s = gl.createShader(type);
     gl.shaderSource(s, src); gl.compileShader(s);
@@ -1539,6 +1619,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     mix: 1, mode: "tween", tweenDur: 1.5, morphStart: 0, morphDur: REDUCED ? 0.01 : 1.5,
     time: 0, lastT: 0, turb: 0, turbTarget: 0, excite: 1,
     mouse: { x: 0, y: 0, wx: 0, wy: 0, str: 0, strTarget: 0 },
+    grab: { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0 },
     dim: 1, dimTarget: 1, rot: { x: 0, y: 0 },
     fps: 60, frames: 0, fpsT: 0, hw: 8, hh: 8,
     post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
@@ -1854,7 +1935,8 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
     state.vao = gl.createVertexArray();
     state.simProg = makeProgram(gl, SIM_VS, SIM_FS);
-    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uOob", "uN"].forEach(function (n) {
+    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uOob", "uN",
+     "uVP", "uInvVP", "uGrabPtr", "uGrabActive", "uGrabEdge", "uGrabR", "uAspect", "uReleaseVel"].forEach(function (n) {
       state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
     });
     state.renProg = makeProgram(gl, REN_VS, REN_FS);
@@ -2007,6 +2089,15 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   function simStep(dt, now) {
     var gl = state.gl;
     var nxt = 1 - state.cur;
+    // camera matrices — identical inputs to the render pass this frame,
+    // so capture math and drawn positions agree
+    var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
+    var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
+    var vp = mat4Mul(
+      perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100),
+      viewMatrix(rx, ry, CAM_Z)
+    );
+    var invVp = mat4Invert(vp);
     gl.bindVertexArray(state.vao);
     gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[nxt]);
@@ -2030,7 +2121,16 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
     gl.uniform1f(state.simLoc.uOob, state.oob);
     gl.uniform1i(state.simLoc.uN, N);
+    gl.uniformMatrix4fv(state.simLoc.uVP, false, vp);
+    gl.uniformMatrix4fv(state.simLoc.uInvVP, false, invVp);
+    gl.uniform2f(state.simLoc.uGrabPtr, state.grab.ptr[0], state.grab.ptr[1]);
+    gl.uniform1f(state.simLoc.uGrabActive, state.grab.active ? 1 : 0);
+    gl.uniform1f(state.simLoc.uGrabEdge, state.grab.edge ? 1 : 0);
+    gl.uniform1f(state.simLoc.uGrabR, 2 * GRAB_R_CSS / Math.max(1, window.innerHeight));
+    gl.uniform1f(state.simLoc.uAspect, state.canvas.width / Math.max(1, state.canvas.height));
+    gl.uniform3f(state.simLoc.uReleaseVel, state.grab.vel[0], state.grab.vel[1], state.grab.vel[2]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    state.grab.edge = false; // capture happens on exactly one step
     state.cur = nxt;
     gl.bindVertexArray(null);
   }
@@ -2059,7 +2159,8 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     state.turb += (state.turbTarget - state.turb) * (1 - Math.exp(-4 * dt));
     state.turbTarget *= Math.exp(-2.2 * dt);
     // excitement decays toward rest; crisp-lock rides this scalar
-    state.excite *= Math.exp(-dt / 1.2);
+    state.excite *= Math.exp(-dt / EXCITE_TAU);
+    if (state.grab.active) excite(0.85);
     if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
 
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
@@ -2223,6 +2324,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     listen(canvas, "webglcontextlost", function (e) {
       e.preventDefault();
       state.running = false;
+      if (state.releaseGrab) state.releaseGrab();
       if (window.console) console.warn("[DMDS] gl2 context lost — render paused");
       // spec: no restoration within 4s → the page's engine boot chain
       // owns replacement; we surface it via status().running + onLost
@@ -2301,8 +2403,59 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         state.mouse.strTarget = REDUCED ? 0 : 2.4;
       });
       listen(window, "mouseout", function () { state.mouse.strTarget = 0; });
+
+      // ── grab input (desktop pointer only; touch stirs, never grabs) ──
+      function pointerNDC(e) {
+        state.grab.ptr[0] = (e.clientX / window.innerWidth) * 2 - 1;
+        state.grab.ptr[1] = -((e.clientY / window.innerHeight) * 2 - 1);
+      }
+      function pointerWorldVel(e) {
+        var now = performance.now() * 0.001;
+        var wx = state.grab.ptr[0] * state.hw, wy = state.grab.ptr[1] * state.hh;
+        if (state.grab.lastW) {
+          var dtp = Math.max(1e-3, now - state.grab.lastT);
+          var vx = (wx - state.grab.lastW[0]) / dtp, vy = (wy - state.grab.lastW[1]) / dtp;
+          var a = 1 - Math.exp(-dtp / 0.08); // ~80ms EMA per spec
+          state.grab.vel[0] += (vx - state.grab.vel[0]) * a;
+          state.grab.vel[1] += (vy - state.grab.vel[1]) * a;
+          var m = Math.hypot(state.grab.vel[0], state.grab.vel[1]);
+          if (m > RELEASE_VMAX) {
+            state.grab.vel[0] *= RELEASE_VMAX / m;
+            state.grab.vel[1] *= RELEASE_VMAX / m;
+          }
+        }
+        state.grab.lastW = [wx, wy];
+        state.grab.lastT = now;
+      }
+      function releaseGrab() {
+        // unconditional: a grab can never outlive its pointer (spec MUST)
+        state.grab.active = false;
+        state.grab.edge = false;
+      }
+      state.releaseGrab = releaseGrab;
+      listen(window, "pointerdown", function (e) {
+        if (REDUCED || TOUCH_GRAB(e) || e.button !== 0) return;
+        var t = e.target;
+        if (t && t.closest && t.closest("a, button, input, textarea, select, label, summary, [contenteditable]")) return;
+        pointerNDC(e);
+        state.grab.vel = [0, 0, 0];
+        state.grab.lastW = null;
+        pointerWorldVel(e);
+        state.grab.active = true;
+        state.grab.edge = true;
+        excite(1);
+      });
+      function TOUCH_GRAB(e) { return e.pointerType === "touch" || e.pointerType === "pen"; }
+      listen(window, "pointermove", function (e) {
+        if (!state.grab.active) return;
+        pointerNDC(e);
+        pointerWorldVel(e);
+      });
+      listen(window, "pointerup", releaseGrab);
+      listen(window, "pointercancel", releaseGrab);
+      listen(window, "blur", releaseGrab);
       listen(document, "visibilitychange", function () {
-        if (document.hidden) { state.running = false; }
+        if (document.hidden) { state.running = false; if (state.releaseGrab) state.releaseGrab(); }
         else if (!state.running && !state.destroyed) {
           state.running = true;
           state.lastT = performance.now() * 0.001; // dt clamp handles the gap
@@ -2393,8 +2546,17 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     dt = dt || 1 / 60;
     for (var i = 0; i < (steps || 1); i++) {
       state.time += dt;
+      state.excite *= Math.exp(-dt / EXCITE_TAU); // mirror frame() so stepped runs settle
       simStep(dt, state.time);
     }
+  }
+  // velocity-channel poke — damping-invariance tests need a known v₀
+  function debugPokeVel(index, x, y, z) {
+    if (!DEBUG) throw new Error("debugPokeVel requires ?debug=1");
+    var gl = state.gl;
+    var data = new Float32Array([x, y, z, 0]);
+    gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, index % N, Math.floor(index / N), 1, 1, gl.RGBA, gl.FLOAT, data);
   }
 
   window.DMDS_GL2 = {
@@ -2422,6 +2584,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     debugReadTargets: debugReadTargets,
     debugStep: debugStep,
     debugPoke: debugPoke,
+    debugPokeVel: debugPokeVel,
     debugGLHealth: debugGLHealth
   };
 })();
@@ -4145,4 +4308,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 0328069 2026-07-17T17:26:15Z -->
+<!-- dmds build 709bb19 2026-07-17T17:57:10Z -->
