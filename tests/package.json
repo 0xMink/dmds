@@ -1,0 +1,11 @@
+{
+  "name": "dmds-tests",
+  "private": true,
+  "description": "Headless verification harness for the DMDS site (M0 gate + suite; see spec).",
+  "scripts": {
+    "m0": "node m0-run.js --out results/m0-latest.json"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

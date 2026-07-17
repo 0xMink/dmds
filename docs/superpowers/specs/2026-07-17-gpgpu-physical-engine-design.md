@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-07-17 |
-| **Status** | **Approved for implementation, pending M0 validation** (rev 3) |
+| **Status** | **Approved for implementation** (rev 3) — M0 capability gate passed under headless SwiftShader 2026-07-17 (36/36; `tests/m0-results.md`, artifact `tests/results/m0-swiftshader-2026-07-17.json`, gate commit `d0654c8`); real-GPU performance and interaction validation remain pending |
 | **Owner** | Dennis Mink (@0xMink) |
 | **Scope** | Phase 1 of the staged plan (physical engine → DMDS/OS terminal → playable layer). This spec covers Phase 1 only. |
 | **Parent docs** | `DESIGN.md` v2.1 (this work bumps it to v2.2), `README.md` |

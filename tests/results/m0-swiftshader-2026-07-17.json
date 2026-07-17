@@ -1,0 +1,215 @@
+{
+  "gate": "M0",
+  "date": "2026-07-17T16:22:37.896Z",
+  "pass": true,
+  "commit": "d0654c8",
+  "runner": {
+    "node": "v20.20.2",
+    "browserVersion": "149.0.7827.55",
+    "executablePath": "/root/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome",
+    "args": [
+      "--no-sandbox",
+      "--use-gl=swiftshader",
+      "--enable-unsafe-swiftshader"
+    ]
+  },
+  "env": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "glsl": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)"
+  },
+  "tolerances": {
+    "simValues": {
+      "portableMax": 0.0001,
+      "note": "absolute; SwiftShader observed 0 — bit-exactness is an observation, not the gate"
+    },
+    "rgba16fRoundtrip": {
+      "portableMax": 0.002,
+      "note": "binary16 quantization bound near |x|<=1"
+    }
+  },
+  "cycles": 3,
+  "checks": [
+    {
+      "name": "c0:webgl2-context",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c0:EXT_color_buffer_float",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c0:fbo0-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c0:fbo1-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c0:sim-pos-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c0:pos-w-sentinel-preserved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c0:sim-vel-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c0:render-fbo-complete",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c0:vertex-texelFetch-render",
+      "ok": true,
+      "detail": "center px=255,64,0,255"
+    },
+    {
+      "name": "c0:rgba16f-roundtrip",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c0:no-gl-error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c0:teardown-clean",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:webgl2-context",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:EXT_color_buffer_float",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:fbo0-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c1:fbo1-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c1:sim-pos-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c1:pos-w-sentinel-preserved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:sim-vel-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c1:render-fbo-complete",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:vertex-texelFetch-render",
+      "ok": true,
+      "detail": "center px=255,64,0,255"
+    },
+    {
+      "name": "c1:rgba16f-roundtrip",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c1:no-gl-error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c1:teardown-clean",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:webgl2-context",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:EXT_color_buffer_float",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:fbo0-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c2:fbo1-complete",
+      "ok": true,
+      "detail": "status=0x8cd5"
+    },
+    {
+      "name": "c2:sim-pos-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c2:pos-w-sentinel-preserved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:sim-vel-values",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c2:render-fbo-complete",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:vertex-texelFetch-render",
+      "ok": true,
+      "detail": "center px=255,64,0,255"
+    },
+    {
+      "name": "c2:rgba16f-roundtrip",
+      "ok": true,
+      "detail": "maxErr=0"
+    },
+    {
+      "name": "c2:no-gl-error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2:teardown-clean",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}
