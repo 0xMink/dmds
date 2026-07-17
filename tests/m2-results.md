@@ -1,8 +1,42 @@
 # M2 results — grab / tear / fling
 
 Run: `node tests/m2-grab.js` · Environment: headless SwiftShader ·
-Date: 2026-07-17 · **PASS — 35/35 checks** (M1 regression re-run
-green, 59/59).
+Date: 2026-07-17 · **PASS — 52/52 checks** (35 initial + 17 from the
+gap-closure pass; M1 regression green, 59/59).
+
+## Gap-closure pass (after external review)
+
+1. **`debugStep` now steps the real engine**: the CPU half of the
+   dynamical system (morph progress, mouse/turbulence/dim lerps,
+   excitement decay and grab re-raise) lives in one shared
+   `advanceSimulationState(dt, now)` used by BOTH the frame loop and
+   the deterministic stepper — tests exercise the system visitors
+   receive, not a calmer laboratory twin.
+2. **Production-N convergence, via the spec'd hierarchical 2×2 GPU
+   reduction** (`debugConvergence`): at 256² and 512², grab (5,330 /
+   18,956 particles captured — counted by the reduction itself), drag,
+   fling, then **0 of 65,536 / 0 of 262,144 outside 0.01 wu at 3 s**;
+   0 outside 0.03, 0 flags, 0 non-finite, maxDist 0 at 4 s.
+3. **Pointer-release ownership completed**: `setPointerCapture` on the
+   canvas at grab start; release proven for lostpointercapture,
+   hidden-tab, context-loss, and destroy (plus the earlier pointerup/
+   pointercancel/blur). `destroy()`/`init()` fully reset CPU grab
+   state — a stale `active` flag would have pinned excitement at 0.85
+   and killed crisp-lock after any re-init.
+4. **Camera-correct pointer geometry**: pointer NDC from
+   `canvas.getBoundingClientRect()` (clamped, so an off-screen drag
+   can't haul a clump toward the recovery bound — the held branch also
+   applies OOB recovery now); release velocity from successive
+   *unprojected* pointer anchors on the world-origin reference plane
+   (camera-rotation-aware); `mat4Invert` throws on singular input;
+   project→unproject round trip ≤ 2e-12 at 16:9 / ultrawide /
+   portrait across depths with the live rotating camera.
+5. Tear screenshot capture is a committed portable script
+   (`tests/m2-tear-shot.js`), not a scratchpad artifact.
+
+Wording correction per review: the fling assertions measure the
+**post-integration release-step velocity** (spring and drag apply in
+the same step, by design), not the raw transition value.
 
 ## What M2 built
 

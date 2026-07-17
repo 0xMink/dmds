@@ -278,6 +278,135 @@ const CX = 720, CY = 396;
     await page.close();
   }
 
+  // ── 6. release matrix completion: lostpointercapture, hidden tab,
+  //       context loss, destroy — a grab can never outlive its pointer ──
+  {
+    const page = await settledPage(browser);
+    const r = await page.evaluate(async ([CX, CY]) => {
+      const { E, grabSet, down } = window.H;
+      const out = {};
+      const step = () => E.debugStep(1);
+      const flags = () => grabSet(window.DMDS_GL2.debugReadState()).length;
+      E.pause();
+      // lostpointercapture (dispatched on the capture owner, the canvas)
+      down(CX, CY); step();
+      out.lpcBefore = flags();
+      document.querySelector('#gl').dispatchEvent(new PointerEvent('lostpointercapture', { pointerType: 'mouse' }));
+      step();
+      out.lpcAfter = flags();
+      // hidden tab
+      down(CX, CY); step();
+      out.hidBefore = flags();
+      Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      step();
+      out.hidAfter = flags();
+      Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      E.pause();
+      return out;
+    }, [CX, CY]);
+    check('grab:lostpointercapture-releases', r.lpcBefore > 0 && r.lpcAfter === 0, JSON.stringify(r));
+    check('grab:hidden-tab-releases', r.hidBefore > 0 && r.hidAfter === 0, JSON.stringify(r));
+    await page.close();
+  }
+  // context loss mid-grab → CPU grab dead; post-restore state grab-free
+  {
+    const page = await settledPage(browser);
+    const r = await page.evaluate(async ([CX, CY]) => {
+      const { E, grabSet, down } = window.H;
+      E.pause();
+      down(CX, CY);
+      E.debugStep(1);
+      const before = grabSet(window.DMDS_GL2.debugReadState()).length;
+      const lose = document.querySelector('#gl').getContext('webgl2').getExtension('WEBGL_lose_context');
+      lose.loseContext();
+      await new Promise(r2 => setTimeout(r2, 400));
+      const cpuReleased = E.debugGLHealth ? true : true; // health needs live GL; check after restore
+      lose.restoreContext();
+      await new Promise(r2 => setTimeout(r2, 1500));
+      E.pause();
+      E.debugStep(1);
+      return { before, grabActive: E.debugGLHealth().grabActive, flags: grabSet(window.DMDS_GL2.debugReadState()).length };
+    }, [CX, CY]);
+    check('grab:context-loss-releases', r.before > 0 && r.grabActive === false && r.flags === 0, JSON.stringify(r));
+    await page.close();
+  }
+  // destroy mid-grab → re-init starts grab-free (a stale active flag would
+  // pin excitement and kill crisp-lock forever)
+  {
+    const page = await settledPage(browser);
+    const r = await page.evaluate(async ([CX, CY]) => {
+      const { E, grabSet, down } = window.H;
+      E.pause();
+      down(CX, CY);
+      E.debugStep(1);
+      const before = grabSet(window.DMDS_GL2.debugReadState()).length;
+      E.destroy();
+      await E.init(document.querySelector('#gl'), null);
+      await new Promise(r2 => setTimeout(r2, 400));
+      E.pause();
+      E.debugStep(1);
+      return { before, grabActive: E.debugGLHealth().grabActive, flags: grabSet(window.DMDS_GL2.debugReadState()).length };
+    }, [CX, CY]);
+    check('grab:destroy-resets-grab', r.before > 0 && r.grabActive === false && r.flags === 0, JSON.stringify(r));
+    await page.close();
+  }
+
+  // ── 7. pointer geometry: project→unproject round trip with the live
+  //       camera, across aspects and depths ──
+  for (const [label, vw, vh] of [['16x9', 1440, 900], ['ultrawide', 3440, 1080], ['portrait', 390, 844]]) {
+    const page = await browser.newPage({ viewport: { width: vw, height: vh } });
+    await page.goto(DIST + '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
+    await page.waitForTimeout(800); // live camera (rotating) has produced frames
+    const err = await page.evaluate(() => {
+      const pts = [];
+      [-1, 0, 1].forEach(sx => [-1, 0, 1].forEach(sy => [-8, 0, 8].forEach(z => {
+        pts.push([sx * 10, sy * 6, z]);
+      })));
+      return window.DMDS_GL2.debugRoundTrip(pts);
+    });
+    check('geom:' + label + ':roundtrip', err < 1e-3, 'maxErr=' + err);
+    await page.close();
+  }
+
+  // ── 8. production-N convergence via the hierarchical GPU reduction ──
+  for (const [label, q, count] of [['256sq', '&gl2n=256', 65536], ['512sq', '', 262144]]) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.errs = [];
+    page.on('pageerror', e => page.errs.push(String(e)));
+    await page.goto(DIST + '?debug=1' + q);
+    await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 120000 });
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 120000 });
+    await page.evaluate(INSTALL_HELPERS);
+    const r = await page.evaluate(async ([CX, CY]) => {
+      const { E, down, move, up } = window.H;
+      E.pause();
+      down(CX, CY);
+      E.debugStep(1);
+      const captured = E.debugConvergence(0.01, 0.03).bad; // grabbed count via reduction
+      for (let k = 1; k <= 5; k++) {
+        move(CX + k * 60, CY - k * 20);
+        await new Promise(r2 => setTimeout(r2, 30));
+        E.debugStep(2);
+      }
+      up();
+      E.debugStep(180, 1 / 60); // 3 sim-seconds
+      const at3 = E.debugConvergence(0.01, 0.03);
+      E.debugStep(60, 1 / 60);  // +1 sim-second
+      const at4 = E.debugConvergence(0.01, 0.03);
+      E.resume();
+      return { captured, at3, at4 };
+    }, [CX, CY]);
+    check('prodconv:' + label + ':captured-via-reduction', r.captured > 100, 'captured=' + r.captured);
+    check('prodconv:' + label + ':99pct-by-3s', r.at3.nearOut <= count * 0.01, 'out=' + r.at3.nearOut + '/' + count);
+    check('prodconv:' + label + ':100pct-by-4s', r.at4.finalOut === 0 && r.at4.bad === 0, 'finalOut=' + r.at4.finalOut + ' bad=' + r.at4.bad);
+    check('prodconv:' + label + ':maxdist-sane', r.at4.maxDist < 0.03, 'maxDist=' + r.at4.maxDist);
+    check('prodconv:' + label + ':no-errors', page.errs.length === 0, page.errs.join('; '));
+    await page.close();
+  }
+
   await browser.close();
   const pass = results.every(r => r.ok);
   results.forEach(r => console.log((r.ok ? '  ok  ' : '  FAIL'), r.name, r.detail));

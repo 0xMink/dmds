@@ -95,7 +95,7 @@
     // channels, so there is no velocity state to integrate a spring with)
     "      vec3 gt = unproj(uGrabPtr, P.w) + v;",
     "      p += (gt - p) * (1.0 - exp(-" + K_GRAB.toFixed(1) + " * uDt));",
-    "      bool badH = isnan(p.x) || isinf(p.x) || isnan(p.y) || isinf(p.y) || isnan(p.z) || isinf(p.z);",
+    "      bool badH = isnan(p.x) || isinf(p.x) || isnan(p.y) || isinf(p.y) || isnan(p.z) || isinf(p.z) || length(p) > uOob;",
     "      if (badH) { oPos = vec4(target, -2.0); oVel = vec4(0.0); return; }",
     "      oPos = vec4(p, P.w);",
     "      oVel = vec4(v, 1.0);",
@@ -252,6 +252,22 @@
     }
     return o;
   }
+  function unprojectCPU(ndcX, ndcY, ndcZ) {
+    var m = state.invVP;
+    var x = m[0] * ndcX + m[4] * ndcY + m[8] * ndcZ + m[12];
+    var y = m[1] * ndcX + m[5] * ndcY + m[9] * ndcZ + m[13];
+    var z = m[2] * ndcX + m[6] * ndcY + m[10] * ndcZ + m[14];
+    var w = m[3] * ndcX + m[7] * ndcY + m[11] * ndcZ + m[15];
+    return [x / w, y / w, z / w];
+  }
+  function projectCPU(wx, wy, wz) {
+    var m = state.vp;
+    var x = m[0] * wx + m[4] * wy + m[8] * wz + m[12];
+    var y = m[1] * wx + m[5] * wy + m[9] * wz + m[13];
+    var z = m[2] * wx + m[6] * wy + m[10] * wz + m[14];
+    var w = m[3] * wx + m[7] * wy + m[11] * wz + m[15];
+    return [x / w, y / w, z / w];
+  }
   function mat4Invert(m) {
     var inv = new Array(16);
     inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
@@ -271,7 +287,7 @@
     inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
     inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
     var det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
-    if (!det) return inv;
+    if (!det || !isFinite(det)) throw new Error("mat4Invert: singular matrix"); // loud, not a pile of numbers
     det = 1 / det;
     for (var k = 0; k < 16; k++) inv[k] *= det;
     return inv;
@@ -310,7 +326,7 @@
     mix: 1, mode: "tween", tweenDur: 1.5, morphStart: 0, morphDur: REDUCED ? 0.01 : 1.5,
     time: 0, lastT: 0, turb: 0, turbTarget: 0, excite: 1,
     mouse: { x: 0, y: 0, wx: 0, wy: 0, str: 0, strTarget: 0 },
-    grab: { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0 },
+    grab: { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0, captureId: null },
     dim: 1, dimTarget: 1, rot: { x: 0, y: 0 },
     fps: 60, frames: 0, fpsT: 0, hw: 8, hh: 8,
     post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
@@ -789,6 +805,11 @@
       viewMatrix(rx, ry, CAM_Z)
     );
     var invVp = mat4Invert(vp);
+    // shared with CPU pointer math (release velocity, round-trip tests):
+    // world origin's NDC depth is the reference plane for pointer anchors
+    state.vp = vp;
+    state.invVP = invVp;
+    state.originNdcZ = vp[14] / vp[15]; // project (0,0,0): clip.z/clip.w
     gl.bindVertexArray(state.vao);
     gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[nxt]);
@@ -826,6 +847,24 @@
     gl.bindVertexArray(null);
   }
 
+  // the CPU half of the dynamical system — one function, used by BOTH the
+  // frame loop and the deterministic test stepper, so tests exercise the
+  // exact system visitors receive, not a calmer laboratory version
+  function advanceSimulationState(dt, now) {
+    if (state.mode === "tween" && state.mix < 1) {
+      state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
+      excite(0.6 + state.mix * (1 - state.mix));
+    }
+    state.mouse.str += (state.mouse.strTarget - state.mouse.str) * (1 - Math.exp(-8 * dt));
+    state.dim += (state.dimTarget - state.dim) * (1 - Math.exp(-5 * dt));
+    state.turb += (state.turbTarget - state.turb) * (1 - Math.exp(-4 * dt));
+    state.turbTarget *= Math.exp(-2.2 * dt);
+    // excitement decays toward rest; crisp-lock rides this scalar
+    state.excite *= Math.exp(-dt / EXCITE_TAU);
+    if (state.grab.active) excite(0.85);
+    if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
+  }
+
   function frame(now) {
     if (!state.running) return;
     state.raf = requestAnimationFrame(frame);
@@ -840,20 +879,7 @@
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
     if (!state.firstFrame) { state.firstFrame = true; milestone("loop"); }
 
-    if (state.mode === "tween" && state.mix < 1) {
-      state.mix = Math.min(1, (now - state.morphStart) / state.tweenDur);
-      excite(0.6 + state.mix * (1 - state.mix));
-    }
-
-    state.mouse.str += (state.mouse.strTarget - state.mouse.str) * (1 - Math.exp(-8 * dt));
-    state.dim += (state.dimTarget - state.dim) * (1 - Math.exp(-5 * dt));
-    state.turb += (state.turbTarget - state.turb) * (1 - Math.exp(-4 * dt));
-    state.turbTarget *= Math.exp(-2.2 * dt);
-    // excitement decays toward rest; crisp-lock rides this scalar
-    state.excite *= Math.exp(-dt / EXCITE_TAU);
-    if (state.grab.active) excite(0.85);
-    if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
-
+    advanceSimulationState(dt, now);
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
@@ -965,6 +991,8 @@
     state.running = false;
     state.ready = false;
     state.destroyed = true;
+    if (state.releaseGrab) state.releaseGrab(); // grabs die with the engine
+    state.grab.active = false; state.grab.edge = false; state.grab.captureId = null;
     clearTimeout(restoreTimer); // a stale loss timer must never fire post-destroy
     if (state.raf) cancelAnimationFrame(state.raf);
     state.listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
@@ -977,6 +1005,7 @@
         [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
         if (state.quadBuf) gl.deleteBuffer(state.quadBuf);
         if (state.vao) gl.deleteVertexArray(state.vao);
+        destroyConvChain();
         ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
       } catch (e) {}
     }
@@ -999,6 +1028,9 @@
     state.mix = 1;
     state.currentName = null;
     state.pairA = null; state.pairB = null;
+    // a CPU-side grab must not survive teardown/re-init (GPU textures are
+    // reseeded, but a stale active flag would pin excitement forever)
+    state.grab = { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0, captureId: null };
 
     if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
 
@@ -1035,6 +1067,7 @@
         state.progFade = null; state.progBlur = null; state.progComp = null;
         state.quadBuf = null; state.vao = null;
         state.trailA = null; state.trailB = null; state.glowA = null; state.glowB = null;
+        state.conv = null; // reduction chain is also dead-epoch
         // a restored context also forgets its extensions — re-enable float
         // rendering or RGBA32F FBOs come back incomplete
         if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");
@@ -1097,15 +1130,24 @@
 
       // ── grab input (desktop pointer only; touch stirs, never grabs) ──
       function pointerNDC(e) {
-        state.grab.ptr[0] = (e.clientX / window.innerWidth) * 2 - 1;
-        state.grab.ptr[1] = -((e.clientY / window.innerHeight) * 2 - 1);
+        // canvas rect, not window — and clamped, so a drag off-screen can
+        // never haul a held clump toward the recovery bound
+        var r = state.canvas.getBoundingClientRect();
+        var nx = ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1;
+        var ny = -(((e.clientY - r.top) / Math.max(1, r.height)) * 2 - 1);
+        state.grab.ptr[0] = Math.max(-1.05, Math.min(1.05, nx));
+        state.grab.ptr[1] = Math.max(-1.05, Math.min(1.05, ny));
       }
-      function pointerWorldVel(e) {
+      function pointerWorldVel() {
+        // pointer anchor unprojected on the world-origin reference plane —
+        // camera-rotation-aware, unlike the retired hw/hh approximation
         var now = performance.now() * 0.001;
-        var wx = state.grab.ptr[0] * state.hw, wy = state.grab.ptr[1] * state.hh;
+        var a3 = state.invVP
+          ? unprojectCPU(state.grab.ptr[0], state.grab.ptr[1], state.originNdcZ)
+          : [state.grab.ptr[0] * state.hw, state.grab.ptr[1] * state.hh, 0];
         if (state.grab.lastW) {
           var dtp = Math.max(1e-3, now - state.grab.lastT);
-          var vx = (wx - state.grab.lastW[0]) / dtp, vy = (wy - state.grab.lastW[1]) / dtp;
+          var vx = (a3[0] - state.grab.lastW[0]) / dtp, vy = (a3[1] - state.grab.lastW[1]) / dtp;
           var a = 1 - Math.exp(-dtp / 0.08); // ~80ms EMA per spec
           state.grab.vel[0] += (vx - state.grab.vel[0]) * a;
           state.grab.vel[1] += (vy - state.grab.vel[1]) * a;
@@ -1115,13 +1157,17 @@
             state.grab.vel[1] *= RELEASE_VMAX / m;
           }
         }
-        state.grab.lastW = [wx, wy];
+        state.grab.lastW = [a3[0], a3[1]];
         state.grab.lastT = now;
       }
       function releaseGrab() {
         // unconditional: a grab can never outlive its pointer (spec MUST)
         state.grab.active = false;
         state.grab.edge = false;
+        if (state.grab.captureId !== null) {
+          try { state.canvas.releasePointerCapture(state.grab.captureId); } catch (err) {}
+          state.grab.captureId = null;
+        }
       }
       state.releaseGrab = releaseGrab;
       listen(window, "pointerdown", function (e) {
@@ -1131,19 +1177,25 @@
         pointerNDC(e);
         state.grab.vel = [0, 0, 0];
         state.grab.lastW = null;
-        pointerWorldVel(e);
+        pointerWorldVel();
         state.grab.active = true;
         state.grab.edge = true;
+        // the canvas owns the pointer: events keep arriving off-window,
+        // and losing the capture is itself a release signal
+        if (e.pointerId !== undefined) {
+          try { state.canvas.setPointerCapture(e.pointerId); state.grab.captureId = e.pointerId; } catch (err) {}
+        }
         excite(1);
       });
       function TOUCH_GRAB(e) { return e.pointerType === "touch" || e.pointerType === "pen"; }
       listen(window, "pointermove", function (e) {
         if (!state.grab.active) return;
         pointerNDC(e);
-        pointerWorldVel(e);
+        pointerWorldVel();
       });
       listen(window, "pointerup", releaseGrab);
       listen(window, "pointercancel", releaseGrab);
+      listen(state.canvas, "lostpointercapture", releaseGrab);
       listen(window, "blur", releaseGrab);
       listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; if (state.releaseGrab) state.releaseGrab(); }
@@ -1160,6 +1212,136 @@
   }
 
   /* ═══ test-only instruments ═══ */
+  // hierarchical 2×2 reduction (spec: Verification instrumentation) —
+  // production-N convergence counting without transferring state textures.
+  // float32 sums are exact to 2^24, far above 1024².
+  var MAP_FS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uPos, uVel, uTargA, uTargB;",
+    "uniform float uMix, uNear, uFinal;",
+    "uniform int uN;",
+    "out vec4 o;",
+    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "void main(){",
+    "  ivec2 c = ivec2(gl_FragCoord.xy);",
+    "  float id = float(c.y * uN + c.x);",
+    "  vec4 P = texelFetch(uPos, c, 0);",
+    "  vec4 V = texelFetch(uVel, c, 0);",
+    "  float r1 = hash11(id * 0.1031 + 0.13);",
+    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
+    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  vec3 t = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stag);",
+    "  float d = distance(P.xyz, t);",
+    "  bool bad = isnan(P.x) || isinf(P.x) || isnan(P.y) || isinf(P.y) || isnan(P.z) || isinf(P.z) || V.w != 0.0;",
+    "  o = vec4(d > uNear ? 1.0 : 0.0, d > uFinal ? 1.0 : 0.0, bad ? 1.0 : 0.0, d);",
+    "}"
+  ].join("\n");
+  var REDUCE_FS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uT;",
+    "uniform ivec2 uSrc;",
+    "out vec4 o;",
+    "void main(){",
+    "  ivec2 c = ivec2(gl_FragCoord.xy) * 2;",
+    "  vec4 s = vec4(0.0);",
+    "  for (int dy = 0; dy < 2; dy++) for (int dx = 0; dx < 2; dx++) {",
+    "    ivec2 q = c + ivec2(dx, dy);",
+    "    if (q.x < uSrc.x && q.y < uSrc.y) {",
+    "      vec4 v = texelFetch(uT, q, 0);",
+    "      s.rgb += v.rgb;",
+    "      s.a = max(s.a, v.a);",
+    "    }",
+    "  }",
+    "  o = s;",
+    "}"
+  ].join("\n");
+  function buildConvChain() {
+    var gl = state.gl;
+    var chain = [], s = N;
+    while (true) {
+      var tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, s, s, 0, gl.RGBA, gl.FLOAT, null);
+      var fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      chain.push({ tex: tex, fbo: fbo, size: s });
+      if (s === 1) break;
+      s = (s + 1) >> 1;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    state.conv = {
+      chain: chain,
+      mapProg: makeProgram(gl, SIM_VS, MAP_FS),
+      redProg: makeProgram(gl, SIM_VS, REDUCE_FS)
+    };
+  }
+  function destroyConvChain() {
+    var gl = state.gl;
+    if (!state.conv || !gl) { state.conv = null; return; }
+    state.conv.chain.forEach(function (l) { gl.deleteTexture(l.tex); gl.deleteFramebuffer(l.fbo); });
+    gl.deleteProgram(state.conv.mapProg);
+    gl.deleteProgram(state.conv.redProg);
+    state.conv = null;
+  }
+  function debugConvergence(epsNear, epsFinal) {
+    if (!DEBUG) throw new Error("debugConvergence requires ?debug=1");
+    var gl = state.gl;
+    if (!state.conv || state.conv.chain[0].size !== N) { destroyConvChain(); buildConvChain(); }
+    var conv = state.conv;
+    gl.bindVertexArray(state.vao);
+    gl.disable(gl.BLEND);
+    // map pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER, conv.chain[0].fbo);
+    gl.viewport(0, 0, N, N);
+    gl.useProgram(conv.mapProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, state.targA);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, state.targB);
+    gl.uniform1i(gl.getUniformLocation(conv.mapProg, "uPos"), 0);
+    gl.uniform1i(gl.getUniformLocation(conv.mapProg, "uVel"), 1);
+    gl.uniform1i(gl.getUniformLocation(conv.mapProg, "uTargA"), 2);
+    gl.uniform1i(gl.getUniformLocation(conv.mapProg, "uTargB"), 3);
+    gl.uniform1f(gl.getUniformLocation(conv.mapProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
+    gl.uniform1f(gl.getUniformLocation(conv.mapProg, "uNear"), epsNear || 0.01);
+    gl.uniform1f(gl.getUniformLocation(conv.mapProg, "uFinal"), epsFinal || 0.03);
+    gl.uniform1i(gl.getUniformLocation(conv.mapProg, "uN"), N);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // reduce chain
+    gl.useProgram(conv.redProg);
+    gl.uniform1i(gl.getUniformLocation(conv.redProg, "uT"), 0);
+    gl.activeTexture(gl.TEXTURE0);
+    for (var i = 1; i < conv.chain.length; i++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, conv.chain[i].fbo);
+      gl.viewport(0, 0, conv.chain[i].size, conv.chain[i].size);
+      gl.bindTexture(gl.TEXTURE_2D, conv.chain[i - 1].tex);
+      gl.uniform2i(gl.getUniformLocation(conv.redProg, "uSrc"), conv.chain[i - 1].size, conv.chain[i - 1].size);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    var px = new Float32Array(4);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    return { nearOut: px[0], finalOut: px[1], bad: px[2], maxDist: px[3], count: COUNT };
+  }
+  // project→unproject round trip with the live camera matrices — the same
+  // matrices the sim shader and the pointer math consume
+  function debugRoundTrip(pts) {
+    if (!DEBUG) throw new Error("debugRoundTrip requires ?debug=1");
+    if (!state.vp) throw new Error("no frame rendered yet");
+    var maxErr = 0;
+    pts.forEach(function (p) {
+      var n = projectCPU(p[0], p[1], p[2]);
+      var w = unprojectCPU(n[0], n[1], n[2]);
+      maxErr = Math.max(maxErr, Math.hypot(w[0] - p[0], w[1] - p[1], w[2] - p[2]));
+    });
+    return maxErr;
+  }
   // overwrite one particle's position texel — lets tests inject NaN /
   // out-of-bounds states and prove the recovery branch, not argue it
   function debugPoke(index, x, y, z) {
@@ -1172,7 +1354,7 @@
   function debugGLHealth() {
     if (!DEBUG) throw new Error("debugGLHealth requires ?debug=1");
     var gl = state.gl;
-    var out = { error: gl.getError(), oob: state.oob, fbo: [] };
+    var out = { error: gl.getError(), oob: state.oob, grabActive: state.grab.active, fbo: [] };
     for (var d = 0; d < 2; d++) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[d]);
       out.fbo.push(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
@@ -1237,7 +1419,7 @@
     dt = dt || 1 / 60;
     for (var i = 0; i < (steps || 1); i++) {
       state.time += dt;
-      state.excite *= Math.exp(-dt / EXCITE_TAU); // mirror frame() so stepped runs settle
+      advanceSimulationState(dt, state.time); // the REAL system, not a lab twin
       simStep(dt, state.time);
     }
   }
@@ -1276,6 +1458,8 @@
     debugStep: debugStep,
     debugPoke: debugPoke,
     debugPokeVel: debugPokeVel,
+    debugConvergence: debugConvergence,
+    debugRoundTrip: debugRoundTrip,
     debugGLHealth: debugGLHealth
   };
 })();
