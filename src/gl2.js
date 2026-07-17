@@ -500,6 +500,9 @@
 
   function buildGLResources() {
     var gl = state.gl;
+    // test hook (?debug=1 only): injected failure AFTER the visible canvas
+    // holds a WebGL2 context — the fallback MUST replace the canvas
+    if (DEBUG && window.__DMDS_GL2_BREAK__) throw new Error("injected build failure");
 
     // sim: two RGBA32F ping-pong pairs behind two MRT FBOs
     var seed = new Float32Array(COUNT * 4);
@@ -859,9 +862,6 @@
     state.canvas = canvas;
     state.ms = onMilestone || null;
 
-    // test hook: injected compile failure must reach the fallback path
-    if (DEBUG && window.__DMDS_GL2_BREAK__) return Promise.reject(new Error("injected failure"));
-
     if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
 
     var gl = canvas.getContext("webgl2", { alpha: true, antialias: false, powerPreference: "high-performance", premultipliedAlpha: true });
@@ -888,6 +888,9 @@
       clearTimeout(restoreTimer);
       try {
         state.enabledAttribs = [];
+        // a restored context forgets its extensions — re-enable float
+        // rendering or RGBA32F FBOs come back incomplete
+        if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");
         buildGLResources();
         state.gl.viewport(0, 0, state.canvas.width, state.canvas.height);
         // rebuild directly into the current formation at current size
@@ -900,6 +903,7 @@
         state.raf = requestAnimationFrame(frame);
         if (window.console) console.info("[DMDS] gl2 context restored");
       } catch (err) {
+        if (window.console) console.warn("[DMDS] gl2 context restore failed → demoting:", err && err.message);
         state.running = false;
         if (state.onLostTimeout) state.onLostTimeout();
       }
@@ -957,7 +961,27 @@
     });
   }
 
-  /* ═══ test-only readback ═══ */
+  /* ═══ test-only instruments ═══ */
+  // overwrite one particle's position texel — lets tests inject NaN /
+  // out-of-bounds states and prove the recovery branch, not argue it
+  function debugPoke(index, x, y, z) {
+    if (!DEBUG) throw new Error("debugPoke requires ?debug=1");
+    var gl = state.gl;
+    var data = new Float32Array([x, y, z, DEPTH_FREE]);
+    gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, index % N, Math.floor(index / N), 1, 1, gl.RGBA, gl.FLOAT, data);
+  }
+  function debugGLHealth() {
+    if (!DEBUG) throw new Error("debugGLHealth requires ?debug=1");
+    var gl = state.gl;
+    var out = { error: gl.getError(), fbo: [] };
+    for (var d = 0; d < 2; d++) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[d]);
+      out.fbo.push(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return out;
+  }
   function debugReadState() {
     if (!DEBUG) throw new Error("debugReadState requires ?debug=1");
     if (N > 64) throw new Error("debugReadState limited to N<=64 (use gl2n=)");
@@ -983,7 +1007,9 @@
     fps: function () { return state.fps; },
     isReady: function () { return state.ready; },
     onLostTimeout: function (fn) { state.onLostTimeout = fn; },
-    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, excite: Math.round(state.excite * 100) / 100 }; },
-    debugReadState: debugReadState
+    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, formation: state.currentName, excite: Math.round(state.excite * 100) / 100 }; },
+    debugReadState: debugReadState,
+    debugPoke: debugPoke,
+    debugGLHealth: debugGLHealth
   };
 })();

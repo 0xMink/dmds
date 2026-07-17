@@ -1,53 +1,85 @@
 # M1 results — tier-1 GPGPU core
 
 Run: `node tests/m1-core.js` · Environment: headless SwiftShader ·
-Date: 2026-07-17 · **PASS (13/13)**
+Date: 2026-07-17 · **PASS — 31/31 checks** (correction pass applied
+after external review; initial run was 13 checks and provisional).
 
-## What M1 built
+## Milestone state
 
-- `src/gl2.js`: WebGL2 GPGPU engine — RGBA32F position/velocity
-  ping-pong behind 2 MRT FBOs, one sim pass + one render draw per
-  frame; formation spring + turbulence + cursor force; semi-implicit
-  Euler, `exp(-k·dt)` damping, dt clamp 1/30, force/velocity caps,
-  non-finite/OOB reset-to-target, settle deadband; formations ported
-  from gl.js at COUNT = N² (512² desktop / 256² mobile · Save-Data;
-  `?debug=1&gl2n=` override); RGBA16F target pair; post pipeline
-  reused (GLSL ES 1.00 compiles unchanged on the WebGL2 context);
-  excitement scalar driving post intensity (first crisp-lock cut);
-  `destroy()`, context-loss handlers with 4 s restore timeout hook.
-- `src/main.js`: engine-agnostic boot chain — gl2 probe → init →
-  on failure `destroy()` + **canvas replacement** → tier 2; boot log
-  names the booted tier (`COMPILE sim + render` vs
-  `COMPILE vertex + fragment`); all call sites use the selected
-  engine handle.
-- `src/gl.js`: behaviorally unchanged; `status()` gains
-  `tier: "gl1"` (spec-permitted lifecycle/interface hook).
-- `src/claims.js`: particle-budget and draw-calls rewritten
-  tier-aware (registry may not drift behind the engine — MUST).
-- Build: 260 KB raw / 112 KB gzip — inside even the pre-raise
-  budgets. `check.py` covers gl2.js glyphs.
+**M1 implementation complete; M1 verification complete** for
+everything SwiftShader can testify to. Real-GPU performance and
+interaction feel remain pending Dennis's hardware (as spec'd — that
+gate belongs to M2+ review, not M1).
 
-## Verified (SwiftShader)
+## What the correction pass changed
 
-- Tier-1 boots; log lines honest (`SEED particles … 16,384` at 128²;
-  262,144 at production size); zero page errors under the strict CSP.
-- Readback at N=64: all values finite, positions within bounds, depth
-  sentinel intact, sim integrating (drift over 1.5 s ≈ 16 wu).
-- Fallbacks: WebGL2 denied at creation → tier 2 boots (42,000 seeded,
-  tier-2 log line); injected post-probe init failure → `destroy()` +
-  canvas replacement → tier 2 boots. Both green.
-- Visual: `m1-settled.png` — at excitement 0.04 the wordmark sits
-  sharp and legible (crisp-lock behaving); `m1-tier1.png` shows
-  mid-assembly. NOTE: at SwiftShader's ~6 fps the dt clamp runs the
-  sim in slow motion by design (no catch-up substeps — spec), so
-  assembly takes ~5× wall time there; real-GPU pacing needs Dennis's
-  review.
+1. **World-scale reconciliation (spec rev 3.1)**: the spec's
+   "[−1,1]³ / ‖p‖ > 4" wording described a normalization the
+   implementation correctly did not adopt (tier 1 shares tier 2's
+   generator space, half-extents ≈ 14.6 × 8.2, formations ≲ r20;
+   OOB bound 60, unreachable legitimately at V_max·dt ≤ 3 wu/frame).
+   The earlier `maxR < 60` test looked like a loosened bound against
+   the stale spec — the spec was amended, and the bound is now tested
+   as the *documented reset bound* plus a tighter legit-motion check
+   (`maxR < 25`).
+2. **Recovery is proven, not argued**: `debugPoke` injects a particle
+   at r = 200 (and another as NaN); both return inside the formation
+   envelope within 1 s — impossible without the reset branch, since
+   capped motion covers ≤ ~3 wu/frame.
+3. **Production shape verified at 512²**: allocation, ≥3 frames,
+   `SEED … 262,144`, zero GL errors, both MRT FBOs complete.
+4. **Morph verified numerically** at readable N: 4095/4096 particles
+   moved > 0.5 wu, stayed finite and in-bounds; engine-level formation
+   name changes synchronously (the page choreography re-asserting the
+   hero formation afterward is page behavior, by design).
+5. **`DMDS_GL.destroy()` exists** (tier 2 lifecycle: tracked
+   listeners, RAF cancel, GL teardown — behaviorally unchanged
+   otherwise). Destroy/teardown verified for tier 1 (stops, releases
+   state, no errors after).
+6. **Canvas replacement proven by identity**, with the break injected
+   *after* the visible canvas holds WebGL2 (old canvas held webgl2,
+   new element ≠ old, new runs webgl1).
+7. **Full fallback matrix**: no-WebGL2 · no-EXT_color_buffer_float ·
+   FBO-incomplete · post-context late failure · runtime loss →
+   pause · restore → resume · no-restore-in-4s → demotion to tier 2
+   on a fresh canvas · no GL at all → CSS tier with honest log.
+8. **Timeout swallowing removed** — a failed precondition now fails
+   the test at the precondition.
 
-## Carried forward (not yet done)
+## Bugs the expanded matrix caught (would have shipped)
 
-- Failure-mode stubs still missing: extension-missing, FBO-incomplete,
-  runtime context loss, restore-timeout demotion (test exists for none
-  of these yet — M2/M4 test work).
-- Grab/tear (M2), depth+camera parallax (M3), two-axis governor +
-  demotion + full crisp-lock contract + reduced-motion stop (M4),
-  design fixes (M5), docs + suite consolidation (M6).
+- **Context restore was broken on every device**: a restored WebGL2
+  context forgets its extensions; without re-acquiring
+  `EXT_color_buffer_float`, the rebuilt RGBA32F FBOs come back
+  incomplete → restore always failed. Fixed (re-acquire on restore);
+  `fb:restore-resumes-gl2` now passes.
+- The failure was invisible because the restore handler's catch was
+  **silent** — it now logs before demoting (truthful instrumentation
+  applies to error paths too).
+
+## Visual evidence
+
+`m1-settled.png` (captured by the committed suite, portable runner):
+at excitement 0.04 the wordmark **appears visually sharp under
+SwiftShader** — post-fx faded, points crisp. This is a visual
+observation; *physical* crisp-lock (convergence to targets, settled
+velocities, snap counts) is verified numerically only at the
+recovery-test level so far — the full convergence reduction and
+settling invariants are M2/M4 scope.
+
+## Provenance flow (corrected)
+
+`dist` committed alongside its own source can never carry a matching
+hash. Flow now: dist is excluded from the dirty computation, the stamp
+names the source commit the artifact was built *from*, and dist is
+committed separately after its source commit (documented in README).
+
+## Carried forward
+
+- Grab/tear + full deterministic sim battery incl. damping-invariance
+  across dt and the convergence invariant (M2) · depth/camera/dust
+  (M3) · two-axis governor + demotion-by-performance + physical
+  crisp-lock verification + reduced-motion stop (M4) · design fixes
+  (M5) · docs + `build.sh --test` consolidation (M6).
+- SwiftShader runs the sim in slow motion at low fps (dt clamp, no
+  catch-up — by design); assembly pacing on real GPUs pends Dennis.

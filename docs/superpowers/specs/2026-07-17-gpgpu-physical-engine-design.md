@@ -143,8 +143,12 @@ minimal ES 3.00 ports. No per-frame CPU uploads.
 - **dt clamp**: `dt = min(frameDelta, 1/30)`; accumulated excess after
   suspension is discarded; max 1 sim step per frame.
 - **Caps**: `|F| ≤ F_max`, `|v| ≤ v_max`, clamped in-shader.
-- **Finite-value recovery**: non-finite or out-of-bounds (‖p‖ > 4)
+- **Finite-value recovery**: non-finite or out-of-bounds (‖p‖ > 60;
+  see Depth & camera for the world scale this bound belongs to)
   particles reset to their current target with v = 0, same frame.
+  The bound is unreachable by legitimate motion: V_max·dt_max caps
+  travel at ~3 world units per frame and no formation exceeds
+  radius ~20.
 - **Grab release is unconditional** on `pointerup`, `pointercancel`,
   `lostpointercapture`, `blur`, `visibilitychange→hidden`, context
   loss, tier teardown. A grab can never outlive its pointer.
@@ -194,7 +198,18 @@ intervals of 1/144, 1/60, 1/30 s; verified numerically at N ≤ 64 via
 
 ## Depth & camera
 
-World box ≈ [−1,1]³. Perspective camera; parallax lerped from scroll +
+**World scale (rev 3.1 amendment, from M1 implementation evidence —
+the freeze rule's intended path)**: tier 1 reuses tier 2's formation
+generators at their native scale, not a unit cube. At CAM_Z = 26,
+FOV = 35°, the visible half-extents are ≈ 14.6 × 8.2 world units at
+16:9 (viewport-dependent); formations span radius ≲ 20. Derived
+constants scale accordingly: OOB recovery bound 60, ε_snap 0.012
+(≈ 0.5 device px), V_max 90, F_max 900. The earlier "[−1,1]³ / ‖p‖>4"
+wording described a normalization that the implementation, correctly,
+did not adopt — sharing generator space with tier 2 keeps the two
+tiers' formations identical.
+
+Perspective camera; parallax lerped from scroll +
 pointer, amplitude ≤ 0.08 world units. Wordmark/type text near-planar
 with shallow deterministic z jitter; terrain/sphere/phone/curve
 volumetric. Point size attenuates with depth. Reduced-motion: fixed

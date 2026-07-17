@@ -165,11 +165,18 @@
     // adaptive quality governor (hysteresis: drop fast, restore slow)
     drawCount: 0, govT: 0, govGood: 0,
     // boot milestone reporter (main.js wires the loader log to this)
-    ms: null, firstFrame: false
+    ms: null, firstFrame: false,
+    // lifecycle (the engine is a replaceable component in the tier chain)
+    listeners: [], raf: 0, destroyed: false
   };
 
   function milestone(kind, detail) {
     if (state.ms) { try { state.ms(kind, detail); } catch (e) {} }
+  }
+
+  function listen(target, ev, fn) {
+    target.addEventListener(ev, fn);
+    state.listeners.push([target, ev, fn]);
   }
 
   function worldExtents() {
@@ -552,7 +559,7 @@
 
   function frame(now) {
     if (!state.running) return;
-    requestAnimationFrame(frame);
+    state.raf = requestAnimationFrame(frame);
     var gl = state.gl;
     now *= 0.001;
     var dt = Math.min(now - state.lastT, 0.05) || 0.016;
@@ -751,12 +758,12 @@
 
     // context loss: pause; on restore, rebuild every GPU resource from
     // the CPU-side formations and resume where we left off
-    canvas.addEventListener("webglcontextlost", function (e) {
+    listen(canvas, "webglcontextlost", function (e) {
       e.preventDefault();
       state.running = false;
       if (window.console) console.warn("[DMDS] WebGL context lost — render paused");
     });
-    canvas.addEventListener("webglcontextrestored", function () {
+    listen(canvas, "webglcontextrestored", function () {
       try {
         buildGLResources();
         gl.viewport(0, 0, state.canvas.width, state.canvas.height);
@@ -796,7 +803,7 @@
       state.ready = true;
       state.running = true;
 
-      window.addEventListener("resize", function () {
+      listen(window, "resize", function () {
         resize();
         // drop world-space text formations; normalized samples in textCache survive
         Object.keys(state.formations).forEach(function (k) {
@@ -809,18 +816,18 @@
         setFormation(name, true);
       });
 
-      window.addEventListener("mousemove", function (e) {
+      listen(window, "mousemove", function (e) {
         state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         state.mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
         state.mouse.wx = state.mouse.x * state.hw;
         state.mouse.wy = -state.mouse.y * state.hh;
         state.mouse.strTarget = REDUCED ? 0 : 2.4;
       });
-      window.addEventListener("mouseout", function () { state.mouse.strTarget = 0; });
+      listen(window, "mouseout", function () { state.mouse.strTarget = 0; });
 
-      document.addEventListener("visibilitychange", function () {
+      listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; }
-        else if (!state.running) { state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
+        else if (!state.running && !state.destroyed) { state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
 
       requestAnimationFrame(frame);
@@ -829,8 +836,28 @@
     });
   }
 
+  function destroy() {
+    var gl = state.gl;
+    state.running = false;
+    state.ready = false;
+    state.destroyed = true;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
+    state.listeners = [];
+    if (gl) {
+      try {
+        [state.bufA, state.bufB, state.bufR, state.quadBuf].forEach(function (b) { if (b) gl.deleteBuffer(b); });
+        if (state.program) gl.deleteProgram(state.program);
+        [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
+        ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
+      } catch (e) {}
+    }
+    state.gl = null;
+  }
+
   window.DMDS_GL = {
     init: init,
+    destroy: destroy,
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },

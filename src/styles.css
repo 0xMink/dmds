@@ -60,9 +60,12 @@ a { color: inherit; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
 .sig { color: var(--signal); }
 
-/* ═══ Virtual scroll shell ═══ */
-.scroll-wrap { position: relative; width: 100%; will-change: transform; }
-html.js.smooth .scroll-wrap { position: fixed; inset: 0 auto auto 0; width: 100%; overflow: visible; }
+/* ═══ Scroll shell ═══
+   Native scroll IS the scroll mechanism — content stays in normal flow.
+   Desktop smoothing animates window.scrollTo from wheel input (main.js),
+   so find-in-page, tab-focus, anchors, history restoration and the
+   scrollbar all keep native behavior. */
+.scroll-wrap { position: relative; width: 100%; }
 
 /* ═══ Canvas + atmosphere ═══ */
 #gl {
@@ -193,7 +196,7 @@ html.loaded .nav { opacity: 1; transform: none; }
 .nav__snd {
   background: none; border: none; padding: 0; cursor: pointer;
   font: inherit; letter-spacing: inherit; text-transform: inherit;
-  color: var(--bone-faint); transition: color 0.25s;
+  color: var(--bone-dim); transition: color 0.25s;
 }
 .nav__snd:hover { color: var(--bone); }
 .nav__snd.on { color: var(--signal); }
@@ -208,11 +211,12 @@ html.loaded .nav { opacity: 1; transform: none; }
 }
 @media (max-width: 900px) { .nav__meta { display: none; } }
 @media (max-width: 560px) {
-  /* keep every jump link on phones — shrink instead of hiding */
-  .nav { padding: 1.1rem 1rem; }
-  .nav__logo { font-size: 1rem; }
-  .nav__links { gap: 0.8rem; }
-  .nav__links a { font-size: 0.55rem; letter-spacing: 0.1em; }
+  /* keep every jump link on phones — shrink type a little, never the tap
+     target: each link keeps a ≥40px hit area via padding */
+  .nav { padding: 0.4rem 1rem; }
+  .nav__logo { font-size: 1rem; padding: 0.7rem 0; }
+  .nav__links { gap: 0.15rem; }
+  .nav__links a { font-size: 0.625rem; letter-spacing: 0.08em; padding: 0.9rem 0.4rem; }
   .nav__snd { display: none; }
 }
 
@@ -260,7 +264,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.18; letter-spacing: 0.005em;
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
-.hero__engine { color: var(--bone-faint); margin-top: 2.2rem; min-height: 1rem; }
+.hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
 #engine-input { color: var(--signal); letter-spacing: 0.2em; }
 #engine-buffer { color: var(--bone); }
 .engine-caret {
@@ -386,7 +390,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .proof__idx { color: var(--signal); }
 .proof__name { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.3rem, 2.4vw, 2rem); letter-spacing: 0.01em; }
 .proof__body { color: var(--bone-dim); max-width: 46rem; }
-.proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-faint); font-size: 0.56rem; }
+.proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-dim); font-size: 0.625rem; }
 .proof__row:hover > *, .proof__row:hover .proof__body, .proof__row:hover .proof__idx { color: var(--ink); }
 .proof__row:hover .proof__plain { color: rgba(11, 11, 12, 0.72); }
 @media (max-width: 860px) {
@@ -442,7 +446,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .dstat { background: var(--ink-2); padding: 1.1rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .dstat b { font-size: clamp(1.4rem, 2.4vw, 2.1rem); font-weight: 700; font-variant-numeric: tabular-nums; }
-.dstat span { color: var(--bone-dim); font-size: 0.56rem; }
+.dstat span { color: var(--bone-dim); font-size: 0.625rem; }
 .dossier__sum { color: var(--bone-dim); max-width: 44rem; margin-bottom: 1.6rem; }
 .dossier__log { list-style: none; border-top: 1px solid var(--line); margin-bottom: 1.8rem; }
 .dossier__log li {
@@ -462,27 +466,36 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .work__row.open .work__idx { color: var(--signal); }
 .work__row.open .work__arrow { transform: rotate(45deg); opacity: 1; color: var(--signal); }
 
+/* dossiers render for everyone without JS; JS collapses them behind the
+   disclosure button (aria-expanded lives on the button, state on the row) */
+html.js .work__row:not(.open) .dossier { display: none; }
+
 /* ═══ Work ═══ */
 .work { padding-top: 8rem; padding-bottom: 10rem; }
 .work__list { border-top: 1px solid var(--line); }
 .work__row {
   position: relative; border-bottom: 1px solid var(--line);
-  overflow: hidden; outline-offset: -4px;
+  overflow: hidden;
 }
 .work__row::before {
   content: ""; position: absolute; inset: 0; background: var(--signal);
   transform: translateY(101%); transition: transform 0.5s var(--ease-inout);
 }
-.work__row:hover::before, .work__row:focus::before { transform: translateY(0); }
+.work__row:hover::before, .work__row:focus-within::before { transform: translateY(0); }
+.work__heading { margin: 0; font-size: 1rem; font-weight: 400; }
 .work__line {
-  position: relative; display: grid;
+  position: relative; display: grid; width: 100%;
   grid-template-columns: 4.5rem 1fr auto auto 3rem;
   gap: 2rem; align-items: center;
   padding: 2.6rem 0.8rem;
+  background: none; border: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
 }
+button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offset: -4px; }
 .work__line > *, .work__detail { position: relative; z-index: 1; transition: color 0.3s; }
 .work__idx { color: var(--signal); }
 .work__name {
+  display: block;
   font-family: var(--font-display); font-weight: 600;
   font-size: clamp(1.9rem, 5.4vw, 4.6rem); line-height: 1; letter-spacing: 0.005em;
   transition: transform 0.5s var(--ease-out), color 0.3s;
@@ -502,12 +515,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   overflow: hidden; color: var(--bone-dim); max-width: 44rem;
   padding: 0 0.8rem 0 7.3rem;
 }
-.work__row:hover .work__detail, .work__row:focus .work__detail { grid-template-rows: 1fr; }
+.work__row:hover .work__detail, .work__row:focus-within .work__detail { grid-template-rows: 1fr; }
 .work__row:hover .work__detail p { padding-bottom: 2.2rem; }
 .work__row:hover .work__line > *, .work__row:hover .work__detail p,
 .work__row:hover .work__idx, .work__row:hover .work__cat,
 .work__row:hover .work__year, .work__row:hover .work__arrow,
-.work__row:focus .work__line > * { color: var(--ink); }
+.work__row:focus-within .work__line > * { color: var(--ink); }
 @media (max-width: 720px) {
   .work__line { grid-template-columns: 3rem 1fr auto; }
   .work__year, .work__arrow { display: none; }
@@ -539,7 +552,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .transmit__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; }
 @media (max-width: 560px) { .transmit__grid { grid-template-columns: 1fr; } }
 .transmit__field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
-.transmit__field .mono { color: var(--signal); font-size: 0.56rem; }
+.transmit__field .mono { color: var(--signal); font-size: 0.625rem; }
 .transmit__field input, .transmit__field textarea {
   background: var(--ink-2); border: 1px solid var(--line); color: var(--bone);
   font-family: var(--font-body); font-size: 0.95rem;
@@ -547,13 +560,13 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
   transition: border-color 0.25s;
   width: 100%; resize: vertical;
 }
-.transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-faint); }
+.transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-dim); }
 .transmit__field input:focus, .transmit__field textarea:focus {
   outline: none; border-color: var(--signal);
 }
 .transmit__field input:user-invalid { border-color: #d4452c; }
 .transmit__chips { border: none; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.transmit__chips legend { color: var(--signal); font-size: 0.56rem; margin-bottom: 0.7rem; }
+.transmit__chips legend { color: var(--signal); font-size: 0.625rem; margin-bottom: 0.7rem; }
 .transmit__chips label { cursor: pointer; }
 .transmit__chips input { position: absolute; opacity: 0; pointer-events: none; }
 .transmit__chips span {
@@ -563,12 +576,19 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .transmit__chips input:checked + span { border-color: var(--signal); color: var(--signal); background: rgba(255, 74, 0, 0.08); }
 .transmit__chips input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
 .transmit__hp { position: absolute; left: -5000px; width: 1px; height: 1px; opacity: 0; }
-.transmit__micro { color: var(--bone-faint); text-align: center; }
+.transmit__micro { color: var(--bone-dim); text-align: center; }
 .transmit__micro a { color: var(--bone-dim); }
 .transmit__done {
   border: 1px solid var(--signal); color: var(--signal);
   padding: 1.6rem 2rem; margin-top: 1rem;
 }
+.transmit__recover { color: var(--bone-dim); text-align: center; line-height: 2.2; }
+.transmit__recover button {
+  background: none; border: 1px solid var(--signal); color: var(--signal);
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  padding: 0.45rem 0.9rem; cursor: pointer; margin: 0 0.3rem;
+}
+.transmit__recover button:hover { background: var(--signal); color: var(--ink); }
 
 .contact__cta {
   display: inline-flex; align-items: center; gap: 1.1rem;
@@ -595,7 +615,7 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 .footer {
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
   padding: 1.4rem var(--pad); border-top: 1px solid var(--line);
-  color: var(--bone-faint);
+  color: var(--bone-dim);
 }
 
 /* ═══ Reduced motion ═══ */
@@ -606,4 +626,16 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
     transition-duration: 0.01s; opacity: 1; transform: none; clip-path: none;
   }
   .manifesto__text .w { opacity: 1; }
+}
+
+/* ═══ Forced colors (Windows High Contrast / forced-colors: active) ═══
+   Atmosphere layers off, native cursor back, system colors do the work.
+   Hover floods rely on background paint the UA strips — hide them so
+   text never sits on an invisible state. */
+@media (forced-colors: active) {
+  .grain, .cursor, #gl, .hero__scroll-line { display: none; }
+  html.js body, html.js a, html.js [data-cursor] { cursor: auto; }
+  .proof__row::before, .work__row::before, .contact__cta::before { display: none; }
+  .manifesto__text .w { opacity: 1; }
+  .cap__ghost { -webkit-text-stroke: 1px CanvasText; }
 }
