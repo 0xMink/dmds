@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-oqMvss96CVChtpO7T+WGRmvxSqEDblU/EPlwrfaMvQs=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-iFH6m3GXmDDO7aZRsSY+hQGdqI4JK8g3Enpbq59aneY=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="f1a16cb 2026-07-18T06:08:57Z">
+<meta name="dmds-build" content="6211f26 2026-07-18T06:41:26Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2575,12 +2575,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   }
   function govDegradeOnce() {
     var g = state.gov;
-    // bad evidence cancels a queued PROMOTION outright — the appointment
-    // was made under conditions that no longer hold
+    // bad evidence cancels a queued PROMOTION — and the SAME window still
+    // degrades below. Consuming a performance collapse merely to cancel
+    // an appointment would leave full quality running for another window.
     if (g.pendingResize && g.pendingResize.dir === "promote") {
       g.pendingResize = null;
       if (window.console) console.info("[DMDS] governor: pending promotion cancelled (performance dropped)");
-      return;
     }
     if (g.rung < 3) applyRung(g.rung + 1);
     else if (g.pendingResize) {
@@ -2703,10 +2703,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     // build at the target size marks it unavailable and rolls back to the
     // previous known-good size. Tier demotion happens only if the
     // rollback also fails. (A speculative promotion must never destroy a
-    // healthy tier 1.)
+    // healthy tier 1.) The phase is observable so tests wait on the
+    // transaction, not on side-effect inference.
     var canvas = state.canvas, ms = state.ms;
     var g = state.gov;
     var oldIdx = g.sizeIdx, keepName = state.currentName || "logo";
+    g.txn = { phase: "building-target", from: SIZES[oldIdx], to: SIZES[idx] };
     function attempt(i) {
       govPersist = g;
       g.sizeIdx = i;
@@ -2719,11 +2721,17 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       targScratch = null; // sized per COUNT
       return init(canvas, ms);
     }
-    return attempt(idx).catch(function (e) {
+    return attempt(idx).then(function () {
+      g.txn = { phase: "idle", last: "committed", from: SIZES[oldIdx], to: SIZES[idx] };
+    }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
       g.trialFailed[SIZES[idx]] = true;
-      return attempt(oldIdx).catch(function (e2) {
+      g.txn = { phase: "rolling-back", from: SIZES[oldIdx], to: SIZES[idx] };
+      return attempt(oldIdx).then(function () {
+        g.txn = { phase: "idle", last: "rolled-back", from: SIZES[oldIdx], to: SIZES[idx] };
+      }, function (e2) {
         if (window.console) console.warn("[DMDS] rollback failed -> demoting:", e2 && e2.message);
+        g.txn = { phase: "idle", last: "demoted", from: SIZES[oldIdx], to: SIZES[idx] };
         if (state.onDemote) state.onDemote();
       });
     });
@@ -3335,6 +3343,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
         pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir } : null,
         post: state.post, demoted: g.demoted,
+        txn: g.txn || { phase: "idle" },
         trialFailed: Object.keys(g.trialFailed),
         // ACTUAL rendered-state evidence, not commanded rung numbers:
         trail: state.trailA ? [state.trailA.w, state.trailA.h] : null,
@@ -5115,4 +5124,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build f1a16cb 2026-07-18T06:08:57Z -->
+<!-- dmds build 6211f26 2026-07-18T06:41:26Z -->
