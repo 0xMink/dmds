@@ -75,6 +75,7 @@
     "uniform vec3 uCursor;",
     "uniform float uCursorStr;",
     "uniform float uOob;",
+    "uniform float uSwirl;",
     "uniform int uN;",
     "uniform mat4 uVP, uInvVP;",
     "uniform vec2 uGrabPtr;",       // pointer, NDC
@@ -137,7 +138,7 @@
     // or idle noise sustains ~0.03 wu orbits that never converge or snap
     "  float gate = smoothstep(0.05, 0.12, uExcite);",
     "  float sw = uMix * (1.0 - uMix) * 4.0;",
-    "  float amp = (uTurb * gate + uNoise * (0.5 + r3) * uExcite * gate + sw * 2.1) * 34.0;",
+    "  float amp = (uTurb * gate + uNoise * (0.5 + r3) * uExcite * gate + sw * 2.1 * uSwirl) * 34.0;",
     "  F += vec3(",
     "    sin(p.y * 0.35 + uTime * 0.9 + r4 * 6.283),",
     "    sin(p.z * 0.30 + uTime * 0.8 + r1 * 6.283),",
@@ -663,6 +664,8 @@
     // test hook (?debug=1 only): injected failure AFTER the visible canvas
     // holds a WebGL2 context — the fallback MUST replace the canvas
     if (DEBUG && window.__DMDS_GL2_BREAK__) throw new Error("injected build failure");
+    // size-conditional failure: resize-transaction tests fail specific Ns
+    if (DEBUG && window.__DMDS_GL2_BREAK_N__ && [].concat(window.__DMDS_GL2_BREAK_N__).indexOf(N) > -1) throw new Error("injected build failure at N=" + N);
 
     // sim: two RGBA32F ping-pong pairs behind two MRT FBOs
     var seed = new Float32Array(COUNT * 4);
@@ -691,7 +694,7 @@
 
     state.vao = gl.createVertexArray();
     state.simProg = makeProgram(gl, SIM_VS, SIM_FS);
-    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uOob", "uN",
+    ["uPos", "uVel", "uTargA", "uTargB", "uDt", "uTime", "uMix", "uNoise", "uTurb", "uExcite", "uCursor", "uCursorStr", "uOob", "uSwirl", "uN",
      "uVP", "uInvVP", "uGrabPtr", "uGrabActive", "uGrabEdge", "uGrabR", "uAspect", "uReleaseVel"].forEach(function (n) {
       state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
     });
@@ -822,6 +825,7 @@
     // wall clock, NOT state.time — the sim clock is stale after a sleep and
     // a stale stamp would put the engine straight back to sleep
     state.lastCommandT = performance.now() * 0.001;
+    state.simSinceCmd = 0;
     if (state.rmSleeping && !state.destroyed && state.ready) {
       state.rmSleeping = false;
       state.running = true;
@@ -1020,6 +1024,7 @@
     gl.uniform3f(state.simLoc.uCursor, state.mouse.wx, state.mouse.wy, 0);
     gl.uniform1f(state.simLoc.uCursorStr, state.mouse.str);
     gl.uniform1f(state.simLoc.uOob, state.oob);
+    gl.uniform1f(state.simLoc.uSwirl, REDUCED ? 0 : 1); // tier-2 parity: no morph swirl under reduced motion
     gl.uniform1i(state.simLoc.uN, N);
     gl.uniformMatrix4fv(state.simLoc.uVP, false, vp);
     gl.uniformMatrix4fv(state.simLoc.uInvVP, false, invVp);
@@ -1049,6 +1054,10 @@
     state.turbTarget *= Math.exp(-2.2 * dt);
     // excitement decays toward rest; crisp-lock rides this scalar
     state.excite *= Math.exp(-dt / EXCITE_TAU);
+    // settle horizon counts the dt the SIM SHADER actually integrates —
+    // under reduced motion that's min(dt, 1/60), and crediting the larger
+    // clamped dt would claim settlement the GPU hasn't reached
+    state.simSinceCmd = (state.simSinceCmd || 0) + (REDUCED ? Math.min(dt, 1 / 60) : dt);
     if (state.grab.active) excite(0.85);
     if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
     // parallax lean toward pointer + scroll drift (spec: fixed camera
@@ -1070,7 +1079,9 @@
     state.lastT = now;
     state.time = now;
     if (dtMs > 0 && dtMs < 10000) govFrame(dtMs, now);
-    govMaybeResize(now);
+    // a resize destroys and reinitializes the engine — this frame must not
+    // touch GL on the far side of that boundary
+    if (govMaybeResize(now)) return;
 
     state.frames++;
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
@@ -1155,10 +1166,12 @@
       drawPoints();
     }
 
-    // reduced-motion power contract (spec): once the last accepted
-    // formation command is 3s old and the field is settled, this frame
-    // was the final one — the loop stops and formation commands wake it
-    if (REDUCED && state.mix >= 1 && now - (state.lastCommandT || 0) > 3) {
+    // reduced-motion power contract (spec): sleep only once the field is
+    // PHYSICALLY settled — mix done, ≥4 SIMULATED seconds since the last
+    // accepted command (wall time lies under the dt clamp on slow
+    // hardware), and excitement below the crisp-lock threshold so the
+    // settle deadband has had authority
+    if (REDUCED && state.mix >= 1 && (state.simSinceCmd || 0) > 4 && state.excite < 0.05) {
       state.running = false;
       state.rmSleeping = true;
     }
@@ -1194,7 +1207,11 @@
     g.rung = r;
     g.cool = state.time + 5;
     g.invalid = true;
-    if (r >= 5) state.post = false;
+    if (r >= 5) {
+      state.post = false;
+      // post-off means the fill-rate cost AND the memory are gone
+      ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(state.gl, state[k]); state[k] = null; });
+    }
     else if (state.progFade && !MOBILE && !SAVEDATA) state.post = true;
     if (state.post) { try { allocPostTargets(); } catch (e) { state.post = false; } }
     resize(); // re-evaluates the DPR cap for rung 3
@@ -1220,12 +1237,12 @@
       return false;
     }
   }
-  function govRequestResize(idx) {
+  function govRequestResize(idx, dir) {
     var g = state.gov;
-    g.pendingResize = idx;
+    g.pendingResize = { idx: idx, dir: dir };
     g.cool = state.time + 5;
     g.invalid = true;
-    if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[idx] + "^2 (deferred until idle)");
+    if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[idx] + "^2 (" + dir + ", deferred until idle)");
   }
   function govDemote() {
     var g = state.gov;
@@ -1236,26 +1253,39 @@
   }
   function govDegradeOnce() {
     var g = state.gov;
+    // bad evidence cancels a queued PROMOTION outright — the appointment
+    // was made under conditions that no longer hold
+    if (g.pendingResize && g.pendingResize.dir === "promote") {
+      g.pendingResize = null;
+      if (window.console) console.info("[DMDS] governor: pending promotion cancelled (performance dropped)");
+      return;
+    }
     if (g.rung < 3) applyRung(g.rung + 1);
-    else if (g.pendingResize !== null) {
-      // a queued (idle-deferred) resize must not deadlock the ladder under
-      // sustained load: deepen the pending target toward the floor, and
-      // once it's at the floor keep descending past the size axis
-      if (g.pendingResize > 0) govRequestResize(g.pendingResize - 1);
+    else if (g.pendingResize) {
+      // a queued (idle-deferred) downsize must not deadlock the ladder:
+      // deepen toward the floor, then keep descending past the size axis
+      if (g.pendingResize.idx > 0) govRequestResize(g.pendingResize.idx - 1, "degrade");
       else if (state.post) applyRung(5);
       else govDemote();
     }
-    else if (g.sizeIdx > 0) govRequestResize(g.sizeIdx - 1);
+    else if (g.sizeIdx > 0) govRequestResize(g.sizeIdx - 1, "degrade");
     else if (state.post) applyRung(5);
     else govDemote();
   }
   function govImproveOnce() {
     var g = state.gov;
+    // recovery evidence cancels a queued DOWNSIZE — don't shrink a field
+    // that has already recovered
+    if (g.pendingResize && g.pendingResize.dir === "degrade") {
+      g.pendingResize = null;
+      if (window.console) console.info("[DMDS] governor: pending downsize cancelled (performance recovered)");
+      return;
+    }
     if (g.rung === 5) applyRung(3);
-    else if (g.sizeIdx < BASE_IDX && g.pendingResize === null) govRequestResize(g.sizeIdx + 1);
+    else if (g.sizeIdx < BASE_IDX && !g.pendingResize) govRequestResize(g.sizeIdx + 1, "promote");
     else if (g.rung > 0) applyRung(g.rung - 1);
-    else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && g.pendingResize === null && !g.trialFailed[SIZES[g.sizeIdx + 1]]) {
-      if (govTrialAlloc(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1);
+    else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && !g.pendingResize && !g.trialFailed[SIZES[g.sizeIdx + 1]]) {
+      if (govTrialAlloc(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1, "promote");
       else g.cool = state.time + 5;
     }
   }
@@ -1265,17 +1295,23 @@
     var g = state.gov;
     if (state.time < g.cool) return "cooldown";
     if (p90 > 25) {
-      g.good = 0;
+      g.good = 0; g.mid = 0;
       govDegradeOnce();
       if (fast && p90 > 40) govDegradeOnce(); // severe startup miss skips a rung
       return "degrade";
     }
     if (p90 < 17.9) {
+      g.mid = 0;
       g.good++;
       if (g.good >= 2) { g.good = 0; govImproveOnce(); return "improve"; }
       return "good";
     }
+    // 17.9–25ms is NOT an acceptable settled state (the acceptance floor
+    // is ~55fps): two consecutive windows here degrade gently rather than
+    // letting a machine sit below the floor forever
     g.good = 0;
+    g.mid = (g.mid || 0) + 1;
+    if (g.mid >= 2) { g.mid = 0; govDegradeOnce(); return "degrade-sustained-hold"; }
     return "hold";
   }
   function govEmergency() {
@@ -1327,32 +1363,47 @@
   }
   function govMaybeResize(now) {
     var g = state.gov;
-    if (g.pendingResize === null || g.pendingResize === undefined) return;
+    if (!g.pendingResize) return false;
+    var p = g.pendingResize;
+    // stale/no-op requests never execute
+    if (p.idx === g.sizeIdx) { g.pendingResize = null; return false; }
+    // a promotion executes only from full quality with its evidence intact
+    if (p.dir === "promote" && g.rung > 0) { g.pendingResize = null; return false; }
     // idle-only (spec): no grab, no morph, calm field, 2s since a command
-    if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return;
-    if (now - (state.lastCommandT || 0) < 2) return;
-    var idx = g.pendingResize;
+    if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return false;
+    if (now - (state.lastCommandT || 0) < 2) return false;
     g.pendingResize = null;
-    executeResize(idx);
+    executeResize(p.idx);
+    return true; // the caller's frame is now on the far side of a lifecycle
   }
   function executeResize(idx) {
-    // a size change IS a managed reinit — the destroy/init lifecycle is
-    // the most-tested path in the engine; governor state and the current
-    // formation survive across it, and the new field seeds near its
-    // targets so it assembles in under a second
+    // a size change IS a managed reinit — but TRANSACTIONAL: a failed
+    // build at the target size marks it unavailable and rolls back to the
+    // previous known-good size. Tier demotion happens only if the
+    // rollback also fails. (A speculative promotion must never destroy a
+    // healthy tier 1.)
     var canvas = state.canvas, ms = state.ms;
-    govPersist = state.gov;
-    govPersist.sizeIdx = idx;
-    govPersist.invalid = true;
-    govPersist.cool = state.time + 5;
-    seedPersist = state.currentName || "logo";
-    destroy();
-    N = SIZES[idx];
-    COUNT = N * N;
-    targScratch = null; // sized per COUNT
-    init(canvas, ms).catch(function (e) {
-      if (window.console) console.warn("[DMDS] resize reinit failed -> demoting:", e && e.message);
-      if (state.onDemote) state.onDemote();
+    var g = state.gov;
+    var oldIdx = g.sizeIdx, keepName = state.currentName || "logo";
+    function attempt(i) {
+      govPersist = g;
+      g.sizeIdx = i;
+      g.invalid = true;
+      g.cool = state.time + 5;
+      seedPersist = keepName;
+      destroy();
+      N = SIZES[i];
+      COUNT = N * N;
+      targScratch = null; // sized per COUNT
+      return init(canvas, ms);
+    }
+    return attempt(idx).catch(function (e) {
+      if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
+      g.trialFailed[SIZES[idx]] = true;
+      return attempt(oldIdx).catch(function (e2) {
+        if (window.console) console.warn("[DMDS] rollback failed -> demoting:", e2 && e2.message);
+        if (state.onDemote) state.onDemote();
+      });
     });
   }
 
@@ -1924,10 +1975,15 @@
     },
     onLostTimeout: function (fn) { state.onLostTimeout = fn; },
     status: function () {
-      var base = SIZES[BASE_IDX] * SIZES[BASE_IDX];
+      // honest names: count = live particles, baseline = the tier's boot
+      // budget, ceiling = the promotion maximum. ("max" would be
+      // semantically false above baseline — the degraded flag carries
+      // the degradation signal.)
       return {
         tier: "gl2", post: state.post,
-        count: COUNT, max: base, // max = the tier's BASELINE budget, so count<max reads as degraded
+        count: COUNT,
+        baseline: SIZES[BASE_IDX] * SIZES[BASE_IDX],
+        ceiling: SIZES[SIZES.length - 1] * SIZES[SIZES.length - 1],
         degraded: !!(state.gov && (state.gov.rung > 0 || state.gov.sizeIdx < BASE_IDX)),
         running: state.running, sleeping: !!state.rmSleeping,
         formation: state.currentName, mix: state.mix,
@@ -1948,14 +2004,36 @@
     debugGLHealth: debugGLHealth,
     debugGov: function () {
       if (!DEBUG) throw new Error("debugGov requires ?debug=1");
-      var g = state.gov;
+      var g = state.gov, gl = state.gl;
+      var aberr = null;
+      try { if (state.post && state.progComp) aberr = gl.getUniform(state.progComp.p, state.progComp.uAberr); } catch (e) {}
       return {
         rung: g.rung, sizeIdx: g.sizeIdx, n: SIZES[g.sizeIdx], count: COUNT,
         sizes: SIZES.slice(), baseIdx: BASE_IDX,
-        warmed: g.warmed, cooling: state.time < g.cool, good: g.good,
-        pending: g.pendingResize, post: state.post, demoted: g.demoted,
-        trialFailed: Object.keys(g.trialFailed)
+        warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
+        pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir } : null,
+        post: state.post, demoted: g.demoted,
+        trialFailed: Object.keys(g.trialFailed),
+        // ACTUAL rendered-state evidence, not commanded rung numbers:
+        trail: state.trailA ? [state.trailA.w, state.trailA.h] : null,
+        glow: state.glowA ? [state.glowA.w, state.glowA.h] : null,
+        canvasPx: [state.canvas.width, state.canvas.height],
+        dprEff: state.canvas.clientWidth ? state.canvas.width / state.canvas.clientWidth : null,
+        aberrUniform: aberr
       };
+    },
+    debugGovFrame: function (dtMs, nowSec) {
+      // feeds the REAL govFrame (warm-up, windows, validity, p90,
+      // emergency mean) with synthetic time — the full production
+      // collector path under deterministic control
+      if (!DEBUG) throw new Error("debugGovFrame requires ?debug=1");
+      var g = state.gov;
+      var saved = g.liveOff;
+      g.liveOff = false;
+      var savedTime = state.time;
+      state.time = nowSec; // cooldown checks read state.time
+      try { govFrame(dtMs, nowSec); }
+      finally { g.liveOff = saved; state.time = savedTime; }
     },
     debugGovInject: function (frameMs, opts) {
       // drives the SAME production evaluation/emergency functions the

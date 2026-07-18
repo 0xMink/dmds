@@ -81,3 +81,53 @@ low/mid/max ids × mix values × {256², 512², 1024²} · the written
 CPU+GPU memory ledger per size (incl. persistent freeze scratch) ·
 1024² promotion default (ships conservative until real-hardware data;
 Dennis's 70–80fps at 512² is promotion datapoint #1).
+
+## Correction pass (after external review) — 30 → 53 checks
+
+All eight review items adopted; three more engine bugs found (total 21):
+
+1. **Transactional resize (bug: healthy tier 1 destroyed by a failed
+   speculative promotion)**: a failed build at the target size now marks
+   it unavailable and ROLLS BACK to the previous known-good size; tier
+   demotion only if the rollback also fails. Verified with
+   size-conditional injected build failures: promotion to 128² fails →
+   rollback to 64² succeeds, size marked, no demotion; 128²+64² both
+   fail → demotes to tier 2.
+2. **Directional pending requests with evidence cancellation**: a bad
+   window cancels a queued promotion; recovery cancels a queued
+   downsize; no-op targets never execute; promotions execute only from
+   rung 0. Alternating-evidence tests prove no spurious resize.
+3. **Frame stops at the lifecycle boundary**: `govMaybeResize` returns
+   true on execution and the frame returns immediately — no GL work on
+   the far side of a destroy/reinit.
+4. **The REAL collector is now deterministic-testable**
+   (`debugGovFrame` feeds synthetic time through the production
+   `govFrame`): warm-up, fast-path 1s windows, under-populated-window
+   invalidity, hold-streak counting, sustained-hold degradation, and
+   the rolling-mean emergency all verified end-to-end (emergency
+   correctly blocked during cooldown, then firing after).
+5. **Physical sleep (bug #19 + bug #20)**: reduced-motion sleep now
+   requires ≥4 SIM seconds + excitement < 0.05, and the boundary is
+   verified with the convergence reduction (0 outside 0.05). Two bugs
+   found: the morph-swirl force was not gated under reduced motion
+   (tier-2 always zeroed uSwirl; the port dropped it — a parked
+   mid-scrub REDUCED page could never settle), and `simSinceCmd`
+   credited the 1/30-clamped dt while the REDUCED shader integrates
+   min(dt, 1/60) — the CPU claimed settlement the GPU hadn't reached
+   (the failing check's 1846/4096 stragglers matched the low-gain
+   population exactly).
+6. **Sustained-hold floor**: two consecutive windows in the 17.9–25ms
+   band now degrade once — a machine can no longer sit below the
+   ~55fps acceptance floor forever in the hysteresis gap.
+7. **Rung effects observed, not commanded**: debugGov exposes real
+   buffer dimensions, effective DPR, and the live aberration uniform
+   (getUniform). Verified: baseline full-res + quarter-res bloom +
+   aberr 1; rung 1 eighth-res bloom + aberr 0; rung 2 half-res trail;
+   post-off frees the buffers entirely (bug #21: they previously
+   stayed allocated — caught by this test); recovery restores
+   everything. The decorative `r && true` check is gone.
+8. **Status honesty**: `{count, baseline, ceiling, degraded}` — the
+   semantically-false `max` is removed from tier-1 status (tier 2
+   keeps its own convention; the console banner uses the live count).
+
+Full regression: M1 59/59, M2 55/55, M3 35/35 — **202 checks**.

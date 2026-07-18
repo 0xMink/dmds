@@ -828,7 +828,8 @@
 
   /* eslint-disable no-console */
   glInit.then(function () {
-    var count = glOK ? GL.status().max.toLocaleString("en-US") + " particles · 1 draw call" : "static render";
+    var s0 = glOK ? GL.status() : null;
+    var count = s0 ? (s0.count || s0.max).toLocaleString("en-US") + " particles · 1 draw call" : "static render";
     console.log(
       "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
       "%c " + count + " · 0 external requests on load.\n" +
