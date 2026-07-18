@@ -367,6 +367,29 @@ async function readyPage(browser, query, opts) {
         out.push({ stage, fbClean, degradedOnce, glErr, finite });
         E.debugStep(60, 1 / 60); // settle before the next round
       }
+      // GL-ERROR injection (real INVALID_ENUM flags, not JS throws): the
+      // post-draw detector itself must fire, degrade once, and recover
+      for (let g = 1; g <= 2; g++) {
+        const A2 = f6[(g * 3 + 1) % 6], B2 = f6[(g * 3 + 2) % 6], C2 = f6[(g * 3 + 3) % 6];
+        sf(A2, 0.3);
+        E.debugStep(30, 1 / 60);
+        sf(B2, 2.0);
+        E.debugStep(30, 1 / 60);
+        const before2 = E.debugGLHealth().freezeDegraded;
+        window.__DMDS_FREEZE_GLERR__ = g;
+        sf(C2, 1.0); // interrupt → injected GL error → detector throws
+        window.__DMDS_FREEZE_GLERR__ = 0;
+        const degradedOnce2 = E.debugGLHealth().freezeDegraded === before2 + 1;
+        E.debugStep(5, 1 / 60);
+        const glErr2 = E.debugGLHealth().error;
+        const s2 = E.debugReadSample();
+        let finite2 = true;
+        for (let i = 0; i < s2.positions.length; i += 4) {
+          for (let k = 0; k < 3; k++) if (!Number.isFinite(s2.positions[i + k])) finite2 = false;
+        }
+        out.push({ stage: 'glerr' + g, fbClean: gl.getParameter(gl.FRAMEBUFFER_BINDING) === null, degradedOnce: degradedOnce2, glErr: glErr2, finite: finite2 });
+        E.debugStep(60, 1 / 60);
+      }
       // recovery: with the hook off, the next interrupt must freeze
       // successfully — i.e. WITHOUT touching the degradation counter
       sf('neural', 2.0);

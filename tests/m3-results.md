@@ -170,3 +170,25 @@ Suite: 23 → 30 checks; M1 59/59, M2 55/55.
   programs + two FBOs are flagged for M4's allocation ledger.
 
 Suite: 30 → 33 checks; M1 59/59, M2 55/55.
+
+## M4-entry corrections (final M3 addendum)
+
+- **Error drain, not a single read**: WebGL can queue one flag per
+  error category — freeze entry now drains (bounded loop) before the
+  pass, so post-draw checks attribute errors to this pass only.
+- **The GL-error detector is exercised, not inspected**: debug hooks
+  inject a REAL `INVALID_ENUM` flag (via `gl.enable(0)`) immediately
+  before each of the two freeze draws; both paths detect, degrade
+  exactly once, leave zero residual GL error, and recover (counter
+  7→7 on the next successful freeze).
+- **Golden-vector wording corrected**: the CPU replica is fround-exact
+  with respect to its OWN operation sequence; shader compilers may
+  fuse/reorder within the precision contract. The claim is the
+  measurement: a float32 CPU reference using the intended operation
+  sequence agrees with sampled GPU results within 0.00023.
+- Deferred into M4's matrix (per review): complete-rendered-frame
+  recovery after each failure stage (with real RAF + frame evidence),
+  golden vectors at low/mid/max ids × multiple mix values ×
+  {256², 512², 1024²}.
+
+Final M3 tally: **35/35**; M1 59/59, M2 55/55 — 149 checks.

@@ -876,16 +876,21 @@
     // 3=post-freeze-draw, 4=post-target-bind, 5=post-copy-draw — the
     // finally block's job is only proven by mid-pass failures
     function brk(stage) { if (DEBUG && window.__DMDS_FREEZE_BREAK__ === stage) throw new Error("injected freeze failure @" + stage); }
-    // WebGL errors don't throw. Clear any stale flag so post-draw checks
-    // attribute errors to THIS pass, then check after every draw.
-    function draws(stage) {
+    // WebGL errors don't throw, and more than one distinct flag can be
+    // queued — DRAIN the state so post-draw checks attribute errors to
+    // THIS pass, then check after every draw.
+    function draws(stage, which) {
+      // GL-error injection (?debug=1): sets a real error flag (INVALID_ENUM
+      // via gl.enable(0)) so the detector itself is exercised, not just the
+      // JS-exception path
+      if (DEBUG && window.__DMDS_FREEZE_GLERR__ === which) gl.enable(0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       var e = gl.getError();
       if (e !== gl.NO_ERROR) throw new Error("freeze " + stage + " GL error 0x" + e.toString(16));
     }
     try {
       brk(1);
-      gl.getError(); // clear stale error state
+      for (var d = 0; d < 8 && gl.getError() !== gl.NO_ERROR; d++) {} // drain stale flags (bounded)
       gl.bindVertexArray(state.vao);
       gl.disable(gl.BLEND);
       gl.viewport(0, 0, N, N);
@@ -899,7 +904,7 @@
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
       gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
-      draws("blend-pass");
+      draws("blend-pass", 1);
       brk(3);
       // scratch → targA (RGBA16F is renderable under EXT_color_buffer_float)
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFbA);
@@ -909,7 +914,7 @@
       gl.useProgram(state.copyProg);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.frzTex);
       gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
-      draws("copy-pass");
+      draws("copy-pass", 2);
       brk(5);
     } finally {
       // exit contract: no freeze FBO/VAO bound, texture unit back to 0 —
