@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-qKkrQ4WB6TOvfd/5yBB1IkQ5ZsE+G6auH9P/MXcnrMw=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-fLba3DhF1iiuzVA+Z04hiAi8P5V2YW0Ks8Ubk2kEt6Y='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-UEKzQ09RzmJwjg9BFBtvX38jTOpFaTlsWHVlrjMBK9g=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-fLba3DhF1iiuzVA+Z04hiAi8P5V2YW0Ks8Ubk2kEt6Y='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="0185436 2026-07-18T00:16:10Z">
+<meta name="dmds-build" content="8892b1c 2026-07-18T00:50:26Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1361,7 +1361,9 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   var V_SNAP = 0.06;
   var EXCITE_TAU = 0.8;  // excitement decay; sized so the convergence invariant closes by 3s
   var K_GRAB = 14.0;     // held-clump first-order convergence rate (τ ≈ 70ms grip)
-  var GRAB_R_CSS = 90;   // capture radius, CSS px
+  var GRAB_R_CSS = 160;  // capture radius, CSS px — MUST exceed the hover-
+                         // repulsion crater (~130px), or a hover-then-press
+                         // grabs the middle of its own evacuated hole
   var RELEASE_VMAX = 72; // fling velocity clamp = 0.8·V_max (spec unit audit)
   var JITTER = 6.0;      // per-axis seed jitter on release, wu/s
 
@@ -4535,4 +4537,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 0185436 2026-07-18T00:16:10Z -->
+<!-- dmds build 8892b1c 2026-07-18T00:50:26Z -->
