@@ -441,3 +441,46 @@ and M4 103 passed under the runner with retained logs. 252 checks.
    are copied to committed tests/failures/; passing logs stay
    gitignored on disk. The two fixture failure logs are retained in
    tests/failures/ as the acceptance evidence.
+
+## Review closure round 6 (2026-07-18) — provenance made honest
+
+1. **Dirty-tree provenance accepted and implemented** (runner schema
+   2): full 40-char commit hash, `dirty` flag, working-diff sha256
+   (ledgers excluded — they grow during multi-suite runs), plus
+   dist_sha256 (the exact artifact tested), runner_sha256, per-ledger
+   flock-serialized run_id, start/end/elapsed, python3-serialized
+   JSON. The round-5 acceptance run IS annotated history now: its
+   schema-1 entries claimed commit 9ac29cf while runner v2 + fixture
+   were uncommitted (the tested dist artifact itself was the clean
+   committed one; the runner was the dirty part — still wrong to
+   leave unrecorded).
+2. **The dirty flag caught a real leak on its first outing**: the M1
+   suite overwrote tracked tests/m1-settled.png every run, so suites
+   2–4 of any multi-suite run truthfully tested a dirty tree. Fixed:
+   per-run captures go to gitignored tests/logs/; the committed png
+   is frozen M1-milestone evidence. The run of record then produced
+   four dirty:false entries at commit d78f894 — 59/55/35/103 = 252
+   checks, one execution, no leftover chromium.
+3. **Hash ≠ evidence, accepted**: the manifest is a durable index +
+   integrity reference, not preserved evidence. Passing logs now also
+   gzip into content-addressed tests/evidence/<sha256>.log.gz
+   (survives log cleanup). HONEST CEILING: this repo has NO git
+   remote — nothing, including committed failure logs, is off this
+   machine. Flagged as an open item for the user (any push target
+   fixes it).
+4. **Fixture events separated from product evidence**: fixture runs
+   ledger to tests/runner-acceptance-manifest.jsonl (kind:"fixture");
+   the two historical fixture lines were moved out of the production
+   manifest. tests/runner-acceptance.sh ASSERTS: exit 1 propagation
+   (assertion mode), exit 2 (harness mode), multi-suite
+   stop-on-first-failure via SUITES override with a real second suite
+   proven never to start, exactly 3 acceptance entries, production
+   ledger untouched. PASS.
+5. **All-suite path completed** (the prior review saw it in flight):
+   order M1→M2→M3→M4, four unique logs, four manifest entries,
+   correct totals, exit 0 only after M4, zero chromium leftovers.
+6. **Load-classification restraint accepted**: the environmental data
+   makes FUTURE incidents diagnosable; it does not retroactively
+   classify the lost M1 failure, which remains: unclassified
+   historical failure, not reproduced (now seven consecutive M1
+   passes since).
