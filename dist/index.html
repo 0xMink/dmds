@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-0PnbAQoGNP6ucvknGVRZwrypqRk88gCjJesiy4xgq9U='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-FCS6RVMXRlKj0y6/8a5KW7f9ZIFEVW9ONUE6PJsMG6Q=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-fLba3DhF1iiuzVA+Z04hiAi8P5V2YW0Ks8Ubk2kEt6Y='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-Z/HBXe30bUMJFqil50Ra0UmUZEw65SpJa4QyZ5v6JJA=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-fLba3DhF1iiuzVA+Z04hiAi8P5V2YW0Ks8Ubk2kEt6Y='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -291,6 +291,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
 .hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
+/* while the engine holds a grab, the browser must not run a text-selection
+   drag in parallel — the class lives exactly as long as the grab does */
+html.engine-grab, html.engine-grab * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
 /* the signature interaction advertises itself — a chip, not a whisper */
 #engine-hint {
   display: inline-block; padding: 0.55rem 0.85rem;
@@ -674,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="354ecb8 2026-07-17T23:32:45Z">
+<meta name="dmds-build" content="c7781e6 2026-07-18T00:02:13Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2484,6 +2490,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         // unconditional: a grab can never outlive its pointer (spec MUST)
         state.grab.active = false;
         state.grab.edge = false;
+        document.documentElement.classList.remove("engine-grab");
         if (state.grab.captureId !== null) {
           try { state.canvas.releasePointerCapture(state.grab.captureId); } catch (err) {}
           state.grab.captureId = null;
@@ -2493,7 +2500,13 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       listen(window, "pointerdown", function (e) {
         if (REDUCED || TOUCH_GRAB(e) || e.button !== 0) return;
         var t = e.target;
-        if (t && t.closest && t.closest("a, button, input, textarea, select, label, summary, [contenteditable]")) return;
+        // controls stay clickable, text stays selectable — the grab owns
+        // only the empty field where the particles live
+        if (t && t.closest && t.closest("a, button, input, textarea, select, label, summary, [contenteditable], p, h1, h2, h3, h4, h5, h6, li, blockquote, table, dl, details")) return;
+        // selection must not fight the tear: kill any drag-anchor and
+        // suppress select for the grab's lifetime (class removed on release)
+        document.documentElement.classList.add("engine-grab");
+        try { var sel = window.getSelection(); if (sel) sel.removeAllRanges(); } catch (err) {}
         pointerNDC(e);
         state.grab.vel = [0, 0, 0];
         state.grab.lastW = null;
@@ -4514,4 +4527,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 354ecb8 2026-07-17T23:32:45Z -->
+<!-- dmds build c7781e6 2026-07-18T00:02:13Z -->
