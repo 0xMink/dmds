@@ -293,7 +293,29 @@ async function readyPage(browser, query, opts) {
         if (Math.abs(w - t) > 0.02) wtMismatch++;
         if (t < -0.02 || t > 1.02) tOutOfRange++;
       }
-      return { midMix, minW, maxW, spread: maxW - minW, finite, offSegment, wtMismatch, tOutOfRange, n };
+      // golden float32 vectors: recompute stag for each sampled id with a
+      // Math.fround-exact replica of the GLSL and compare against frozen.w
+      // (preA.w=0, preB.w=1 here, so frozen.w IS the stagger). Catches
+      // altered constants and precision failures at high particle ids.
+      const f = Math.fround;
+      const hash11f32 = p => {
+        p = f(p * f(0.1031)); p = f(p - Math.floor(p));
+        p = f(p * f(p + f(33.33)));
+        p = f(p * f(p + p));
+        return f(p - Math.floor(p));
+      };
+      const stagf32 = (id, m) => {
+        const r1 = hash11f32(f(f(id * f(0.1031)) + f(0.13)));
+        let s = Math.min(1, Math.max(0, f(f(m - f(r1 * f(0.35))) / f(0.65))));
+        return f(s * f(s * f(3 - f(2 * s))));
+      };
+      const m32 = f(midMix);
+      let goldenMax = 0;
+      for (let i = 0; i < n; i++) {
+        const id = (400 + Math.floor(i / 16)) * 512 + (i % 16); // region (0,400)
+        goldenMax = Math.max(goldenMax, Math.abs(frozen[i * 4 + 3] - stagf32(id, m32)));
+      }
+      return { midMix, minW, maxW, spread: maxW - minW, finite, offSegment, wtMismatch, tOutOfRange, goldenMax, n };
     });
     check('dust:interrupt-mid-morph', r.midMix > 0.05 && r.midMix < 0.95, 'mix=' + r.midMix.toFixed(2));
     // per-particle stagger ⇒ the frozen dust factors VARY (a uniform value
@@ -302,12 +324,13 @@ async function readyPage(browser, query, opts) {
     check('dust:freeze-on-own-segment', r.offSegment === 0, 'off=' + r.offSegment + '/' + r.n * 2);
     check('dust:freeze-w-equals-position-t', r.wtMismatch === 0, 'mismatch=' + r.wtMismatch + '/' + r.n);
     check('dust:freeze-t-in-range', r.tOutOfRange === 0, 'out=' + r.tOutOfRange);
+    check('dust:freeze-matches-f32-golden', r.goldenMax < 0.01, 'maxDiff=' + r.goldenMax.toFixed(5));
     check('dust:frozen-blend-finite', r.finite);
     await page.close();
   }
 
-  // ── 7b. freeze failure: honest degradation (named-formation fallback,
-  //        degraded counter, engine intact), then recovery ──
+  // ── 7b. staged freeze failures: every mid-pass exit leaves clean GL
+  //        state, degrades honestly, and the engine keeps simulating ──
   {
     const page = await readyPage(browser, '?debug=1&gl2n=64');
     await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 60000 });
@@ -315,31 +338,52 @@ async function readyPage(browser, query, opts) {
       const E = window.DMDS_GL2;
       const sf = E.setFormation.bind(E);
       E.setFormation = function () {}; E.setMorphPair = function () {};
+      const gl = document.querySelector('#gl').getContext('webgl2');
+      const out = [];
+      const f6 = ['logo', 'grid', 'device', 'neural', 'curve', 'ambient'];
       E.pause();
-      sf('neural', 2.0);
-      E.debugStep(30, 1 / 60); // mid-morph
-      window.__DMDS_FREEZE_BREAK__ = true;
-      sf('grid', 1.0); // interrupt → freeze throws → named fallback
-      const degraded = E.debugGLHealth().freezeDegraded;
-      const health1 = E.debugGLHealth();
-      // recovery: hook cleared, next interrupt freezes normally
-      window.__DMDS_FREEZE_BREAK__ = false;
-      E.debugStep(20, 1 / 60);
-      sf('device', 1.0);
-      const degraded2 = E.debugGLHealth().freezeDegraded;
-      E.debugStep(60, 1 / 60);
-      const s = E.debugReadState();
-      let finite = true;
-      for (let i = 0; i < s.positions.length; i += 4) {
-        for (let k = 0; k < 3; k++) if (!Number.isFinite(s.positions[i + k])) finite = false;
+      for (let stage = 1; stage <= 5; stage++) {
+        // three DISTINCT formations per round (a repeat early-returns and
+        // never enters the freeze path): settle A, morph toward B, interrupt with C
+        const A = f6[(stage * 3) % 6], B = f6[(stage * 3 + 1) % 6], C = f6[(stage * 3 + 2) % 6];
+        sf(A, 0.3);
+        E.debugStep(30, 1 / 60); // settle
+        sf(B, 2.0);
+        E.debugStep(30, 1 / 60); // mid-morph
+        const before = E.debugGLHealth().freezeDegraded;
+        window.__DMDS_FREEZE_BREAK__ = stage;
+        sf(C, 1.0); // interrupt → freeze throws at this stage
+        window.__DMDS_FREEZE_BREAK__ = 0;
+        const fbClean = gl.getParameter(gl.FRAMEBUFFER_BINDING) === null;
+        const degradedOnce = E.debugGLHealth().freezeDegraded === before + 1;
+        // a normal frame must run cleanly right after the failure
+        E.debugStep(5, 1 / 60);
+        const glErr = E.debugGLHealth().error;
+        const s = E.debugReadSample();
+        let finite = true;
+        for (let i = 0; i < s.positions.length; i += 4) {
+          for (let k = 0; k < 3; k++) if (!Number.isFinite(s.positions[i + k])) finite = false;
+        }
+        out.push({ stage, fbClean, degradedOnce, glErr, finite });
+        E.debugStep(60, 1 / 60); // settle before the next round
       }
+      // recovery: with the hook off, the next interrupt must freeze
+      // successfully — i.e. WITHOUT touching the degradation counter
+      sf('neural', 2.0);
+      E.debugStep(30, 1 / 60);
+      const dBefore = E.debugGLHealth().freezeDegraded;
+      sf('grid', 1.0);
+      const dAfter = E.debugGLHealth().freezeDegraded;
+      const glOK = E.debugGLHealth().error === 0;
       E.resume();
-      return { degraded, degraded2, glError: health1.error, finite };
+      return { out, recovered: dAfter === dBefore && glOK, dBefore, dAfter };
     });
-    check('freeze:failure-degrades-honestly', r.degraded === 1, 'count=' + r.degraded);
-    check('freeze:no-gl-error-after-failure', r.glError === 0, 'err=' + r.glError);
-    check('freeze:recovers-next-interrupt', r.degraded2 === 1, 'count=' + r.degraded2);
-    check('freeze:field-finite-throughout', r.finite);
+    for (const s of r.out) {
+      check('freeze:stage' + s.stage + ':clean-degrade',
+        s.fbClean && s.degradedOnce && s.glErr === 0 && s.finite,
+        JSON.stringify(s));
+    }
+    check('freeze:recovers-after-staged-failures', r.recovered, 'degraded ' + r.dBefore + '→' + r.dAfter);
     check('freeze:no-page-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }

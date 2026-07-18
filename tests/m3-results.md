@@ -144,3 +144,29 @@ M2 55/55.
   Production-N reference diffs via reduction → M4 scale matrix.
 
 Suite: 23 → 30 checks; M1 59/59, M2 55/55.
+
+## M4-entry hardening (staged failures + formula conformance)
+
+- **Wording corrected per review**: w≈t proves position and dust share
+  the same per-particle factor; the shared GLSL_STAG source is what
+  guarantees the FORMULA (my "any other varied factor fails this" was
+  false — stag=hash11(id) passes w≈t). Both layers now exist, plus a
+  third: **float32 golden vectors** — a Math.fround-exact CPU replica
+  of the GLSL hash/stagger, compared against 256 frozen texels at high
+  particle ids (~205k): maxDiff 0.00023. Altered constants or
+  precision failures at scale now fail a test.
+- **Staged freeze-failure injection** (5 stages: pre-GL, post-scratch-
+  bind, post-freeze-draw, post-target-bind, post-copy-draw): every
+  stage exits with no framebuffer bound, exactly one degradation
+  counted, zero GL errors, and a clean normal frame immediately after.
+  The finally contract is verified by mid-pass failures, not just an
+  early throw.
+- **Post-draw GL error detection**: stale error state cleared at freeze
+  entry; getError checked after BOTH draws (a complete FBO does not
+  imply a successful draw — WebGL never throws).
+- **Recovery is measured**: after five staged failures, the next
+  interrupt freezes without touching the degradation counter (5→5).
+- Persistent freeze scratch (1/4/16 MiB at 256²/512²/1024²) + two
+  programs + two FBOs are flagged for M4's allocation ledger.
+
+Suite: 30 → 33 checks; M1 59/59, M2 55/55.

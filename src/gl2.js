@@ -872,14 +872,26 @@
     // second, and a 16 MiB alloc/free per interrupt — or a shader compile
     // on the first typed character — is the wrong place to pay
     var gl = state.gl;
+    // staged injection (?debug=1): 1=pre-GL, 2=post-scratch-bind,
+    // 3=post-freeze-draw, 4=post-target-bind, 5=post-copy-draw — the
+    // finally block's job is only proven by mid-pass failures
+    function brk(stage) { if (DEBUG && window.__DMDS_FREEZE_BREAK__ === stage) throw new Error("injected freeze failure @" + stage); }
+    // WebGL errors don't throw. Clear any stale flag so post-draw checks
+    // attribute errors to THIS pass, then check after every draw.
+    function draws(stage) {
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      var e = gl.getError();
+      if (e !== gl.NO_ERROR) throw new Error("freeze " + stage + " GL error 0x" + e.toString(16));
+    }
     try {
-      if (DEBUG && window.__DMDS_FREEZE_BREAK__) throw new Error("injected freeze failure");
+      brk(1);
+      gl.getError(); // clear stale error state
       gl.bindVertexArray(state.vao);
       gl.disable(gl.BLEND);
       gl.viewport(0, 0, N, N);
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFb);
-      // WebGL errors don't throw — completeness must be checked explicitly
       if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("freeze scratch fbo incomplete");
+      brk(2);
       gl.useProgram(state.freezeProg);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.targA);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.targB);
@@ -887,19 +899,26 @@
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
       gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      draws("blend-pass");
+      brk(3);
       // scratch → targA (RGBA16F is renderable under EXT_color_buffer_float)
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFbA);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.targA, 0);
       if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("freeze target fbo incomplete");
+      brk(4);
       gl.useProgram(state.copyProg);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.frzTex);
       gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      draws("copy-pass");
+      brk(5);
     } finally {
-      // never leave freeze state bound, success or not
+      // exit contract: no freeze FBO/VAO bound, texture unit back to 0 —
+      // full pass state (program, viewport, texture bindings) is
+      // re-established by every pass on entry, which the staged-failure
+      // tests verify empirically by running a normal frame after each stage
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.bindVertexArray(null);
+      gl.activeTexture(gl.TEXTURE0);
     }
   }
   function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
