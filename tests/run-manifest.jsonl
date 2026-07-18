@@ -1,5 +1,3 @@
-{"commit":"9ac29cf","suite":"fail-fixture","stamp":"20260718T115712.659957975-95144","exit":1,"checks":null,"log_sha256":"e5704e8e27910912428987504c8893975228375ad00fd46c56377ea0e9cce8c1"}
-{"commit":"9ac29cf","suite":"fail-fixture","stamp":"20260718T115714.880404231-95187","exit":2,"checks":null,"log_sha256":"fe28c9e0736b3e12db6b6ecd3b46bc922655e475ce607fd9a18946014e566136"}
 {"commit":"9ac29cf","suite":"m1-core","stamp":"20260718T115800.976505478-95275","exit":0,"checks":59,"log_sha256":"e0246862180cab54672194b6c916e5201a425d01a7f36ac687ee82508cf99f93"}
 {"commit":"9ac29cf","suite":"m2-grab","stamp":"20260718T120019.687560323-95275","exit":0,"checks":55,"log_sha256":"8843c0ac8a34e04f43f7c2076db575299a48ec9618d5043b52436ca57a8c7e7d"}
 {"commit":"9ac29cf","suite":"m3-depth","stamp":"20260718T120249.303295459-95275","exit":0,"checks":35,"log_sha256":"cdce0978bb239238384e02d13dd9b3874e6fa83d79ca90cfa405db9b6795773d"}
