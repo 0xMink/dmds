@@ -554,6 +554,86 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
+  // ── 17. tier-2 oscillation lock machine: precise cycle identity ──
+  {
+    const page = await readyPage(browser, '');
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    });
+    await page.goto(DIST + '?debug=1');
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => {
+      const T = (fps, t) => window.DMDS_GL.debugGovTick(fps, t);
+      const out = {};
+      // transient drop: no suspect (no recent restore), no lock
+      out.a = T(30, 100);                    // 42000 → 21000
+      // restore (two goods), then drop soon after → SUSPECT, no lock
+      T(60, 102); out.b = T(60, 104);        // → 42000, restoredAt=104
+      out.c = T(30, 106);                    // → 21000, suspect=42000
+      // restore again, drop again (same pair, within window) → LOCK
+      T(60, 108); out.d = T(60, 110);        // → 42000
+      out.e = T(30, 112);                    // → 21000, LOCKED
+      return out;
+    });
+    check('lock:transient-no-lock', r.a.locked === false && r.a.suspect === null && r.a.drawCount === 21000, JSON.stringify(r.a));
+    check('lock:first-reversal-suspect-only', r.c.locked === false && r.c.suspect === 42000, JSON.stringify(r.c));
+    check('lock:same-pair-repeat-locks', r.e.locked === true && r.e.drawCount === 21000, JSON.stringify(r.e));
+    await page.close();
+  }
+  {
+    const page = await readyPage(browser, '');
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    });
+    await page.goto(DIST + '?debug=1');
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(async () => {
+      const T = (fps, t) => window.DMDS_GL.debugGovTick(fps, t);
+      const out = {};
+      // suspicion decays: reversal, then a second one 60s later → still no lock
+      T(30, 100); T(60, 102); T(60, 104); T(30, 106); // suspect=42000 @106
+      T(60, 170); T(60, 172);                          // restore at t=172
+      out.decayed = T(30, 174);                        // suspect expired → re-suspect, NO lock
+      // now force the lock, then verify tab-revisit unlock semantics
+      T(60, 176); T(60, 178); out.locked = T(30, 180); // same pair again → LOCK
+      Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await new Promise(r2 => setTimeout(r2, 300));
+      // unlocked, but fresh evidence required: ONE good tick must not restore
+      out.oneGood = T(60, 190);
+      out.twoGood = T(60, 192); // second consecutive good → restore permitted
+      return out;
+    });
+    check('lock:suspicion-decays-no-false-lock', r.decayed.locked === false, JSON.stringify(r.decayed));
+    check('lock:locks-on-true-repeat', r.locked.locked === true);
+    check('lock:resume-unlocks-without-promotion', r.oneGood.locked === false && r.oneGood.drawCount === 21000 && r.oneGood.good === 1, JSON.stringify(r.oneGood));
+    check('lock:fresh-evidence-then-restores', r.twoGood.drawCount === 42000, JSON.stringify(r.twoGood));
+    await page.close();
+  }
+
+  // ── 18. governor history ring records the trajectory ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(([BAD, GOOD]) => {
+      const E = window.DMDS_GL2;
+      E.debugGovInject(BAD);
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);
+      const h = E.debugGovHistory();
+      return {
+        len: h.length,
+        events: h.map(e => e.event),
+        hasWindow: h.some(e => e.event === 'window' && typeof e.p90 === 'number'),
+        hasRung: h.some(e => e.event === 'rung'),
+      };
+    }, [BAD, GOOD]);
+    check('history:records-trajectory', r.len >= 4 && r.hasWindow && r.hasRung, JSON.stringify(r));
+    await page.close();
+  }
+
   await browser.close();
   const pass = results.every(r => r.ok);
   results.forEach(r => console.log((r.ok ? '  ok  ' : '  FAIL'), r.name, r.detail));

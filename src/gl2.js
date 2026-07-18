@@ -1206,6 +1206,17 @@
       pendingResize: null, trialFailed: {}, demoted: false
     };
   }
+  function govLog(event, extra) {
+    // trajectory ring (always recorded, ~120 entries, exposed under
+    // debug): the final state says "512²"; the path says it tried 768²
+    // three times and spent half the run in cooldown
+    var g = state.gov;
+    if (!g.history) g.history = [];
+    var e = { t: Math.round(state.time * 10) / 10, event: event, rung: g.rung, n: SIZES[g.sizeIdx], post: state.post };
+    if (extra) for (var k in extra) e[k] = extra[k];
+    g.history.push(e);
+    if (g.history.length > 120) g.history.shift();
+  }
   function applyRung(r) {
     var g = state.gov;
     g.rung = r;
@@ -1219,6 +1230,7 @@
     else if (state.progFade && !MOBILE && !SAVEDATA) state.post = true;
     if (state.post) { try { allocPostTargets(); } catch (e) { state.post = false; } }
     resize(); // re-evaluates the DPR cap for rung 3
+    govLog("rung", { to: r });
     if (window.console) console.info("[DMDS] governor: quality rung -> " + r + (state.post ? "" : " (post off)"));
   }
   function govTrialAlloc(n) {
@@ -1246,12 +1258,14 @@
     g.pendingResize = { idx: idx, dir: dir };
     g.cool = state.time + 5;
     g.invalid = true;
+    govLog("resize-request", { dir: dir, to: SIZES[idx] });
     if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[idx] + "^2 (" + dir + ", deferred until idle)");
   }
   function govDemote() {
     var g = state.gov;
     if (g.demoted) return;
     g.demoted = true;
+    govLog("demote");
     if (window.console) console.warn("[DMDS] governor: tier 1 cannot hold frame rate at the floor -> demoting to tier 2");
     if (state.onDemote) state.onDemote();
   }
@@ -1297,7 +1311,8 @@
   // both call this, so tests exercise production decision logic
   function govEvaluate(p90, fast) {
     var g = state.gov;
-    if (state.time < g.cool) return "cooldown";
+    if (state.time < g.cool) { govLog("window", { p90: Math.round(p90 * 10) / 10, action: "cooldown" }); return "cooldown"; }
+    govLog("window", { p90: Math.round(p90 * 10) / 10, action: p90 > 25 ? "bad" : p90 < 17.9 ? "good" : "hold" });
     if (p90 > 25) {
       g.good = 0; g.mid = 0;
       govDegradeOnce();
@@ -1321,6 +1336,7 @@
   function govEmergency() {
     var g = state.gov;
     if (state.time < g.cool) return "cooldown";
+    govLog("emergency");
     govDegradeOnce();
     govDegradeOnce();
     g.good = 0;
@@ -1405,12 +1421,14 @@
     }
     return attempt(idx).then(function () {
       g.txn = { phase: "idle", last: "committed", from: SIZES[oldIdx], to: SIZES[idx] };
+      govLog("resize-commit", { from: SIZES[oldIdx], to: SIZES[idx] });
     }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
       g.trialFailed[SIZES[idx]] = true;
       g.txn = { phase: "rolling-back", from: SIZES[oldIdx], to: SIZES[idx] };
       return attempt(oldIdx).then(function () {
         g.txn = { phase: "idle", last: "rolled-back", from: SIZES[oldIdx], to: SIZES[idx] };
+        govLog("resize-rollback", { failed: SIZES[idx], back: SIZES[oldIdx] });
       }, function (e2) {
         if (window.console) console.warn("[DMDS] rollback failed -> demoting:", e2 && e2.message);
         g.txn = { phase: "idle", last: "demoted", from: SIZES[oldIdx], to: SIZES[idx] };
@@ -2047,6 +2065,10 @@
       state.time = nowSec; // cooldown checks read state.time
       try { govFrame(dtMs, nowSec); }
       finally { g.liveOff = saved; state.time = savedTime; }
+    },
+    debugGovHistory: function () {
+      if (!DEBUG) throw new Error("debugGovHistory requires ?debug=1");
+      return (state.gov.history || []).slice();
     },
     debugGovInject: function (frameMs, opts) {
       // drives the SAME production evaluation/emergency functions the

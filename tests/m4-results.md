@@ -196,3 +196,24 @@ hold full quality (and promote) — that comparison is the promotion-
 default datapoint.
 
 Suite: 69 → 72 checks; regression M1 59/59, M2 55/55, M3 35/35 — 221.
+
+## Protocol-hardening pass (per review) — 72 → 80 checks
+
+- **Pair-identity oscillation lock**: only the SAME high→low reversal,
+  repeated within a bounded window after restores, locks the budget.
+  Verified deterministically via a new `debugGovTick` injection on
+  tier 2: transient drop → no lock; first reversal → suspect only;
+  same-pair repeat → lock; suspicion decays after 40s (no false lock);
+  tab-revisit unlocks WITHOUT immediate promotion (good streak reset —
+  one good tick holds, two restore). Alt-tab is not a "please resume
+  oscillating" button.
+- **Governor history ring** (~120 entries, always recorded, exposed
+  via `debugGovHistory` under debug): every window with its p90 and
+  classification, every rung change, resize request/commit/rollback,
+  emergency, demotion. The retest captures the trajectory, not the
+  obituary.
+- Incident wording adopted: prior slow runs remain environmentally
+  unclassified; the plugged/battery/plugged comparison is a
+  bidirectional real-device validation case, not full verification.
+  Baseline / promotion-availability / promotion-ceiling are recorded
+  as three separate decisions.

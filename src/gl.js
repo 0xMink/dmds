@@ -568,6 +568,39 @@
 
   function easeCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
+  // oscillation lock with PRECISE cycle identity: only the SAME
+  // high→low reversal, repeated within a bounded window after restores,
+  // grants the lower budget tenure — a transient drop, or an unrelated
+  // lower step, never locks. Suspicion decays after 40s without repeat.
+  function govTick(now, fps) {
+    if (state.govSuspect && now - state.govSuspectT > 40) state.govSuspect = null;
+    if (fps < 40 && state.drawCount > COUNT / 4) {
+      state.govGood = 0;
+      var high = state.drawCount;
+      if (state.govRestoredAt && now - state.govRestoredAt < 12) {
+        if (state.govSuspect === high) {
+          state.govLocked = true;
+          if (window.console) console.info("[DMDS] governor: repeated " + high + "\u2194" + Math.floor(high / 2) + " oscillation \u2014 locking budget (re-armed on tab revisit)");
+        } else {
+          state.govSuspect = high;
+          state.govSuspectT = now;
+        }
+      }
+      state.drawCount = Math.floor(state.drawCount / 2);
+      if (window.console) console.info("[DMDS] governor: particle budget \u2192 " + state.drawCount);
+    } else if (fps > 56 && state.drawCount < COUNT) {
+      state.govGood++;
+      if (state.govGood >= 2) {
+        state.govGood = 0;
+        state.govRestoredAt = now;
+        state.drawCount = Math.min(COUNT, state.drawCount * 2);
+        if (window.console) console.info("[DMDS] governor: particle budget \u2192 " + state.drawCount);
+      }
+    } else {
+      state.govGood = 0;
+    }
+  }
+
   function frame(now) {
     if (!state.running) return;
     state.raf = requestAnimationFrame(frame);
@@ -595,37 +628,10 @@
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    // adaptive quality governor: protect frame rate before aesthetics.
-    // drops immediately on a slow window; restores only after two
-    // consecutive fast windows so it can't oscillate at a tier boundary
+    // adaptive quality governor: protect frame rate before aesthetics
     if (!state.govLocked && now - state.govT > 2 && state.fpsT > 3) {
       state.govT = now;
-      if (state.fps < 40 && state.drawCount > COUNT / 4) {
-        state.govGood = 0;
-        // a drop soon after a restore is ONE oscillation event; locking on
-        // the first could mistake a transient (background task, thermal
-        // blip) for a stable hysteresis conflict — require the cycle to
-        // repeat before granting the lower budget tenure
-        if (state.govRestoredAt && now - state.govRestoredAt < 12) {
-          state.govOsc = (state.govOsc || 0) + 1;
-          if (state.govOsc >= 2) {
-            state.govLocked = true;
-            if (window.console) console.info("[DMDS] governor: repeated oscillation — locking budget (returns on tab revisit)");
-          }
-        }
-        state.drawCount = Math.floor(state.drawCount / 2);
-        if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
-      } else if (state.fps > 56 && state.drawCount < COUNT) {
-        state.govGood++;
-        if (state.govGood >= 2) {
-          state.govGood = 0;
-          state.govRestoredAt = now;
-          state.drawCount = Math.min(COUNT, state.drawCount * 2);
-          if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
-        }
-      } else {
-        state.govGood = 0;
-      }
+      govTick(now, state.fps);
     }
 
     function drawPoints() {
@@ -861,7 +867,8 @@
           // the conditions that caused an oscillation lock may be gone
           if (state.govLocked) {
             state.govLocked = false;
-            state.govOsc = 0;
+            state.govSuspect = null;
+            state.govGood = 0; // fresh evidence required before restoring
             if (window.console) console.info("[DMDS] governor: budget lock released on tab revisit");
           } state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
@@ -891,9 +898,16 @@
     state.gl = null;
   }
 
+  var DEBUG = /[?&]debug=1/.test(location.search);
+
   window.DMDS_GL = {
     init: init,
     destroy: destroy,
+    debugGovTick: function (fps, nowSec) {
+      if (!DEBUG) throw new Error("debugGovTick requires ?debug=1");
+      govTick(nowSec, fps);
+      return { drawCount: state.drawCount, locked: !!state.govLocked, suspect: state.govSuspect || null, good: state.govGood };
+    },
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
