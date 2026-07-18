@@ -103,6 +103,18 @@ the same step, by design), not the raw transition value.
 letterform), holding its shape mid-drag near the headline, field
 excited. SwiftShader still (feel review pends real hardware).
 
+## Real-hardware review (Dennis)
+
+2026-07-18 — grab/tear/fling **confirmed working on Dennis's machine**
+(tier 1, 262,144 particles, after the device-class fix). The path to
+confirmation surfaced three shipped defects headless testing could not
+see, all fixed: (1) touchscreen-laptop/scaled-window misclassification
+→ mobile budget with post disabled; (2) text-selection drag defeating
+the grab; (3) no visual state feedback on capture — held clumps now
+render signal-orange. Outstanding from the feel checklist: settled/
+tearing fps numbers, grip/fling-weight judgment, crisp-lock timing —
+to be collected in later sessions.
+
 ## Notes / carried forward
 
 - EXCITE_TAU tuned 1.2 → 0.8 s so the convergence window closes by
