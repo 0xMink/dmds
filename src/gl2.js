@@ -1208,7 +1208,8 @@
       frames: [], recent: [], winStart: 0,
       good: 0, cool: 0, invalid: false,
       warmed: false, warmFrames: 0, warmT0: 0, fastUntil: 0,
-      pendingResize: null, trialFailed: {}, demoted: false
+      pendingResize: null, trialFailed: {}, demoted: false,
+      lastRungPromo: null, rungStrikes: null, rungLockAt: 0
     };
   }
   function govLog(event, extra) {
@@ -1286,13 +1287,49 @@
       g.pendingResize = null;
       if (window.console) console.info("[DMDS] governor: pending promotion cancelled (performance dropped)");
     }
-    if (g.rung < 3) applyRung(g.rung + 1);
+    if (g.rung < 3) {
+      // two-strike rung-promotion memory (real-hardware finding: a
+      // machine whose rung-N p90 sits just under the good line and whose
+      // rung-(N-1) p90 sits in the hold band flickers post effects every
+      // ~30s forever — the rung axis had no promotion memory, unlike
+      // sizes and tier 2). A promotion undone twice within its evidence
+      // window locks the lower rung until tab revisit or a size change.
+      var promo = g.lastRungPromo;
+      if (promo && promo.to === g.rung && state.time - promo.t < 120) {
+        var strikes = g.rungStrikes;
+        if (!strikes || strikes.to !== promo.to || state.time - strikes.t > 180) strikes = { to: promo.to, n: 0 };
+        strikes.n++;
+        strikes.t = state.time;
+        g.rungStrikes = strikes;
+        if (strikes.n >= 2) {
+          g.rungLockAt = promo.to + 1;
+          govLog("rung-lock", { at: g.rungLockAt });
+          if (window.console) console.info("[DMDS] governor: rung " + promo.to + " promotion failed twice — holding rung " + g.rungLockAt + " (re-armed on tab revisit)");
+        }
+        g.lastRungPromo = null;
+      }
+      applyRung(g.rung + 1);
+    }
     else if (g.pendingResize) {
-      // a queued (idle-deferred) downsize must not deadlock the ladder:
-      // deepen toward the floor, then keep descending past the size axis
-      if (g.pendingResize.idx > 0) govRequestResize(g.pendingResize.idx - 1, "degrade");
-      else if (state.post) applyRung(5);
-      else govDemote();
+      // sustained bad must not starve behind idle-deferral (real-hardware
+      // finding: a continuously-interacted machine demoted from 512²
+      // having never actually run a smaller size — the deferred downsizes
+      // starved and the demote verdict cited evidence that was never
+      // collected). The deferral protects a smooth field from a visible
+      // pop; a field missing its frame budget is not smooth. Force the
+      // queued downsize at the next frame boundary — further descent uses
+      // evidence collected AT the smaller size, never at the size the
+      // ladder already left.
+      if (!g.pendingResize.forced) {
+        g.pendingResize.forced = true;
+        // duress mark: a size abandoned under sustained bad is not
+        // retried this session (same philosophy as trial-alloc no-retry) —
+        // without it the field bounces baseline↔smaller on minutes-scale
+        g.trialFailed[SIZES[g.sizeIdx]] = true;
+        g.cool = state.time + 5;
+        govLog("resize-forced", { to: SIZES[g.pendingResize.idx] });
+        if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[g.pendingResize.idx] + "^2 (forced — sustained bad)");
+      }
     }
     else if (g.sizeIdx > 0) govRequestResize(g.sizeIdx - 1, "degrade");
     else if (state.post) applyRung(5);
@@ -1308,8 +1345,16 @@
       return;
     }
     if (g.rung === 5) applyRung(3);
-    else if (g.sizeIdx < BASE_IDX && !g.pendingResize) govRequestResize(g.sizeIdx + 1, "promote");
-    else if (g.rung > 0) applyRung(g.rung - 1);
+    else if (g.rung > 0) {
+      // rungs restore BEFORE size promotions: a size promotion may only
+      // execute from rung 0 (govMaybeResize), so requesting one while
+      // rungs are degraded created a request/cancel loop that starved
+      // rung recovery entirely once a downsize had actually applied
+      if (g.rung - 1 < (g.rungLockAt || 0)) return; // locked pair: hold here
+      g.lastRungPromo = { to: g.rung - 1, t: state.time };
+      applyRung(g.rung - 1);
+    }
+    else if (g.sizeIdx < BASE_IDX && !g.pendingResize && !g.trialFailed[SIZES[g.sizeIdx + 1]]) govRequestResize(g.sizeIdx + 1, "promote");
     else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && !g.pendingResize && !g.trialFailed[SIZES[g.sizeIdx + 1]]) {
       if (govTrialAlloc(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1, "promote");
       else g.cool = state.time + 5;
@@ -1397,9 +1442,12 @@
     if (p.idx === g.sizeIdx) { g.pendingResize = null; return false; }
     // a promotion executes only from full quality with its evidence intact
     if (p.dir === "promote" && g.rung > 0) { g.pendingResize = null; return false; }
-    // idle-only (spec): no grab, no morph, calm field, 2s since a command
-    if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return false;
-    if (now - (state.lastCommandT || 0) < 2) return false;
+    // idle-only (spec): no grab, no morph, calm field, 2s since a command —
+    // unless FORCED by sustained bad evidence: nothing smooth left to protect
+    if (!p.forced) {
+      if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return false;
+      if (now - (state.lastCommandT || 0) < 2) return false;
+    }
     g.pendingResize = null;
     executeResize(p.idx);
     return true; // the caller's frame is now on the far side of a lifecycle
@@ -1429,6 +1477,11 @@
     }
     return attempt(idx).then(function () {
       g.txn = { phase: "idle", last: "committed", from: SIZES[oldIdx], to: SIZES[idx] };
+      // a size change moves the perf landscape: rung-bounce evidence
+      // collected at the old size doesn't transfer — fresh chance
+      g.rungLockAt = 0;
+      g.rungStrikes = null;
+      g.lastRungPromo = null;
       govLog("resize-commit", { from: SIZES[oldIdx], to: SIZES[idx] });
     }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
@@ -1748,7 +1801,14 @@
       listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; if (state.releaseGrab) state.releaseGrab(); }
         else if (!state.running && !state.destroyed) {
-          if (state.gov) state.gov.invalid = true; // first window after resume is invalid
+          if (state.gov) {
+            state.gov.invalid = true; // first window after resume is invalid
+            // rung-lock re-arm on tab revisit (same policy as tier 2):
+            // the conditions behind the flicker may be gone
+            state.gov.rungLockAt = 0;
+            state.gov.rungStrikes = null;
+            state.gov.lastRungPromo = null;
+          }
           state.running = true;
           state.lastT = performance.now() * 0.001; // dt clamp handles the gap
           state.raf = requestAnimationFrame(frame);
@@ -2049,7 +2109,8 @@
         rung: g.rung, sizeIdx: g.sizeIdx, n: SIZES[g.sizeIdx], count: COUNT,
         sizes: SIZES.slice(), baseIdx: BASE_IDX, liveOff: !!g.liveOff,
         warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
-        pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir } : null,
+        pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir, forced: !!g.pendingResize.forced } : null,
+        rungLockAt: g.rungLockAt || 0,
         post: state.post, demoted: g.demoted,
         txn: g.txn || { phase: "idle" },
         trialFailed: Object.keys(g.trialFailed),

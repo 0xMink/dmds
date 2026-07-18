@@ -60,19 +60,31 @@ async function readyPage(browser, query, opts) {
       const snap = () => { const g = E.debugGov(); return { rung: g.rung, sizeIdx: g.sizeIdx, pending: g.pending, post: g.post, demoted: g.demoted }; };
       let demoteCalled = 0;
       E.onDemote(() => demoteCalled++); // capture instead of actually demoting
-      for (let i = 0; i < 8; i++) {
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      for (let i = 0; i < 5; i++) {
         E.debugGovInject(BAD);
         seq.push(snap());
       }
-      return { seq, demoteCalled, degradedFlag: E.status().degraded };
+      // the 5th bad FORCED the queued downsize; it executes at a real
+      // frame boundary — demotion evidence must come from the applied
+      // floor, never from the size the ladder already left
+      for (let i = 0; i < 40 && E.status().count !== 1024; i++) await new Promise(r2 => setTimeout(r2, 250));
+      const applied = E.status().count;
+      E.debugGovInject(BAD); seq.push(snap()); // bad AT the floor: post off
+      E.debugGovInject(BAD); seq.push(snap()); // still bad at floor → demote
+      const hist = E.debugGovHistory();
+      const demoteEntry = hist.filter(e => e.event === 'demote')[0];
+      return { seq, applied, demoteCalled, degradedFlag: E.status().degraded,
+               forcedLogged: hist.some(e => e.event === 'resize-forced'), demoteEntry };
     }, [BAD]);
     const s = r.seq;
     check('gov:ladder-rungs-first', s[0].rung === 1 && s[1].rung === 2 && s[2].rung === 3, JSON.stringify(s.slice(0, 3)));
-    check('gov:ladder-then-size-steps', (s[3].pending && s[3].pending.idx === 0 && s[3].pending.dir === 'degrade') || s[3].sizeIdx === 0, JSON.stringify(s[3]));
-    // size is idle-deferred: further bad windows while a resize is pending
-    // must not stack extra actions past the ladder's intent
-    check('gov:ladder-post-off-at-floor', s.some(x => x.post === false), JSON.stringify(s));
+    check('gov:ladder-then-size-request', s[3].pending && s[3].pending.idx === 0 && s[3].pending.dir === 'degrade' && !s[3].pending.forced, JSON.stringify(s[3]));
+    check('gov:sustained-bad-forces-downsize', s[4].pending && s[4].pending.forced === true && r.forcedLogged, JSON.stringify(s[4]));
+    check('gov:floor-actually-applied', r.applied === 1024, 'count=' + r.applied);
+    check('gov:ladder-post-off-at-floor', s[5].post === false, JSON.stringify(s[5]));
     check('gov:ladder-ends-in-demotion', r.demoteCalled >= 1, 'demote calls=' + r.demoteCalled);
+    check('gov:demote-evidence-at-floor', r.demoteEntry && r.demoteEntry.n === 32, JSON.stringify(r.demoteEntry));
     check('gov:degraded-flag-honest', r.degradedFlag === true);
     check('gov:no-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
@@ -443,9 +455,14 @@ async function readyPage(browser, query, opts) {
       const g1 = E.debugGov(); // rung 1: bloom at eighth-res, aberration uniform 0
       E.debugGovInject(BAD); await wait();
       const g2 = E.debugGov(); // rung 2: trail at half-res
-      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); await wait();
-      const g5 = E.debugGov(); // pending size at floor + eventually post off
-      // recover fully
+      // honest ladder route: rung 3 → size request → sustained bad forces
+      // it → floor APPLIES → bad at the floor turns post off
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      for (let i = 0; i < 40 && window.DMDS_GL2.status().count !== 1024; i++) await wait();
+      E.debugGovInject(BAD); await wait();
+      const g5 = E.debugGov(); // at the applied floor, post off
+      // recover: rungs restore fully; the duress-marked size does NOT
+      // bounce back this session
       for (let i = 0; i < 12; i++) E.debugGovInject(GOOD);
       await wait();
       const gr = E.debugGov();
@@ -457,6 +474,7 @@ async function readyPage(browser, query, opts) {
     check('observe:rung2-trail-half', Math.abs(r.g2.trail[0] - Math.round(r.g2.canvasPx[0] / 2)) <= 1, JSON.stringify(q(r.g2)));
     check('observe:post-off-real', r.g5.post === false && r.g5.trail === null, JSON.stringify(q(r.g5)));
     check('observe:recovery-restores', r.gr.rung === 0 && r.gr.trail && r.gr.trail[0] === r.gr.canvasPx[0] && r.gr.glow[0] === r.gr.trail[0] >> 2 && r.gr.aberrUniform === 1, JSON.stringify(q(r.gr)));
+    check('observe:duress-marked-size-stays', r.gr.sizeIdx === 0 && r.gr.trialFailed.indexOf('64') >= 0, JSON.stringify({ sizeIdx: r.gr.sizeIdx, trialFailed: r.gr.trialFailed }));
     await page.close();
   }
 
@@ -802,6 +820,74 @@ async function readyPage(browser, query, opts) {
     check('history:caps-at-120-evicting-oldest', r.capped && r.evictedOldest, JSON.stringify({ capped: r.capped, evictedOldest: r.evictedOldest }));
     check('history:survives-managed-reinit', r.survivedReinit === true);
     check('history:seq-survives-reinit-uninterrupted', r.seqContinuous === true);
+    await page.close();
+  }
+
+  // ── 22. rung-promotion two-strike lock (real-hardware finding: p90
+  //        16.9–17.4ms at rung 2, 18–20ms at rung 1 → post effects
+  //        flickered every ~30s forever) ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD, GOOD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      const HOLD = Array(70).fill(20); // 17.9–25ms hold band
+      E.debugGovInject(BAD); E.debugGovInject(BAD);       // → rung 2
+      // bounce 1: promote on 2 goods, sustained-hold degrades back
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);     // → rung 1
+      const afterPromo1 = E.debugGov().rung;
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);     // → rung 2 (strike 1)
+      const strike1 = E.debugGov();
+      // bounce 2 → lock
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);     // → rung 1
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);     // → rung 2, LOCK
+      const locked = E.debugGov();
+      // good evidence must no longer re-promote the locked pair
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);
+      const afterGoodWhileLocked = E.debugGov().rung;
+      // bad still degrades — the lock blocks promotions only
+      E.debugGovInject(BAD);
+      const afterBadWhileLocked = E.debugGov().rung;
+      const hist = E.debugGovHistory();
+      return { afterPromo1, strike1rung: strike1.rung, strike1lock: strike1.rungLockAt,
+               lockAt: locked.rungLockAt, lockedRung: locked.rung,
+               afterGoodWhileLocked, afterBadWhileLocked,
+               lockLogged: hist.some(e => e.event === 'rung-lock' && e.at === 2) };
+    }, [BAD, GOOD]);
+    check('runglock:first-bounce-no-lock', r.afterPromo1 === 1 && r.strike1rung === 2 && r.strike1lock === 0, JSON.stringify(r));
+    check('runglock:second-bounce-locks', r.lockAt === 2 && r.lockedRung === 2 && r.lockLogged, JSON.stringify(r));
+    check('runglock:good-evidence-cannot-repromote', r.afterGoodWhileLocked === 2, 'rung=' + r.afterGoodWhileLocked);
+    check('runglock:bad-still-degrades-while-locked', r.afterBadWhileLocked === 3, 'rung=' + r.afterBadWhileLocked);
+    await page.close();
+  }
+
+  // ── 23. sustained bad forces a starved idle-deferred downsize (real-
+  //        hardware finding: a continuously-interacted machine demoted
+  //        from 512² having never actually run a smaller size) ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {}; // stop choreography; keep real setMorphPair
+      // hold the field permanently non-idle: scrub-park a morph at mix 0.5
+      E.setMorphPair('logo', 'device', 0.5);
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); // rungs 1..3
+      E.debugGovInject(BAD);                                              // request floor size
+      // an UNFORCED pending must starve while the field is non-idle
+      await new Promise(r2 => setTimeout(r2, 3000));
+      const starved = { count: E.status().count, pending: E.debugGov().pending, mix: E.status().mix };
+      E.debugGovInject(BAD);                                              // sustained bad → force
+      let executed = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r2 => setTimeout(r2, 250));
+        if (E.status().count === 1024) { executed = 1024; break; }
+      }
+      return { starved, executed };
+    }, [BAD]);
+    check('force:unforced-pending-starves-while-non-idle',
+      r.starved.count === 4096 && r.starved.pending && r.starved.pending.idx === 0 && !r.starved.pending.forced && r.starved.mix === 0.5,
+      JSON.stringify(r.starved));
+    check('force:sustained-bad-overrides-idle-deferral', r.executed === 1024, 'count=' + (r.executed || 'never'));
     await page.close();
   }
 
