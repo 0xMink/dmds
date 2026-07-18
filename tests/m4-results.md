@@ -547,3 +547,26 @@ to 0, size stays). M4: 113 checks.
 
 Full clean-provenance regression at b297351 (runner, all
 dirty:false): M1 59 · M2 55 · M3 35 · M4 113 = **262 checks**.
+
+## Field validation (2026-07-18, same Haswell machine, build 7a46b2c)
+
+Second telemetry run on the machine that demoted yesterday. 59-entry
+history, verbatim outcome — every mechanism fired per design:
+- resize-forced → resize-commit 512→384 at t=60 (starvation fix, live)
+- full rung recovery 3→2→1→0 at 384² by t=160 (rung-first recovery
+  fix, live — the old code deadlocked on this exact path)
+- queued 256² downsize cancelled on 4 consecutive goods (stale-pending
+  cancellation, live)
+- NO attempt to re-promote to the collapsed 512² (duress mark, live)
+- rung-1 promotion failed twice (t=225 strike 1, t=250 strike 2) →
+  rung-lock at 2 → three subsequent good windows produced NO churn
+- **no demotion**
+
+Final state: tier 1 (gl2), 384² = 147,456 particles, rung 2, post on,
+p90 ~17ms ≈ 58fps, stable. Yesterday: tier-2 fallback at 42,000 CPU
+particles. Today: 3.5× the particles with full GPU physics on the
+same 2013 3GB-RAM laptop. Interaction bads (31–49ms p90) were
+absorbed by rung moves + one applied size step.
+
+Remaining open on this machine: subjective experience report; the
+plugged/battery variance question (optional A/B/A).
