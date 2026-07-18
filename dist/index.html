@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-6UWdyP+iqtnQNsrGAZJGIt708voAIRr203Nc5+e0RYQ=' 'sha256-fLFxF9ulhP79Tm50j9o2CvriD1gegjp4YD1sgIBIZnU=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-MgI9e/t0s4qYMjjYlOvmgp90J0wlD5Fxm1eK2Q41ivg=' 'sha256-fLFxF9ulhP79Tm50j9o2CvriD1gegjp4YD1sgIBIZnU=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="9cd0818 2026-07-18T07:54:57Z">
+<meta name="dmds-build" content="604610a-dirty 2026-07-18T08:06:40Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1342,6 +1342,11 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   // ── debug/test configuration: only honored under ?debug=1 ──
   var DEBUG = /[?&]debug=1/.test(location.search);
+  // ?telemetry=1: READ-ONLY observability (status/gov/history getters) with
+  // zero behavior change — the live governor runs exactly as production,
+  // no fault injection, no readbacks, no debug branches. Hardware retests
+  // use this so the measured run IS the production experience.
+  var TELEMETRY = /[?&]telemetry=1/.test(location.search);
   // sim-size ladder (governor moves along it; count = N*N). Desktop
   // baseline 512², floor 256², promotion ceiling 1024²; mobile pinned low.
   var SIZES = (MOBILE || SAVEDATA) ? [256, 384] : [256, 384, 512, 768, 1024];
@@ -3355,7 +3360,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     debugCamera: debugCamera,
     debugGLHealth: debugGLHealth,
     debugGov: function () {
-      if (!DEBUG) throw new Error("debugGov requires ?debug=1");
+      if (!DEBUG && !TELEMETRY) throw new Error("debugGov requires ?debug=1 or ?telemetry=1");
       var g = state.gov, gl = state.gl;
       var aberr = null;
       try { if (state.post && state.progComp) aberr = gl.getUniform(state.progComp.p, state.progComp.uAberr); } catch (e) {}
@@ -3389,7 +3394,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       finally { g.liveOff = saved; state.time = savedTime; }
     },
     debugGovHistory: function () {
-      if (!DEBUG) throw new Error("debugGovHistory requires ?debug=1");
+      if (!DEBUG && !TELEMETRY) throw new Error("debugGovHistory requires ?debug=1 or ?telemetry=1");
       return (state.gov.history || []).slice();
     },
     debugGovInject: function (frameMs, opts) {
@@ -5183,4 +5188,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 9cd0818 2026-07-18T07:54:57Z -->
+<!-- dmds build 604610a-dirty 2026-07-18T08:06:40Z -->
