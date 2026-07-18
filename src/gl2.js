@@ -149,23 +149,25 @@
   var REN_VS = [
     "#version 300 es",
     "precision highp float;",
-    "uniform sampler2D uPos;",
+    "uniform sampler2D uPos, uVel;",
     "uniform int uN;",
     "uniform mat4 uProj, uView;",
     "uniform float uTime, uSize;",
     "out float vMix;",
     "out float vTwinkle;",
     "out float vDepth;",
+    "out float vGrab;",
     "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
     "void main(){",
     "  ivec2 c = ivec2(gl_VertexID % uN, gl_VertexID / uN);",
     "  float id = float(gl_VertexID);",
     "  vec3 pos = texelFetch(uPos, c, 0).xyz;",
+    "  vGrab = texelFetch(uVel, c, 0).w;", // held particles declare themselves
     "  float r2 = hash11(id * 0.2711 + 0.53), r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
     "  vec4 mv = uView * vec4(pos, 1.0);",
     "  gl_Position = uProj * mv;",
     "  float att = clamp(18.0 / -mv.z, 0.2, 2.2);",
-    "  gl_PointSize = uSize * (0.55 + r3 * 0.9) * att;",
+    "  gl_PointSize = uSize * (0.55 + r3 * 0.9) * att * (1.0 + vGrab * 0.6);",
     "  vMix = r2;",
     "  vTwinkle = 0.62 + 0.38 * sin(uTime * 1.7 + r4 * 6.283);",
     "  vDepth = clamp((-mv.z - 14.0) / 26.0, 0.0, 1.0);",
@@ -180,12 +182,14 @@
     "in float vMix;",
     "in float vTwinkle;",
     "in float vDepth;",
+    "in float vGrab;",
     "out vec4 outColor;",
     "void main(){",
     "  vec2 c = gl_PointCoord - 0.5;",
     "  float a = smoothstep(0.5, 0.08, length(c));",
-    "  vec3 col = mix(uBone, uSignal, step(0.88, vMix));",
-    "  a *= vTwinkle * mix(1.0, 0.35, vDepth) * uDim;",
+    // a torn clump burns signal-orange in your hand — unmistakable feedback
+    "  vec3 col = mix(mix(uBone, uSignal, step(0.88, vMix)), uSignal, vGrab * 0.9);",
+    "  a *= mix(vTwinkle * mix(1.0, 0.35, vDepth), 1.0, vGrab) * uDim;",
     "  outColor = vec4(col * a, a);",
     "}"
   ].join("\n");
@@ -651,7 +655,7 @@
       state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
     });
     state.renProg = makeProgram(gl, REN_VS, REN_FS);
-    ["uPos", "uN", "uProj", "uView", "uTime", "uSize", "uBone", "uSignal", "uDim"].forEach(function (n) {
+    ["uPos", "uVel", "uN", "uProj", "uView", "uTime", "uSize", "uBone", "uSignal", "uDim"].forEach(function (n) {
       state.renLoc[n] = gl.getUniformLocation(state.renProg, n);
     });
     gl.useProgram(state.renProg);
@@ -896,7 +900,11 @@
       state.enabledAttribs = [];
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
+      gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(state.renLoc.uPos, 0);
+      gl.uniform1i(state.renLoc.uVel, 1);
       gl.uniform1i(state.renLoc.uN, N);
       gl.uniformMatrix4fv(state.renLoc.uProj, false, perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100));
       gl.uniformMatrix4fv(state.renLoc.uView, false, viewMatrix(rx, ry, CAM_Z));
