@@ -39,7 +39,9 @@
   var V_SNAP = 0.06;
   var EXCITE_TAU = 0.8;  // excitement decay; sized so the convergence invariant closes by 3s
   var K_GRAB = 14.0;     // held-clump first-order convergence rate (τ ≈ 70ms grip)
-  var GRAB_R_CSS = 90;   // capture radius, CSS px
+  var GRAB_R_CSS = 160;  // capture radius, CSS px — MUST exceed the hover-
+                         // repulsion crater (~130px), or a hover-then-press
+                         // grabs the middle of its own evacuated hole
   var RELEASE_VMAX = 72; // fling velocity clamp = 0.8·V_max (spec unit audit)
   var JITTER = 6.0;      // per-axis seed jitter on release, wu/s
 

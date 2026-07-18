@@ -100,12 +100,16 @@ const CX = 720, CY = 396;
       const g2 = grabSet(s2);
       const c1 = centroidOf(s1, g0), c2 = centroidOf(s2, g0);
       const movedRight = c2[0] - c1[0];
-      // clump keeps its shape: offsets from centroid preserved
-      let shapeDrift = 0;
+      // clump keeps its shape: offsets from centroid preserved. Per-depth
+      // unprojection shears the clump in proportion to its own depth
+      // spread during a drag (physical, by design), so the bound is
+      // relative to clump extent, not absolute
+      let shapeDrift = 0, clumpR = 0;
       g0.forEach(i => {
         const a = [s1.positions[i * 4] - c1[0], s1.positions[i * 4 + 1] - c1[1]];
         const b = [s2.positions[i * 4] - c2[0], s2.positions[i * 4 + 1] - c2[1]];
         shapeDrift = Math.max(shapeDrift, Math.hypot(b[0] - a[0], b[1] - a[1]));
+        clumpR = Math.max(clumpR, Math.hypot(a[0], a[1]));
       });
       // release: same-step transition
       up();
@@ -125,7 +129,7 @@ const CX = 720, CY = 396;
       return {
         grabCount: g0.length, depthStored, freeSentinel, constant,
         heldConstant: JSON.stringify(g0) === JSON.stringify(g2),
-        movedRight, shapeDrift,
+        movedRight, shapeDrift, clumpR,
         releasedAll: g3.length === 0, flingOK, meanVX, maxV, sentinelBack,
       };
     }, [CX, CY]);
@@ -135,10 +139,8 @@ const CX = 720, CY = 396;
     check('grab:membership-constant-still', r.constant);
     check('grab:membership-constant-dragging', r.heldConstant);
     check('grab:clump-follows-pointer', r.movedRight > 1.5, 'dx=' + r.movedRight.toFixed(2));
-    // per-depth unprojection means a clump shears slightly under parallax
-    // while dragged (physical, by design); the bound scales with the fact
-    // that capture size varies with camera sway phase at grab time
-    check('grab:clump-keeps-shape', r.shapeDrift < 1.0, 'drift=' + r.shapeDrift.toFixed(3));
+    check('grab:clump-keeps-shape', r.shapeDrift < Math.max(0.6, r.clumpR * 0.4),
+      'drift=' + r.shapeDrift.toFixed(3) + ' clumpR=' + r.clumpR.toFixed(2));
     check('grab:release-same-step-clears-all', r.releasedAll);
     check('grab:release-restores-sentinel', r.sentinelBack);
     check('grab:fling-finite-bounded', r.flingOK, 'maxV=' + r.maxV.toFixed(1));
@@ -392,7 +394,10 @@ const CX = 720, CY = 396;
     const page = await browser.newPage({ viewport: { width: vw, height: vh } });
     await page.goto(DIST + '?debug=1&gl2n=64');
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
-    await page.waitForTimeout(800); // live camera (rotating) has produced frames
+    // wait for an actual rendered frame (matrices exist), not wall time
+    await page.waitForFunction(() => {
+      try { window.DMDS_GL2.debugRoundTrip([[0, 0, 0]]); return true; } catch (e) { return false; }
+    }, { timeout: 30000 });
     const err = await page.evaluate(() => {
       const pts = [];
       [-1, 0, 1].forEach(sx => [-1, 0, 1].forEach(sy => [-8, 0, 8].forEach(z => {
