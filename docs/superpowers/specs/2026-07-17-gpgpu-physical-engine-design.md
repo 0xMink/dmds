@@ -213,7 +213,7 @@ units, wu; formation half-height ≈ 8 wu is the reference scale):
 | OOB recovery bound | **derived at runtime**: max(60, ambient corner radius + 31 excursion + 10 safety) | a fixed bound is not viewport-safe — at 32:9 the ambient corner alone reaches ≈ 36 wu and legitimate interaction would cross a fixed 60; recomputed on resize, uniform to the sim shader; verified at portrait / 16:9 / ultrawide |
 | V_max / F_max | 90 wu/s / 900 wu/s² | caps ≈ 4.5×/2× the strongest legitimate demand |
 | ε_snap | 0.012 | ≈ 0.5 device px at default camera |
-| Parallax amplitude | TBD at M3, ≈ 0.6 wu | old spec's 0.08 was unit-cube-relative |
+| Parallax amplitude | **fixed at M3**: pointer ±0.4 (x) / ±0.2 (y) wu, scroll ±0.3 wu — combined ≲ 0.65, lerped at 4/s; zero under reduced motion | camera truck in view space; sim and render share the same per-frame matrices so capture math never diverges from the drawn image |
 
 NOTE: a per-frame displacement cap (V_max·dt ≤ 3 wu) bounds *speed*,
 not position — recovery-time arguments must integrate over the window

@@ -332,6 +332,13 @@ const LIFECYCLE_INSTRUMENTS = () => {
     await page.goto(DIST + '?debug=1&gl2n=64');
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
     const r = await page.evaluate(async () => {
+      // freeze the page choreography: scroll-zone boundary jitter can call
+      // setMorphPair mid-test and re-upload targets, racing the before/
+      // after texture comparison (the source of an intermittent failure).
+      // Stubbing the public API neutralizes the page; the restore handler
+      // uses internal paths and is unaffected.
+      window.DMDS_GL2.setMorphPair = function () {};
+      window.DMDS_GL2.setFormation = function () {};
       const before = window.DMDS_GL2.status();
       const targBefore = Array.from(window.DMDS_GL2.debugReadTargets(8).b);
       const ctx = document.querySelector('#gl').getContext('webgl2');

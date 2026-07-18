@@ -42,6 +42,9 @@
   var GRAB_R_CSS = 160;  // capture radius, CSS px — MUST exceed the hover-
                          // repulsion crater (~130px), or a hover-then-press
                          // grabs the middle of its own evacuated hole
+  // parallax amplitudes, world units (spec unit-audit table, fixed at M3)
+  var PAR_PX = 0.4, PAR_PY = 0.2, PAR_SCROLL = 0.3;
+  var TEXT_CAP = 120000; // type-mode glyph particles; the rest become dust
   var RELEASE_VMAX = 72; // fling velocity clamp = 0.8·V_max (spec unit audit)
   var JITTER = 6.0;      // per-axis seed jitter on release, wu/s
 
@@ -151,25 +154,32 @@
   var REN_VS = [
     "#version 300 es",
     "precision highp float;",
-    "uniform sampler2D uPos, uVel;",
+    "uniform sampler2D uPos, uVel, uTargA, uTargB;",
     "uniform int uN;",
     "uniform mat4 uProj, uView;",
-    "uniform float uTime, uSize;",
+    "uniform float uTime, uSize, uMix;",
     "out float vMix;",
     "out float vTwinkle;",
     "out float vDepth;",
     "out float vGrab;",
+    "out float vDust;",
     "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
     "void main(){",
     "  ivec2 c = ivec2(gl_VertexID % uN, gl_VertexID / uN);",
     "  float id = float(gl_VertexID);",
     "  vec3 pos = texelFetch(uPos, c, 0).xyz;",
     "  vGrab = texelFetch(uVel, c, 0).w;", // held particles declare themselves
+    // dust factor rides target.w and blends with the same stagger as
+    // position, so a particle fades to dust as it travels to a dust target
+    "  float r1 = hash11(id * 0.1031 + 0.13);",
+    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
+    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  vDust = mix(texelFetch(uTargA, c, 0).w, texelFetch(uTargB, c, 0).w, stag);",
     "  float r2 = hash11(id * 0.2711 + 0.53), r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
     "  vec4 mv = uView * vec4(pos, 1.0);",
     "  gl_Position = uProj * mv;",
     "  float att = clamp(18.0 / -mv.z, 0.2, 2.2);",
-    "  gl_PointSize = uSize * (0.55 + r3 * 0.9) * att * (1.0 + vGrab * 0.6);",
+    "  gl_PointSize = uSize * (0.55 + r3 * 0.9) * att * (1.0 + vGrab * 0.6) * (1.0 - vDust * 0.45);",
     "  vMix = r2;",
     "  vTwinkle = 0.62 + 0.38 * sin(uTime * 1.7 + r4 * 6.283);",
     "  vDepth = clamp((-mv.z - 14.0) / 26.0, 0.0, 1.0);",
@@ -185,13 +195,16 @@
     "in float vTwinkle;",
     "in float vDepth;",
     "in float vGrab;",
+    "in float vDust;",
     "out vec4 outColor;",
     "void main(){",
     "  vec2 c = gl_PointCoord - 0.5;",
     "  float a = smoothstep(0.5, 0.08, length(c));",
     // a torn clump burns signal-orange in your hand — unmistakable feedback
     "  vec3 col = mix(mix(uBone, uSignal, step(0.88, vMix)), uSignal, vGrab * 0.9);",
-    "  a *= mix(vTwinkle * mix(1.0, 0.35, vDepth), 1.0, vGrab) * uDim;",
+    // dust: dimmer, so it feeds less energy into bloom and can never
+    // overwhelm the glyph silhouette (spec ambient-dust rules)
+    "  a *= mix(vTwinkle * mix(1.0, 0.35, vDepth), 1.0, vGrab) * uDim * (1.0 - vDust * 0.65);",
     "  outColor = vec4(col * a, a);",
     "}"
   ].join("\n");
@@ -250,9 +263,10 @@
     var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
     return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
   }
-  function viewMatrix(rx, ry, z) {
+  function viewMatrix(rx, ry, z, ox, oy) {
     var cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
-    return [cy, sx * sy, -cx * sy, 0, 0, cx, sx, 0, sy, -sx * cy, cx * cy, 0, 0, 0, -z, 1];
+    // ox/oy: camera truck (view-space translation) — the parallax lean
+    return [cy, sx * sy, -cx * sy, 0, 0, cx, sx, 0, sy, -sx * cy, cx * cy, 0, -(ox || 0), -(oy || 0), -z, 1];
   }
   // column-major a·b (apply b, then a) — matches the shader's uProj*uView order
   function mat4Mul(a, b) {
@@ -338,6 +352,7 @@
     mouse: { x: 0, y: 0, wx: 0, wy: 0, str: 0, strTarget: 0 },
     grab: { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0, captureId: null },
     dim: 1, dimTarget: 1, rot: { x: 0, y: 0 },
+    parX: 0, parY: 0, scroll: 0.5, dustStart: {},
     fps: 60, frames: 0, fpsT: 0, hw: 8, hh: 8,
     post: false, quadBuf: null, progFade: null, progBlur: null, progComp: null,
     trailA: null, trailB: null, glowA: null, glowB: null, enabledAttribs: [],
@@ -428,19 +443,19 @@
         else if ((t -= straightW) < arc) { var a3 = t / r; x = -straightW / 2 - Math.sin(a3) * r; y = -hh2 + r - Math.cos(a3) * r; }
         else if ((t -= arc) < straightH) { x = -hw2; y = -hh2 + r + t; }
         else { var a4 = (t - straightH) / r; x = -hw2 + r - Math.cos(a4) * r; y = hh2 - r + Math.sin(a4) * r; }
-        z = (Math.floor(R() * 3) - 1) * 0.35;
+        z = (Math.floor(R() * 3) - 1) * 0.9;
         x += gauss() * 0.03; y += gauss() * 0.03;
       } else if (pick < 0.62) {
-        x = (R() - 0.5) * 1.6; y = H / 2 - 1.05 + (R() - 0.5) * 0.22; z = 0.2;
+        x = (R() - 0.5) * 1.6; y = H / 2 - 1.05 + (R() - 0.5) * 0.22; z = 0.5;
       } else if (pick < 0.9) {
         var row = Math.floor(R() * 4);
         var bw = [3.8, 4.4, 2.9, 4.1][row];
         x = (R() - 0.5) * bw;
         y = 2.2 - row * 1.7 + (R() - 0.5) * 0.42;
-        z = 0.1;
+        z = (R() - 0.5) * 1.2;
       } else {
         if (R() < 0.5) { x = (R() - 0.5) * 2.2; y = -H / 2 + 0.7; z = 0.15; }
-        else { x = (R() - 0.5) * (W - 1); y = (R() - 0.5) * (H - 1); z = -0.3; }
+        else { x = (R() - 0.5) * (W - 1); y = (R() - 0.5) * (H - 1); z = -(0.5 + R() * 1.5); }
       }
       a[i * 3] = x + cx; a[i * 3 + 1] = y; a[i * 3 + 2] = z;
     }
@@ -576,16 +591,22 @@
     return t;
   }
   var targScratch = null; // reused RGBA staging array
-  function uploadTarget(gl, tex, xyz) {
+  // dustStart: particle index where a formation's ambient dust begins
+  // (COUNT = no dust); rides target.w so the renderer can dim/shrink it
+  function uploadTarget(gl, tex, xyz, dustStart) {
     if (!targScratch) targScratch = new Float32Array(COUNT * 4);
+    if (dustStart === undefined) dustStart = COUNT;
     for (var i = 0; i < COUNT; i++) {
       targScratch[i * 4] = xyz[i * 3];
       targScratch[i * 4 + 1] = xyz[i * 3 + 1];
       targScratch[i * 4 + 2] = xyz[i * 3 + 2];
-      targScratch[i * 4 + 3] = 0;
+      targScratch[i * 4 + 3] = i >= dustStart ? 1 : 0;
     }
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, targScratch);
+  }
+  function dustOf(name) {
+    return (name && state.dustStart[name] !== undefined) ? state.dustStart[name] : COUNT;
   }
 
   function makeFBO(gl, w, h) {
@@ -657,7 +678,7 @@
       state.simLoc[n] = gl.getUniformLocation(state.simProg, n);
     });
     state.renProg = makeProgram(gl, REN_VS, REN_FS);
-    ["uPos", "uVel", "uN", "uProj", "uView", "uTime", "uSize", "uBone", "uSignal", "uDim"].forEach(function (n) {
+    ["uPos", "uVel", "uTargA", "uTargB", "uMix", "uN", "uProj", "uView", "uTime", "uSize", "uBone", "uSignal", "uDim"].forEach(function (n) {
       state.renLoc[n] = gl.getUniformLocation(state.renProg, n);
     });
     gl.useProgram(state.renProg);
@@ -745,6 +766,17 @@
       var pts = sampleText(name.slice(5));
       if (!pts.xy.length) return null;
       var f = genLogo(pts);
+      // type-mode cap (spec): at most TEXT_CAP particles form glyphs;
+      // the remainder become ambient dust — scattered, BEHIND the text
+      // plane, flagged for the renderer's dust rules
+      if (COUNT > TEXT_CAP) {
+        for (var i = TEXT_CAP; i < COUNT; i++) {
+          f[i * 3] = (R() * 2 - 1) * state.hw * 1.05;
+          f[i * 3 + 1] = (R() * 2 - 1) * state.hh * 1.05;
+          f[i * 3 + 2] = -(3 + R() * 6);
+        }
+        state.dustStart[name] = TEXT_CAP;
+      }
       state.formations[name] = f;
       return f;
     }
@@ -761,8 +793,8 @@
     // physical engine: particles are wherever they are — the outgoing
     // blend becomes the new A so the spring path stays continuous
     var prev = formationFor(state.currentName) || target;
-    uploadTarget(gl, state.targA, state.mix >= 1 ? prev : blendedTargets());
-    uploadTarget(gl, state.targB, target);
+    uploadTarget(gl, state.targA, state.mix >= 1 ? prev : blendedTargets(), dustOf(state.currentName));
+    uploadTarget(gl, state.targB, target, dustOf(name));
     state.currentName = name;
     state.pairA = null; state.pairB = null;
     state.mode = "tween";
@@ -789,8 +821,8 @@
     if (state.pairA !== a || state.pairB !== b) {
       var fa = formationFor(a), fb = formationFor(b);
       if (!fa || !fb) return;
-      uploadTarget(state.gl, state.targA, fa);
-      uploadTarget(state.gl, state.targB, fb);
+      uploadTarget(state.gl, state.targA, fa, dustOf(a));
+      uploadTarget(state.gl, state.targB, fb, dustOf(b));
       state.pairA = a; state.pairB = b;
     }
     state.mode = "scrub";
@@ -810,13 +842,14 @@
     // so capture math and drawn positions agree
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
-    var vp = mat4Mul(
-      perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100),
-      viewMatrix(rx, ry, CAM_Z)
-    );
+    var proj = perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100);
+    var view = viewMatrix(rx, ry, CAM_Z, state.parX, state.parY);
+    var vp = mat4Mul(proj, view);
     var invVp = mat4Invert(vp);
-    // shared with CPU pointer math (release velocity, round-trip tests):
-    // world origin's NDC depth is the reference plane for pointer anchors
+    // shared with the render pass and CPU pointer math (release velocity,
+    // round-trip tests): world origin's NDC depth is the reference plane
+    state.proj = proj;
+    state.view = view;
     state.vp = vp;
     state.invVP = invVp;
     state.originNdcZ = vp[14] / vp[15]; // project (0,0,0): clip.z/clip.w
@@ -873,6 +906,12 @@
     state.excite *= Math.exp(-dt / EXCITE_TAU);
     if (state.grab.active) excite(0.85);
     if (state.mouse.str > 0.2) excite(Math.min(1, state.mouse.str * 0.3));
+    // parallax lean toward pointer + scroll drift (spec: fixed camera
+    // under reduced motion)
+    var ptx = REDUCED ? 0 : state.mouse.x * PAR_PX;
+    var pty = REDUCED ? 0 : -state.mouse.y * PAR_PY - (state.scroll - 0.5) * 2 * PAR_SCROLL;
+    state.parX += (ptx - state.parX) * (1 - Math.exp(-4 * dt));
+    state.parY += (pty - state.parY) * (1 - Math.exp(-4 * dt));
   }
 
   function frame(now) {
@@ -890,10 +929,7 @@
     if (!state.firstFrame) { state.firstFrame = true; milestone("loop"); }
 
     advanceSimulationState(dt, now);
-    var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
-    var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
-
-    simStep(dt, now);
+    simStep(dt, now); // also computes and stores this frame's camera matrices
 
     // ── render pass ──
     function drawPoints() {
@@ -905,11 +941,20 @@
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, state.velT[state.cur]);
       gl.activeTexture(gl.TEXTURE0);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, state.targA);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, state.targB);
+      gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(state.renLoc.uPos, 0);
       gl.uniform1i(state.renLoc.uVel, 1);
+      gl.uniform1i(state.renLoc.uTargA, 2);
+      gl.uniform1i(state.renLoc.uTargB, 3);
+      gl.uniform1f(state.renLoc.uMix, state.mode === "scrub" ? smooth01(state.mix) : state.mix);
       gl.uniform1i(state.renLoc.uN, N);
-      gl.uniformMatrix4fv(state.renLoc.uProj, false, perspective(FOV, state.canvas.width / state.canvas.height, 0.1, 100));
-      gl.uniformMatrix4fv(state.renLoc.uView, false, viewMatrix(rx, ry, CAM_Z));
+      // the same matrices the sim pass used this frame — never recomputed
+      gl.uniformMatrix4fv(state.renLoc.uProj, false, state.proj);
+      gl.uniformMatrix4fv(state.renLoc.uView, false, state.view);
       gl.uniform1f(state.renLoc.uTime, now);
       gl.uniform1f(state.renLoc.uSize, (MOBILE ? 1.35 : 1.6) * Math.min(window.devicePixelRatio || 1, DPR_CAP));
       gl.uniform1f(state.renLoc.uDim, state.dim);
@@ -1089,8 +1134,8 @@
         state.gl.viewport(0, 0, state.canvas.width, state.canvas.height);
         // rebuild directly into the current formation at current size
         var curF = formationFor(state.currentName) || state.formations.ambient;
-        uploadTarget(state.gl, state.targA, curF);
-        uploadTarget(state.gl, state.targB, curF);
+        uploadTarget(state.gl, state.targA, curF, dustOf(state.currentName));
+        uploadTarget(state.gl, state.targB, curF, dustOf(state.currentName));
         state.mix = 1;
         state.running = true;
         state.lastT = performance.now() * 0.001;
@@ -1126,7 +1171,7 @@
       listen(window, "resize", function () {
         resize();
         Object.keys(state.formations).forEach(function (k) {
-          if (k.indexOf("text:") === 0) delete state.formations[k];
+          if (k.indexOf("text:") === 0) { delete state.formations[k]; delete state.dustStart[k]; }
         });
         rebuildFormations();
         var name = state.currentName;
@@ -1363,6 +1408,13 @@
     });
     return maxErr;
   }
+  // project world points with the live camera — parallax tests observe
+  // the camera through this, not through wall-clock screenshots
+  function debugProject(pts) {
+    if (!DEBUG) throw new Error("debugProject requires ?debug=1");
+    if (!state.vp) throw new Error("no frame rendered yet");
+    return pts.map(function (p) { return projectCPU(p[0], p[1], p[2]); });
+  }
   // overwrite one particle's position texel — lets tests inject NaN /
   // out-of-bounds states and prove the recovery branch, not argue it
   function debugPoke(index, x, y, z) {
@@ -1416,17 +1468,19 @@
   }
   // read the target textures themselves, so tests compare state against
   // the actual GPU-side targets rather than re-deriving them on the CPU
-  function debugReadTargets(w) {
+  function debugReadTargets(w, x0, y0) {
     if (!DEBUG) throw new Error("debugReadTargets requires ?debug=1");
     var gl = state.gl;
     w = Math.min(w || 32, N);
+    x0 = Math.min(x0 || 0, N - w);
+    y0 = Math.min(y0 || 0, N - w);
     var fb = gl.createFramebuffer();
     var out = {};
     [["a", state.targA], ["b", state.targB]].forEach(function (pair) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pair[1], 0);
       var data = new Float32Array(w * w * 4);
-      gl.readPixels(0, 0, w, w, gl.RGBA, gl.FLOAT, data);
+      gl.readPixels(x0, y0, w, w, gl.RGBA, gl.FLOAT, data);
       out[pair[0]] = data;
     });
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1460,6 +1514,7 @@
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
+    setScroll: function (v) { state.scroll = Math.max(0, Math.min(1, +v || 0)); },
     kick: function (v) { state.turbTarget = Math.min(state.turbTarget + v, REDUCED ? 0 : 0.55); excite(0.7); },
     fps: function () { return state.fps; },
     isReady: function () { return state.ready; },
@@ -1481,6 +1536,7 @@
     debugPokeVel: debugPokeVel,
     debugConvergence: debugConvergence,
     debugRoundTrip: debugRoundTrip,
+    debugProject: debugProject,
     debugGLHealth: debugGLHealth
   };
 })();

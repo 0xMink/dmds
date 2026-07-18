@@ -322,6 +322,8 @@
       navScrolled = scrolled;
       nav.classList.toggle("nav--scrolled", scrolled);
     }
+    // scroll-driven camera parallax (tier 1 only; tier 2 has no camera truck)
+    if (glOK && GL.setScroll) GL.setScroll(maxScroll() ? cur / maxScroll() : 0);
     onScrollUpdate(cur);
     updateCursor();
   }
