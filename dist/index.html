@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-iFH6m3GXmDDO7aZRsSY+hQGdqI4JK8g3Enpbq59aneY=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-WRMXXWecAuUoULgVGzu9K62gyw5IlxFNWiv1t9EgnZs=' 'sha256-f3mcBT2k8WJF0YEOMnombAo8D0g0H+bndgEUATSTKh0=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="6211f26 2026-07-18T06:41:26Z">
+<meta name="dmds-build" content="829d3db 2026-07-18T07:16:08Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2401,6 +2401,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     state.lastT = now;
     state.time = now;
     if (dtMs > 0 && dtMs < 10000) govFrame(dtMs, now);
+    // a demotion inside govFrame destroys the engine mid-frame (found on
+    // real hardware: null-GL crash) — the SAME lifecycle-boundary rule as
+    // resizes applies to every teardown path
+    if (state.destroyed || !state.running || !state.gl) return;
     // a resize destroys and reinitializes the engine — this frame must not
     // touch GL on the far side of that boundary
     if (govMaybeResize(now)) return;
@@ -2516,7 +2520,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       // Decision logic is exercised via debugGovInject, which calls the
       // SAME production functions; live windowing is validated on real
       // hardware, where ?debug=1 is never present.
-      liveOff: DEBUG,
+      liveOff: DEBUG && !/[?&]govlive=1/.test(location.search),
       rung: 0, sizeIdx: BASE_IDX,
       frames: [], recent: [], winStart: 0,
       good: 0, cool: 0, invalid: false,
@@ -3991,12 +3995,20 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       state.govT = now;
       if (state.fps < 40 && state.drawCount > COUNT / 4) {
         state.govGood = 0;
+        // a drop soon after a restore = the machine straddles the
+        // hysteresis gap; lock at the stable lower budget rather than
+        // pulsing between the two forever
+        if (state.govRestoredAt && now - state.govRestoredAt < 12) {
+          state.govLocked = true;
+          if (window.console) console.info("[DMDS] governor: oscillation detected — locking budget");
+        }
         state.drawCount = Math.floor(state.drawCount / 2);
         if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
       } else if (state.fps > 56 && state.drawCount < COUNT) {
         state.govGood++;
         if (state.govGood >= 2) {
           state.govGood = 0;
+          state.govRestoredAt = now;
           state.drawCount = Math.min(COUNT, state.drawCount * 2);
           if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
         }
@@ -5124,4 +5136,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 6211f26 2026-07-18T06:41:26Z -->
+<!-- dmds build 829d3db 2026-07-18T07:16:08Z -->
