@@ -546,18 +546,32 @@ async function readyPage(browser, query, opts) {
     // walk happens on its own: warm-up → emergencies/windows → rungs →
     // sizes (idle-deferred) → post off → demote → tier 2 boots
     await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady && window.DMDS_GL.isReady(), { timeout: 300000 });
-    const r = await page.evaluate(() => ({
-      status: window.DMDS_GL.status(),
+    const r = await page.evaluate(async () => {
+      const readHist = () => { try { return window.DMDS_GL2.debugGovHistory(); } catch (e) { return null; } };
       // the trajectory is MOST valuable on the run that demoted — it must
-      // survive tier-1 teardown and end with the demote event
-      history: (() => { try { return window.DMDS_GL2.debugGovHistory(); } catch (e) { return null; } })(),
-    }));
+      // survive tier-1 teardown and END at the demote event, immutably:
+      // tier 2 keeps rendering below, so if any stale tier-1 loop were
+      // still scribbling in the chart, the ring would grow while we wait
+      const h1 = readHist();
+      await new Promise(res => setTimeout(res, 2000));
+      const h2 = readHist();
+      return { status: window.DMDS_GL.status(), h1, h2 };
+    });
     const crash = page.errs.filter(e => /bindVertexArray|null/.test(e));
+    const h1 = r.h1, h2 = r.h2;
     check('live:demotes-cleanly-to-tier2', r.status.tier === 'gl1' && r.status.running === true, JSON.stringify(r.status));
     check('live:no-mid-frame-lifecycle-crash', crash.length === 0, crash.join('; '));
     check('live:no-page-errors-at-all', page.errs.length === 0, page.errs.join('; '));
-    check('live:history-survives-demotion', r.history && r.history.length > 3 && r.history.some(e => e.event === 'demote'),
-      r.history ? r.history.length + ' entries, events=' + [...new Set(r.history.map(e => e.event))] : 'null');
+    check('live:history-survives-demotion', h1 && h1.length > 3 && h1.some(e => e.event === 'demote'),
+      h1 ? h1.length + ' entries, events=' + [...new Set(h1.map(e => e.event))] : 'null');
+    check('live:history-ends-at-demotion', h1 && h1.length > 0 && h1[h1.length - 1].event === 'demote',
+      h1 && h1.length ? 'last=' + h1[h1.length - 1].event : 'null');
+    check('live:history-seq-strict', h1 && h1.every((e, i) => i === 0 || e.seq > h1[i - 1].seq));
+    check('live:history-immutable-after-demotion',
+      h1 && h2 && h2.length === h1.length
+      && h2[h2.length - 1].seq === h1[h1.length - 1].seq
+      && h2[h2.length - 1].event === 'demote',
+      h1 && h2 ? 'len ' + h1.length + '→' + h2.length + ', lastSeq ' + h1[h1.length - 1].seq + '→' + h2[h2.length - 1].seq : 'null');
     await page.close();
   }
 
@@ -622,6 +636,46 @@ async function readyPage(browser, query, opts) {
     check('lock:locks-on-true-repeat', r.locked.locked === true);
     check('lock:resume-unlocks-without-promotion', r.oneGood.locked === false && r.oneGood.drawCount === 21000 && r.oneGood.good === 1, JSON.stringify(r.oneGood));
     check('lock:fresh-evidence-then-restores', r.twoGood.drawCount === 42000, JSON.stringify(r.twoGood));
+    await page.close();
+  }
+
+  // ── 17b. visibility resume clears ALL oscillation evidence — the
+  //        UNLOCKED branch: a pre-hide restoration credential (still
+  //        inside its 12s window) must not mint a post-resume strike ──
+  {
+    const page = await readyPage(browser, '');
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    });
+    await page.goto(DIST + '?debug=1');
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => {
+      const T = (fps, t) => window.DMDS_GL.debugGovTick(fps, t);
+      const out = {};
+      // establish a genuine restoration credential: drop, restore → 42000
+      T(30, 100); T(60, 102); T(60, 104);               // restoredTo=42000 @104
+      // hide → resume: lifecycle discontinuity, governor re-arms
+      Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      // the resume re-armed the LIVE loop — stop it; ticks are pure
+      window.DMDS_GL.destroy();
+      // immediate post-resume drop: t=106 is inside the pre-hide window,
+      // but the credential must be gone — drop normally, NO suspicion
+      out.postResume = T(30, 106);
+      // suspicion is earned only after the pair restores AGAIN post-resume
+      T(60, 108); T(60, 110);                            // → 42000, fresh credential
+      out.fresh = T(30, 112);
+      return out;
+    });
+    check('lock:resume-clears-stale-restore-credential',
+      r.postResume.locked === false && r.postResume.suspect === null && r.postResume.drawCount === 21000,
+      JSON.stringify(r.postResume));
+    check('lock:post-resume-suspicion-freshly-earned',
+      r.fresh.locked === false && r.fresh.suspect === 42000,
+      JSON.stringify(r.fresh));
     await page.close();
   }
 

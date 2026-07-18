@@ -307,3 +307,39 @@ Also closed this round:
 
 Full regression after changing both engines:
 M1 59/59 · M2 55/55 · M3 35/35 · M4 97/97 — **246 checks**.
+
+## Review closure round 3 (2026-07-18) — two lifecycle proofs
+
+1. **Visibility resume now clears ALL oscillation evidence** (src/gl.js).
+   The re-arm previously reset only under `if (govLocked)` — the
+   convenient branch. An unlocked resume kept `govRestoredAt`/
+   `govRestoredTo`, so a pre-hide restoration credential still inside
+   its 12s window could mint a post-resume strike from evidence that
+   spans a lifecycle discontinuity, violating the stated fresh-evidence
+   policy. Resume now unconditionally zeroes lock, suspect, suspectT,
+   restoredAt, restoredTo and good. New test (17b) exercises the
+   previously untested branch: resume at the HIGHER budget with a
+   still-valid pre-hide credential → the immediate drop degrades
+   normally with NO suspicion; suspicion is earned only after the pair
+   restores again post-resume.
+2. **The demotion history now proves "ends at demote, immutably" —
+   the claim the prose made** (test 16 strengthened). Previously
+   asserted only `some(event === 'demote')`, which a stale tier-1 loop
+   scribbling after demotion would still satisfy. Now asserted:
+   last entry IS `demote`; seq strictly monotonic end to end; and
+   after a 2s wait with tier 2 rendering below, a second read shows
+   identical length, identical last seq, last event still `demote` —
+   tier-1 telemetry provably stops at its lifecycle boundary.
+
+Full regression: M1 59/59 · M2 55/55 · M3 35/35 · M4 102/102 —
+**251 checks**.
+
+Honest flake record: one M1 run FAILED during this round while system
+load was ~16 (immediately after the M4 suite; a follow-up attempt
+couldn't even launch a browser within 180s under the same load). Two
+subsequent runs at normal load: 59/59 both. The failing check's
+identity was LOST because only the verdict line was captured — process
+fixed (full suite output now tee'd to a file). Classification:
+environmentally unclassified, machine-saturation suspected; if an M1
+check fails again at normal load it must be treated as real, not
+waved at this record.

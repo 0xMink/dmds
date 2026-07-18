@@ -869,13 +869,19 @@
         if (document.hidden) { state.running = false; }
         else if (!state.running && !state.destroyed) {
           // unlock policy: returning to the tab re-arms the governor —
-          // the conditions that caused an oscillation lock may be gone
-          if (state.govLocked) {
-            state.govLocked = false;
-            state.govSuspect = null;
-            state.govGood = 0; // fresh evidence required before restoring
-            if (window.console) console.info("[DMDS] governor: budget lock released on tab revisit");
-          } state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
+          // the conditions that caused an oscillation lock may be gone.
+          // ALL oscillation evidence resets, not just the lock: a hidden
+          // gap is a lifecycle discontinuity, so a pre-hide restoration
+          // credential must not mint a post-resume strike — the resumed
+          // session collects fresh evidence from zero
+          if (state.govLocked && window.console) console.info("[DMDS] governor: budget lock released on tab revisit");
+          state.govLocked = false;
+          state.govSuspect = null;
+          state.govSuspectT = 0;
+          state.govRestoredAt = 0;
+          state.govRestoredTo = null;
+          state.govGood = 0;
+          state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
 
       requestAnimationFrame(frame);
