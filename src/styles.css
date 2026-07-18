@@ -265,6 +265,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 }
 .hero__sub { color: var(--signal); margin-top: 1.1rem; }
 .hero__engine { color: var(--bone-dim); margin-top: 2.2rem; min-height: 1rem; }
+/* while the engine holds a grab, the browser must not run a text-selection
+   drag in parallel — the class lives exactly as long as the grab does */
+html.engine-grab, html.engine-grab * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
 /* the signature interaction advertises itself — a chip, not a whisper */
 #engine-hint {
   display: inline-block; padding: 0.55rem 0.85rem;

@@ -1168,6 +1168,7 @@
         // unconditional: a grab can never outlive its pointer (spec MUST)
         state.grab.active = false;
         state.grab.edge = false;
+        document.documentElement.classList.remove("engine-grab");
         if (state.grab.captureId !== null) {
           try { state.canvas.releasePointerCapture(state.grab.captureId); } catch (err) {}
           state.grab.captureId = null;
@@ -1177,7 +1178,13 @@
       listen(window, "pointerdown", function (e) {
         if (REDUCED || TOUCH_GRAB(e) || e.button !== 0) return;
         var t = e.target;
-        if (t && t.closest && t.closest("a, button, input, textarea, select, label, summary, [contenteditable]")) return;
+        // controls stay clickable, text stays selectable — the grab owns
+        // only the empty field where the particles live
+        if (t && t.closest && t.closest("a, button, input, textarea, select, label, summary, [contenteditable], p, h1, h2, h3, h4, h5, h6, li, blockquote, table, dl, details")) return;
+        // selection must not fight the tear: kill any drag-anchor and
+        // suppress select for the grab's lifetime (class removed on release)
+        document.documentElement.classList.add("engine-grab");
+        try { var sel = window.getSelection(); if (sel) sel.removeAllRanges(); } catch (err) {}
         pointerNDC(e);
         state.grab.vel = [0, 0, 0];
         state.grab.lastW = null;

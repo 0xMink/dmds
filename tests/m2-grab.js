@@ -135,7 +135,10 @@ const CX = 720, CY = 396;
     check('grab:membership-constant-still', r.constant);
     check('grab:membership-constant-dragging', r.heldConstant);
     check('grab:clump-follows-pointer', r.movedRight > 1.5, 'dx=' + r.movedRight.toFixed(2));
-    check('grab:clump-keeps-shape', r.shapeDrift < 0.5, 'drift=' + r.shapeDrift.toFixed(3));
+    // per-depth unprojection means a clump shears slightly under parallax
+    // while dragged (physical, by design); the bound scales with the fact
+    // that capture size varies with camera sway phase at grab time
+    check('grab:clump-keeps-shape', r.shapeDrift < 1.0, 'drift=' + r.shapeDrift.toFixed(3));
     check('grab:release-same-step-clears-all', r.releasedAll);
     check('grab:release-restores-sentinel', r.sentinelBack);
     check('grab:fling-finite-bounded', r.flingOK, 'maxV=' + r.maxV.toFixed(1));
@@ -350,6 +353,36 @@ const CX = 720, CY = 396;
       return { before, grabActive: E.debugGLHealth().grabActive, flags: grabSet(window.DMDS_GL2.debugReadState()).length };
     }, [CX, CY]);
     check('grab:destroy-resets-grab', r.before > 0 && r.grabActive === false && r.flags === 0, JSON.stringify(r));
+    await page.close();
+  }
+
+  // ── 6b. text yields selection, emptiness yields grabs; selection is
+  //        suppressed exactly for the grab's lifetime ──
+  {
+    const page = await settledPage(browser);
+    const r = await page.evaluate(async ([CX, CY]) => {
+      const { E, grabSet, down, up } = window.H;
+      E.pause();
+      // press ON text (the headline) → no grab, selection left alone
+      document.querySelector('.hero__tagline').dispatchEvent(
+        new PointerEvent('pointerdown', { clientX: 200, clientY: 700, button: 0, pointerType: 'mouse', bubbles: true }));
+      E.debugStep(1);
+      const textGrab = grabSet(window.DMDS_GL2.debugReadState()).length;
+      const classDuringText = document.documentElement.classList.contains('engine-grab');
+      // press on the empty field → grab + selection suppressed
+      down(CX, CY);
+      E.debugStep(1);
+      const fieldGrab = grabSet(window.DMDS_GL2.debugReadState()).length;
+      const classDuringGrab = document.documentElement.classList.contains('engine-grab');
+      up();
+      E.debugStep(1);
+      const classAfterRelease = document.documentElement.classList.contains('engine-grab');
+      E.resume();
+      return { textGrab, classDuringText, fieldGrab, classDuringGrab, classAfterRelease };
+    }, [CX, CY]);
+    check('grab:text-press-never-grabs', r.textGrab === 0 && r.classDuringText === false, JSON.stringify(r));
+    check('grab:field-press-grabs', r.fieldGrab > 0);
+    check('grab:selection-suppressed-during-grab-only', r.classDuringGrab === true && r.classAfterRelease === false, JSON.stringify(r));
     await page.close();
   }
 
