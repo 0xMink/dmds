@@ -602,12 +602,16 @@
       state.govT = now;
       if (state.fps < 40 && state.drawCount > COUNT / 4) {
         state.govGood = 0;
-        // a drop soon after a restore = the machine straddles the
-        // hysteresis gap; lock at the stable lower budget rather than
-        // pulsing between the two forever
+        // a drop soon after a restore is ONE oscillation event; locking on
+        // the first could mistake a transient (background task, thermal
+        // blip) for a stable hysteresis conflict — require the cycle to
+        // repeat before granting the lower budget tenure
         if (state.govRestoredAt && now - state.govRestoredAt < 12) {
-          state.govLocked = true;
-          if (window.console) console.info("[DMDS] governor: oscillation detected — locking budget");
+          state.govOsc = (state.govOsc || 0) + 1;
+          if (state.govOsc >= 2) {
+            state.govLocked = true;
+            if (window.console) console.info("[DMDS] governor: repeated oscillation — locking budget (returns on tab revisit)");
+          }
         }
         state.drawCount = Math.floor(state.drawCount / 2);
         if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
@@ -852,7 +856,14 @@
 
       listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; }
-        else if (!state.running && !state.destroyed) { state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
+        else if (!state.running && !state.destroyed) {
+          // unlock policy: returning to the tab re-arms the governor —
+          // the conditions that caused an oscillation lock may be gone
+          if (state.govLocked) {
+            state.govLocked = false;
+            state.govOsc = 0;
+            if (window.console) console.info("[DMDS] governor: budget lock released on tab revisit");
+          } state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
 
       requestAnimationFrame(frame);
