@@ -572,6 +572,10 @@ async function readyPage(browser, query, opts) {
       && h2[h2.length - 1].seq === h1[h1.length - 1].seq
       && h2[h2.length - 1].event === 'demote',
       h1 && h2 ? 'len ' + h1.length + '→' + h2.length + ', lastSeq ' + h1[h1.length - 1].seq + '→' + h2[h2.length - 1].seq : 'null');
+    // exact snapshot equality: also catches in-place mutation of an
+    // existing entry, which length + final seq cannot see
+    check('live:history-byte-identical-after-demotion',
+      h1 && h2 && JSON.stringify(h1) === JSON.stringify(h2));
     await page.close();
   }
 
@@ -660,8 +664,11 @@ async function readyPage(browser, query, opts) {
       document.dispatchEvent(new Event('visibilitychange'));
       Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
-      // the resume re-armed the LIVE loop — stop it; ticks are pure
-      window.DMDS_GL.destroy();
+      // NO destroy() here: the assertion must isolate the RESUME HANDLER
+      // as the thing that cleared the credential — another lifecycle
+      // function must not wander through the crime scene. This is safe:
+      // dispatchEvent ran the handler synchronously, and the rAF it
+      // requested cannot fire inside this synchronous evaluate task.
       // immediate post-resume drop: t=106 is inside the pre-hide window,
       // but the credential must be gone — drop normally, NO suspicion
       out.postResume = T(30, 106);

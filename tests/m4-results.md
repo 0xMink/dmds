@@ -343,3 +343,61 @@ fixed (full suite output now tee'd to a file). Classification:
 environmentally unclassified, machine-saturation suspected; if an M1
 check fails again at normal load it must be treated as real, not
 waved at this record.
+
+## Review closure round 4 (2026-07-18) — evidence hygiene
+
+Accounting correction, accepted from review: "full regression
+251/251" was too clean a description. The defensible claim is: **M1,
+M2, M3 and M4 each produced a successful post-change run, totaling
+251 passing checks.** One earlier M1 run failed without retained
+diagnostic output, and a separate rerun attempt failed during browser
+launch under host load ~16. Those are two distinct events and neither
+is part of an "uninterrupted 251/251" — that phrasing (including in
+commit 1a9e575's message) overstated.
+
+Closed this round:
+1. **Resume test de-confounded**: the intervening `destroy()` between
+   the visibility dance and the assertion is gone — it could have
+   masked a resume-handler failure if destroy ever cleared governor
+   fields, and it made the test exercise a destroyed engine rather
+   than the live resumed state. Safe without it: dispatchEvent runs
+   the handler synchronously and the rAF it requests cannot fire
+   inside the same synchronous evaluate task. The test now isolates
+   the resume handler as the thing that cleared the credential.
+2. **Demotion history: exact snapshot equality**
+   (JSON.stringify(h1) === JSON.stringify(h2)) — also catches
+   in-place mutation of an existing entry, which length + final seq
+   cannot see. (+1 check, M4 → 103.)
+3. **tests/run.sh**: every suite run now records an environmental
+   preamble (UTC time, uptime/load, memory, chromium/node processes),
+   tees complete output to tests/logs/<suite>-<stamp>.log and appends
+   the numeric exit status — launch failure (2), assertion failure
+   (1), signal kill (>128) stay distinguishable. Logs are gitignored
+   (evidence on disk, summaries in these records). Flake-hunt mode:
+   `tests/run.sh m1-core 3` stops immediately on any failure and
+   names the retained log.
+4. **M1 controlled repetition**: three consecutive runs at ordinary
+   recorded load via the runner (results below).
+5. Hardware-retest cache note: the served dist updates on rebuild,
+   but the BROWSER may cache — retest with a cache-busting param:
+   http://192.168.4.40:8080/?telemetry=1&build=<dist-commit>
+   (inert to the app; new URL to the cache).
+
+**Round-4 run results** (all via tests/run.sh, complete logs in
+tests/logs/, exit=0 each):
+- M4 103/103 — de-confounded resume test passes with the resume
+  handler as the only actor; byte-identical history snapshot holds.
+- M1 controlled repetition: 3 consecutive 59/59 passes
+  (11:28, 11:30, 11:32 UTC; 1-min load at preamble 9.25 / 7.89 / 7.94
+  — largely self-inflicted by the back-to-back suites on this box,
+  and well below the ~16 of the failure incident; no stale chromium).
+- With the two earlier passes, that is 5 consecutive M1 passes since
+  the single unclassified failure. Per the adopted protocol the
+  incident is classified **harness/host infrastructure instability**
+  (launch-timeout twin correlated with load ~16), with the standing
+  rule: any future M1 assertion failure at normal load is a real
+  defect until proven otherwise — its log will exist this time.
+
+Defensible totals: M2 55 and M3 35 passed post-change earlier this
+round (pre-runner, verdict lines only — the last such runs); M1 59
+and M4 103 passed under the runner with retained logs. 252 checks.
