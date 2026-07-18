@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-GDkw2tNBJ1zrNlUSRXgfO9AK3OZoTfFppypmwHinYkk=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-8X8x3XZcWlpfiS3xn8BFo5bYM9EWLeoCEzLGZ1kH6SA='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-S77oBW5JO+VrSETvaU9FTEuP4Mmqk0e7nDiCi4GbNS8=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-+wOAmRhyT4Z7DIh0Thh18lRp4K/J+NbfzTfny6Jvt2I='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="77ec769 2026-07-18T04:10:26Z">
+<meta name="dmds-build" content="492b6dc 2026-07-18T04:59:24Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1342,11 +1342,19 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   // ── debug/test configuration: only honored under ?debug=1 ──
   var DEBUG = /[?&]debug=1/.test(location.search);
-  var N = (MOBILE || SAVEDATA) ? 256 : 512; // sim texture side; count = N*N
+  // sim-size ladder (governor moves along it; count = N*N). Desktop
+  // baseline 512², floor 256², promotion ceiling 1024²; mobile pinned low.
+  var SIZES = (MOBILE || SAVEDATA) ? [256, 384] : [256, 384, 512, 768, 1024];
+  var BASE_IDX = (MOBILE || SAVEDATA) ? 0 : 2;
   if (DEBUG) {
     var m = location.search.match(/[?&]gl2n=(\d+)/);
-    if (m) N = Math.max(8, Math.min(1024, parseInt(m[1], 10)));
+    if (m) {
+      var dn = Math.max(16, Math.min(1024, parseInt(m[1], 10)));
+      SIZES = [Math.max(16, dn >> 1), dn, Math.min(1024, dn << 1)];
+      BASE_IDX = 1;
+    }
   }
+  var N = SIZES[BASE_IDX]; // reassigned by governor resizes (managed reinit)
 
   var CAM_Z = 26, FOV = 35 * Math.PI / 180;
 
@@ -1566,11 +1574,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     "uniform sampler2D uField;",
     "uniform sampler2D uGlow;",
     "uniform float uPostMix;",
+    "uniform float uAberr;",
     "varying vec2 vUv;",
     "void main(){",
     "  vec2 c = vUv - 0.5;",
     "  float r = length(c);",
-    "  float k = 0.0045 * r * uPostMix;",
+    "  float k = 0.0045 * r * uPostMix * uAberr;",
     "  vec3 field;",
     "  field.r = texture2D(uField, vUv + c * k).r;",
     "  field.g = texture2D(uField, vUv).g;",
@@ -1706,7 +1715,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   /* ═══ formation generators — identical world-space math to gl.js,
      COUNT = N*N; ported so the two tiers speak the same shapes ═══ */
-  var COUNT = N * N;
+  var COUNT = N * N; // reassigned alongside N on governor resizes
   var R = (function () { var s = 1234567; return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })();
   function gauss() { return (R() + R() + R() - 1.5) * 0.82; }
 
@@ -1957,11 +1966,16 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     gl.deleteFramebuffer(f.fb);
   }
   function allocPostTargets() {
+    // governor axis 2 (fill rate): rung ≥ 1 shrinks bloom to eighth-res,
+    // rung ≥ 2 runs the whole post chain at half resolution
     var gl = state.gl, w = state.canvas.width, h = state.canvas.height;
+    var ts = state.gov && state.gov.rung >= 2 ? 0.5 : 1;
+    var gshift = state.gov && state.gov.rung >= 1 ? 3 : 2;
     ["trailA", "trailB", "glowA", "glowB"].forEach(function (k) { destroyFBO(gl, state[k]); state[k] = null; });
-    state.trailA = makeFBO(gl, w, h);
-    state.trailB = makeFBO(gl, w, h);
-    var qw = Math.max(2, w >> 2), qh = Math.max(2, h >> 2);
+    var tw = Math.max(2, Math.round(w * ts)), th = Math.max(2, Math.round(h * ts));
+    state.trailA = makeFBO(gl, tw, th);
+    state.trailB = makeFBO(gl, tw, th);
+    var qw = Math.max(2, tw >> gshift), qh = Math.max(2, th >> gshift);
     state.glowA = makeFBO(gl, qw, qh);
     state.glowB = makeFBO(gl, qw, qh);
   }
@@ -2038,7 +2052,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         var pb = makeProgram(gl, QUAD_VS, BLUR_FS);
         state.progBlur = { p: pb, aXY: gl.getAttribLocation(pb, "aXY"), uTex: gl.getUniformLocation(pb, "uTex"), uDir: gl.getUniformLocation(pb, "uDir") };
         var pc = makeProgram(gl, QUAD_VS, COMP_FS);
-        state.progComp = { p: pc, aXY: gl.getAttribLocation(pc, "aXY"), uTex: gl.getUniformLocation(pc, "uField"), uGlow: gl.getUniformLocation(pc, "uGlow"), uPostMix: gl.getUniformLocation(pc, "uPostMix") };
+        state.progComp = { p: pc, aXY: gl.getAttribLocation(pc, "aXY"), uTex: gl.getUniformLocation(pc, "uField"), uGlow: gl.getUniformLocation(pc, "uGlow"), uPostMix: gl.getUniformLocation(pc, "uPostMix"), uAberr: gl.getUniformLocation(pc, "uAberr") };
         state.quadBuf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, state.quadBuf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -2073,8 +2087,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  function effDprCap() {
+    // governor axis 2, rung 3: cap the backing store at 1.0 device px
+    return state.gov && state.gov.rung >= 3 ? 1.0 : DPR_CAP;
+  }
   function resize() {
-    var c = state.canvas, dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    var c = state.canvas, dpr = Math.min(window.devicePixelRatio || 1, effDprCap());
     var w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) {
       c.width = w; c.height = h;
@@ -2122,10 +2140,22 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   function excite(v) { state.excite = Math.min(1, Math.max(state.excite, v)); }
 
+  function rmWake() {
+    // wall clock, NOT state.time — the sim clock is stale after a sleep and
+    // a stale stamp would put the engine straight back to sleep
+    state.lastCommandT = performance.now() * 0.001;
+    if (state.rmSleeping && !state.destroyed && state.ready) {
+      state.rmSleeping = false;
+      state.running = true;
+      state.lastT = performance.now() * 0.001;
+      state.raf = requestAnimationFrame(frame);
+    }
+  }
   function setFormation(name, instant, dur) {
     if (!state.ready || name === state.currentName) return;
     var target = formationFor(name);
     if (!target) return;
+    rmWake();
     var gl = state.gl;
     // physical engine: particles are wherever they are — the outgoing
     // blend becomes the new A so the spring path stays continuous
@@ -2263,7 +2293,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     var prev = state.mix;
     state.mix = Math.max(0, Math.min(1, t));
     state.currentName = state.mix >= 0.5 ? b : a;
-    if (Math.abs(state.mix - prev) > 0.002) excite(Math.min(1, 0.4 + Math.abs(state.mix - prev) * 30));
+    if (Math.abs(state.mix - prev) > 0.002) {
+      excite(Math.min(1, 0.4 + Math.abs(state.mix - prev) * 30));
+      rmWake(); // an actual scrub movement is a command
+    }
   }
 
   // one MRT sim draw — callable from the frame loop AND from the
@@ -2353,10 +2386,13 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     state.raf = requestAnimationFrame(frame);
     var gl = state.gl;
     now *= 0.001;
+    var dtMs = (now - state.lastT) * 1000; // real presented interval (governor metric)
     var dt = Math.min(now - state.lastT, DT_MAX) || 0.016;
     if (dt <= 0) dt = 0.016;
     state.lastT = now;
     state.time = now;
+    if (dtMs > 0 && dtMs < 10000) govFrame(dtMs, now);
+    govMaybeResize(now);
 
     state.frames++;
     if (now - state.fpsT > 0.5) { state.fps = Math.round(state.frames / (now - state.fpsT)); state.frames = 0; state.fpsT = now; }
@@ -2390,7 +2426,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       gl.uniformMatrix4fv(state.renLoc.uProj, false, state.proj);
       gl.uniformMatrix4fv(state.renLoc.uView, false, state.view);
       gl.uniform1f(state.renLoc.uTime, now);
-      gl.uniform1f(state.renLoc.uSize, (MOBILE ? 1.35 : 1.6) * Math.min(window.devicePixelRatio || 1, DPR_CAP));
+      gl.uniform1f(state.renLoc.uSize, (MOBILE ? 1.35 : 1.6) * Math.min(window.devicePixelRatio || 1, effDprCap()) * (state.post && state.trailB ? state.trailB.h / state.canvas.height : 1));
       gl.uniform1f(state.renLoc.uDim, state.dim);
       gl.drawArrays(gl.POINTS, 0, COUNT);
     }
@@ -2402,7 +2438,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       var W = state.canvas.width, H = state.canvas.height;
       gl.disable(gl.BLEND);
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.trailB.fb);
-      gl.viewport(0, 0, W, H);
+      gl.viewport(0, 0, state.trailB.w, state.trailB.h); // governed size, not canvas size
       drawQuad(state.progFade, state.trailA.tex, function () {
         // trails die fast at rest (decay rate rises as excitement falls)
         gl.uniform1f(state.progFade.uDecay, REDUCED ? 0.0 : Math.exp(-dt * (9 + (1 - postMix) * 30)));
@@ -2428,6 +2464,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         gl.bindTexture(gl.TEXTURE_2D, state.glowB.tex);
         gl.uniform1i(state.progComp.uGlow, 1);
         gl.uniform1f(state.progComp.uPostMix, postMix);
+        gl.uniform1f(state.progComp.uAberr, state.gov && state.gov.rung >= 1 ? 0 : 1);
         gl.activeTexture(gl.TEXTURE0);
       });
       var t = state.trailA; state.trailA = state.trailB; state.trailB = t;
@@ -2439,6 +2476,206 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       drawPoints();
     }
+
+    // reduced-motion power contract (spec): once the last accepted
+    // formation command is 3s old and the field is settled, this frame
+    // was the final one — the loop stops and formation commands wake it
+    if (REDUCED && state.mix >= 1 && now - (state.lastCommandT || 0) > 3) {
+      state.running = false;
+      state.rmSleeping = true;
+    }
+  }
+
+
+  /* ═══ governor — two axes: post/fill quality (rungs 0–5) and sim size ═══
+     Metric: p90 frame time per window (5s; 1s during the startup fast
+     path). Good < 17.9ms, bad > 25ms, emergency = rolling 1s mean > 50ms.
+     Degrade order: aberration+bloom → post half-res → DPR cap → sim size
+     down (idle-deferred reinit) → post off → tier demotion. Improvement
+     reverses; promotion above baseline is desktop-only and gated on a
+     trial allocation (no retry per session on failure). */
+  var govPersist = null, seedPersist = null;
+  function initGov() {
+    state.gov = {
+      // debug pages are test instruments: live collection would let
+      // SwiftShader's real frame times fight the injector (emergencies,
+      // even mid-test resizes tearing down engines under inspection).
+      // Decision logic is exercised via debugGovInject, which calls the
+      // SAME production functions; live windowing is validated on real
+      // hardware, where ?debug=1 is never present.
+      liveOff: DEBUG,
+      rung: 0, sizeIdx: BASE_IDX,
+      frames: [], recent: [], winStart: 0,
+      good: 0, cool: 0, invalid: false,
+      warmed: false, warmFrames: 0, warmT0: 0, fastUntil: 0,
+      pendingResize: null, trialFailed: {}, demoted: false
+    };
+  }
+  function applyRung(r) {
+    var g = state.gov;
+    g.rung = r;
+    g.cool = state.time + 5;
+    g.invalid = true;
+    if (r >= 5) state.post = false;
+    else if (state.progFade && !MOBILE && !SAVEDATA) state.post = true;
+    if (state.post) { try { allocPostTargets(); } catch (e) { state.post = false; } }
+    resize(); // re-evaluates the DPR cap for rung 3
+    if (window.console) console.info("[DMDS] governor: quality rung -> " + r + (state.post ? "" : " (post off)"));
+  }
+  function govTrialAlloc(n) {
+    var gl = state.gl;
+    try {
+      var t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, n, n, 0, gl.RGBA, gl.FLOAT, null);
+      var fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE && gl.getError() === gl.NO_ERROR;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteTexture(t);
+      gl.deleteFramebuffer(fb);
+      if (!ok) state.gov.trialFailed[n] = true;
+      return ok;
+    } catch (e) {
+      state.gov.trialFailed[n] = true;
+      return false;
+    }
+  }
+  function govRequestResize(idx) {
+    var g = state.gov;
+    g.pendingResize = idx;
+    g.cool = state.time + 5;
+    g.invalid = true;
+    if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[idx] + "^2 (deferred until idle)");
+  }
+  function govDemote() {
+    var g = state.gov;
+    if (g.demoted) return;
+    g.demoted = true;
+    if (window.console) console.warn("[DMDS] governor: tier 1 cannot hold frame rate at the floor -> demoting to tier 2");
+    if (state.onDemote) state.onDemote();
+  }
+  function govDegradeOnce() {
+    var g = state.gov;
+    if (g.rung < 3) applyRung(g.rung + 1);
+    else if (g.pendingResize !== null) {
+      // a queued (idle-deferred) resize must not deadlock the ladder under
+      // sustained load: deepen the pending target toward the floor, and
+      // once it's at the floor keep descending past the size axis
+      if (g.pendingResize > 0) govRequestResize(g.pendingResize - 1);
+      else if (state.post) applyRung(5);
+      else govDemote();
+    }
+    else if (g.sizeIdx > 0) govRequestResize(g.sizeIdx - 1);
+    else if (state.post) applyRung(5);
+    else govDemote();
+  }
+  function govImproveOnce() {
+    var g = state.gov;
+    if (g.rung === 5) applyRung(3);
+    else if (g.sizeIdx < BASE_IDX && g.pendingResize === null) govRequestResize(g.sizeIdx + 1);
+    else if (g.rung > 0) applyRung(g.rung - 1);
+    else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && g.pendingResize === null && !g.trialFailed[SIZES[g.sizeIdx + 1]]) {
+      if (govTrialAlloc(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1);
+      else g.cool = state.time + 5;
+    }
+  }
+  // ONE evaluation function — the real frame loop and the test injector
+  // both call this, so tests exercise production decision logic
+  function govEvaluate(p90, fast) {
+    var g = state.gov;
+    if (state.time < g.cool) return "cooldown";
+    if (p90 > 25) {
+      g.good = 0;
+      govDegradeOnce();
+      if (fast && p90 > 40) govDegradeOnce(); // severe startup miss skips a rung
+      return "degrade";
+    }
+    if (p90 < 17.9) {
+      g.good++;
+      if (g.good >= 2) { g.good = 0; govImproveOnce(); return "improve"; }
+      return "good";
+    }
+    g.good = 0;
+    return "hold";
+  }
+  function govEmergency() {
+    var g = state.gov;
+    if (state.time < g.cool) return "cooldown";
+    govDegradeOnce();
+    govDegradeOnce();
+    g.good = 0;
+    return "emergency";
+  }
+  function govFrame(dtMs, now) {
+    if (REDUCED) return; // reduced motion: static field, no governing
+    var g = state.gov;
+    if (g.demoted || g.liveOff) return; // liveOff: a test injector owns the governor
+    if (!g.warmed) {
+      // warm-up: compile/upload stalls never count against the page
+      if (!g.warmT0) g.warmT0 = now;
+      g.warmFrames++;
+      if (g.warmFrames >= 30 || now - g.warmT0 >= 1) {
+        g.warmed = true;
+        g.fastUntil = now + 3;
+        g.winStart = now;
+        g.frames = [];
+      }
+      return;
+    }
+    g.frames.push(dtMs);
+    g.recent.push([now, dtMs]);
+    while (g.recent.length && g.recent[0][0] < now - 1) g.recent.shift();
+    if (g.recent.length >= 4) {
+      var sum = 0;
+      for (var i = 0; i < g.recent.length; i++) sum += g.recent[i][1];
+      if (sum / g.recent.length > 50) {
+        if (govEmergency() === "emergency") {
+          g.frames = []; g.winStart = now; g.invalid = false;
+          return;
+        }
+      }
+    }
+    var winLen = now < g.fastUntil ? 1 : 5;
+    if (now - g.winStart < winLen) return;
+    var frames = g.frames, wasInvalid = g.invalid;
+    g.frames = []; g.winStart = now; g.invalid = false;
+    // validity: not hidden, not marked (resume/restore/resize/alloc),
+    // enough presented frames for the percentile to mean something
+    if (wasInvalid || document.hidden || frames.length < winLen * 12) { g.good = 0; return; }
+    var sorted = frames.slice().sort(function (a, b) { return a - b; });
+    govEvaluate(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], now < g.fastUntil);
+  }
+  function govMaybeResize(now) {
+    var g = state.gov;
+    if (g.pendingResize === null || g.pendingResize === undefined) return;
+    // idle-only (spec): no grab, no morph, calm field, 2s since a command
+    if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return;
+    if (now - (state.lastCommandT || 0) < 2) return;
+    var idx = g.pendingResize;
+    g.pendingResize = null;
+    executeResize(idx);
+  }
+  function executeResize(idx) {
+    // a size change IS a managed reinit — the destroy/init lifecycle is
+    // the most-tested path in the engine; governor state and the current
+    // formation survive across it, and the new field seeds near its
+    // targets so it assembles in under a second
+    var canvas = state.canvas, ms = state.ms;
+    govPersist = state.gov;
+    govPersist.sizeIdx = idx;
+    govPersist.invalid = true;
+    govPersist.cool = state.time + 5;
+    seedPersist = state.currentName || "logo";
+    destroy();
+    N = SIZES[idx];
+    COUNT = N * N;
+    targScratch = null; // sized per COUNT
+    init(canvas, ms).catch(function (e) {
+      if (window.console) console.warn("[DMDS] resize reinit failed -> demoting:", e && e.message);
+      if (state.onDemote) state.onDemote();
+    });
   }
 
   /* ═══ capability probe — throwaway canvas, production shape ═══ */
@@ -2529,6 +2766,11 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     // a CPU-side grab must not survive teardown/re-init (GPU textures are
     // reseeded, but a stale active flag would pin excitement forever)
     state.grab = { active: false, edge: false, ptr: [0, 0], vel: [0, 0, 0], lastW: null, lastT: 0, captureId: null };
+    // governor survives a resize reinit (it ordered it); fresh boots start clean
+    if (govPersist) { state.gov = govPersist; govPersist = null; }
+    else initGov();
+    state.rmSleeping = false;
+    state.lastCommandT = performance.now() * 0.001;
 
     if (!probe()) return Promise.reject(new Error("gl2 probe failed"));
 
@@ -2579,6 +2821,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
         uploadTarget(state.gl, state.targB, curF, dustOf(state.currentName));
         state.mix = 1;
         state.mode = "tween";
+        if (state.gov) { state.gov.invalid = true; state.gov.cool = state.time + 5; }
         // the scrub-pair cache is now stale: both textures hold the current
         // formation, so a post-restore setMorphPair with the PRE-LOSS pair
         // must not hit the same-pair guard and skip its re-upload — that
@@ -2604,18 +2847,43 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       rebuildFormations();
       milestone("seed", COUNT);
 
-      uploadTarget(gl, state.targA, state.formations.ambient);
-      uploadTarget(gl, state.targB, state.formations.logo);
-      state.currentName = "logo";
-      state.mix = 0;
-      state.morphStart = 0;
-      state.mode = "tween";
-      state.tweenDur = state.morphDur = REDUCED ? 0.01 : 2.2;
-      state.excite = 1;
+      if (seedPersist) {
+        // governor resize: re-seed AT the surviving formation's targets
+        // (small jitter) so the field re-assembles in well under a second
+        var keepName = seedPersist;
+        seedPersist = null;
+        var keep = formationFor(keepName) || state.formations.logo;
+        uploadTarget(gl, state.targA, keep, dustOf(keepName));
+        uploadTarget(gl, state.targB, keep, dustOf(keepName));
+        state.currentName = keepName;
+        var reseed = new Float32Array(COUNT * 4);
+        for (var ri = 0; ri < COUNT; ri++) {
+          reseed[ri * 4] = keep[ri * 3] + gauss() * 1.5;
+          reseed[ri * 4 + 1] = keep[ri * 3 + 1] + gauss() * 1.5;
+          reseed[ri * 4 + 2] = keep[ri * 3 + 2] + gauss() * 1.5;
+          reseed[ri * 4 + 3] = DEPTH_FREE;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, state.posT[state.cur]);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, reseed);
+        state.mix = 1;
+        state.mode = "tween";
+        state.tweenDur = state.morphDur = REDUCED ? 0.01 : 1.5;
+        state.excite = 0.6;
+      } else {
+        uploadTarget(gl, state.targA, state.formations.ambient);
+        uploadTarget(gl, state.targB, state.formations.logo);
+        state.currentName = "logo";
+        state.mix = 0;
+        state.morphStart = 0;
+        state.mode = "tween";
+        state.tweenDur = state.morphDur = REDUCED ? 0.01 : 2.2;
+        state.excite = 1;
+      }
       state.ready = true;
       state.running = true;
 
       listen(window, "resize", function () {
+        if (state.gov) state.gov.invalid = true; // realloc window is invalid
         resize();
         Object.keys(state.formations).forEach(function (k) {
           if (k.indexOf("text:") === 0) { delete state.formations[k]; delete state.dustStart[k]; }
@@ -2713,6 +2981,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       listen(document, "visibilitychange", function () {
         if (document.hidden) { state.running = false; if (state.releaseGrab) state.releaseGrab(); }
         else if (!state.running && !state.destroyed) {
+          if (state.gov) state.gov.invalid = true; // first window after resume is invalid
           state.running = true;
           state.lastT = performance.now() * 0.001; // dt clamp handles the gap
           state.raf = requestAnimationFrame(frame);
@@ -2976,7 +3245,18 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       }
     },
     onLostTimeout: function (fn) { state.onLostTimeout = fn; },
-    status: function () { return { tier: "gl2", post: state.post, count: COUNT, max: COUNT, running: state.running, formation: state.currentName, mix: state.mix, excite: Math.round(state.excite * 100) / 100 }; },
+    status: function () {
+      var base = SIZES[BASE_IDX] * SIZES[BASE_IDX];
+      return {
+        tier: "gl2", post: state.post,
+        count: COUNT, max: base, // max = the tier's BASELINE budget, so count<max reads as degraded
+        degraded: !!(state.gov && (state.gov.rung > 0 || state.gov.sizeIdx < BASE_IDX)),
+        running: state.running, sleeping: !!state.rmSleeping,
+        formation: state.currentName, mix: state.mix,
+        excite: Math.round(state.excite * 100) / 100
+      };
+    },
+    onDemote: function (fn) { state.onDemote = fn; },
     debugReadState: debugReadState,
     debugReadSample: debugReadSample,
     debugReadTargets: debugReadTargets,
@@ -2987,7 +3267,34 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     debugRoundTrip: debugRoundTrip,
     debugProject: debugProject,
     debugCamera: debugCamera,
-    debugGLHealth: debugGLHealth
+    debugGLHealth: debugGLHealth,
+    debugGov: function () {
+      if (!DEBUG) throw new Error("debugGov requires ?debug=1");
+      var g = state.gov;
+      return {
+        rung: g.rung, sizeIdx: g.sizeIdx, n: SIZES[g.sizeIdx], count: COUNT,
+        sizes: SIZES.slice(), baseIdx: BASE_IDX,
+        warmed: g.warmed, cooling: state.time < g.cool, good: g.good,
+        pending: g.pendingResize, post: state.post, demoted: g.demoted,
+        trialFailed: Object.keys(g.trialFailed)
+      };
+    },
+    debugGovInject: function (frameMs, opts) {
+      // drives the SAME production evaluation/emergency functions the
+      // frame loop uses — tests exercise real decision logic
+      if (!DEBUG) throw new Error("debugGovInject requires ?debug=1");
+      opts = opts || {};
+      var g = state.gov;
+      g.liveOff = true; // the injector owns the governor from first use —
+                        // real SwiftShader frame times must not interleave
+      if (!g.warmed) { g.warmed = true; g.fastUntil = 0; }
+      if (!opts.respectCooldown) g.cool = 0;
+      if (opts.invalid) { g.good = 0; return "invalid"; }
+      if (opts.emergency) return govEmergency();
+      var sorted = frameMs.slice().sort(function (a, b) { return a - b; });
+      var p90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))];
+      return govEvaluate(p90, opts.fast === true);
+    }
   };
 })();
 
@@ -4019,11 +4326,14 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     if (window.DMDS_GL2 && window.DMDS_GL2.probe()) {
       return window.DMDS_GL2.init(canvas, onMilestone).then(function () {
         GL = window.DMDS_GL2;
-        GL.onLostTimeout(function () {
-          // context gone >4s: tear down tier 1, boot tier 2 on a fresh canvas
+        function toTier2() {
+          // tear down tier 1, boot tier 2 on a fresh canvas — used by both
+          // the context-restore timeout and the governor's perf demotion
           try { window.DMDS_GL2.destroy(); } catch (e) {}
           bootTier2(replaceCanvas($("#gl"))).catch(function () {});
-        });
+        }
+        GL.onLostTimeout(toTier2);
+        if (GL.onDemote) GL.onDemote(toTier2);
       }, function (err) {
         if (window.console) console.warn("[DMDS] gl2 init failed → tier 2:", err && err.message);
         try { window.DMDS_GL2.destroy(); } catch (e) {}
@@ -4691,7 +5001,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     if (!sysStatus) return;
     if (!glOK) { sysStatus.textContent = "STATIC RENDER · CONTENT NOMINAL"; return; }
     var s = GL.status();
-    sysStatus.textContent = s.count < s.max
+    // tier 1 reports a governed `degraded` flag (post rungs count too, not
+    // just particle cuts); tier 2 keeps the count<max convention
+    var degraded = s.degraded !== undefined ? s.degraded : s.count < s.max;
+    sysStatus.textContent = degraded
       ? "RENDER DEGRADED · CORE NOMINAL"
       : "ALL SYSTEMS NOMINAL";
   }
@@ -4723,4 +5036,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 77ec769 2026-07-18T04:10:26Z -->
+<!-- dmds build 492b6dc 2026-07-18T04:59:24Z -->
