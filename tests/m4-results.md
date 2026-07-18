@@ -484,3 +484,66 @@ and M4 103 passed under the runner with retained logs. 252 checks.
    classify the lost M1 failure, which remains: unclassified
    historical failure, not reproduced (now seven consecutive M1
    passes since).
+
+## Real-hardware telemetry round (2026-07-18) — first field data
+
+User's machine identified via ?telemetry=1 + chrome://gpu: Intel HD
+Graphics Family 0x0A16 (Haswell Gen 7.5, HD 4400 class), driver
+20.19.15.4835, SINGLE GPU (no discrete, no Optimus — GPU1 is the
+Microsoft Basic Render fallback), 4 threads, 3 GB RAM, 1366×768.
+Both webgl and webgl2 hardware-accelerated on the identical ANGLE
+D3D11 renderer. **Dual-GPU hypothesis: dead. Software-WebGL2
+hypothesis: dead.** Remaining day-to-day variance question is
+power/thermal only.
+
+The 49-entry history ring (seq 1–49) convicted the governor of two
+defects and the fix unmasked a third:
+
+1. **Starved downsizes → demotion on never-collected evidence.**
+   resize-requests to 384² (t=191.7) and 256² (t=201.7) never
+   executed — every subsequent window shows n:512 through the demote
+   at t=221.8. Idle-deferral starved under continuous interaction;
+   the demote verdict cited floor evidence that was never collected.
+   FIX: a second bad window forces the queued downsize at the next
+   frame boundary (resize-forced event); demotion now requires bad
+   evidence AT the applied floor. The forced-abandoned size gets a
+   duress mark (trialFailed) — not retried that session, preventing
+   minutes-scale baseline↔smaller bouncing.
+2. **Rung 1↔2 ping-pong ×7 (~90s of post-effect flicker).** Rung-2
+   p90 16.9–17.4ms (just under the 17.9 good line) promoted; rung-1
+   p90 18–20ms (hold band) degraded back via sustained-hold. The
+   rung axis had NO promotion memory (sizes: trial-no-retry; tier 2:
+   pair lock; rungs: nothing). FIX: two-strike rung-promotion lock
+   (rung-lock event, 120s bounce window, 180s strike decay), cleared
+   on size change (new landscape), re-armed on tab revisit (tier-2
+   policy). This machine now parks at rung 2 ≈ 58fps at full 512².
+3. **Latent recovery deadlock (unmasked by fix 1).** Once a downsize
+   actually applied, govImproveOnce requested a size promotion every
+   improve window; govMaybeResize cancelled it every frame (promote
+   requires rung 0) — rung restoration starved forever below
+   baseline. Unreachable before only because downsizes never
+   executed under load. FIX: rung-first recovery ordering.
+
+Also from the dump: tier 2 held the FULL 42,000 budget at >56fps
+(pair lock correctly saw recovery, not cycling — no lock); the X3557
+HLSL warnings are harmless unroll notes; one EGL "version not
+supported" is Chrome probing a higher ES version. Expected behavior
+on this machine with the fixes: stable 512²/rung-2 under light use;
+under heavy interaction a genuinely-applied 384², likely no
+demotion at all.
+
+Open (M4 part 2): size-promotion perf-bounce above the duress mark
+is damped per-session but the mark's permanence (vs decay) deserves
+review; the promote-request-from-degraded-rungs pattern still
+consumes improve windows when below baseline at rung 0 with an
+unmarked size above.
+
+Tests: honest-ladder rewrite (test 1 now forces, applies the floor,
+and demotes on floor evidence — demote entry n===32), rung-lock
+battery (two-strike, good-cannot-repromote, bad-still-degrades),
+starvation battery (scrub-parked mix=0.5 proves unforced pendings
+starve and forced ones execute), duress-mark recovery (rungs restore
+to 0, size stays). M4: 113 checks.
+
+Full clean-provenance regression at b297351 (runner, all
+dirty:false): M1 59 · M2 55 · M3 35 · M4 113 = **262 checks**.
