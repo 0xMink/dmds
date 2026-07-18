@@ -27,8 +27,11 @@ DIST = os.path.join(ROOT, "dist", "index.html")
 
 # Budgets (bytes). Raw is what a cheap host serves uncompressed;
 # gzip is what any sane host actually sends.
-BUDGET_RAW = 320 * 1024
-BUDGET_GZIP = 200 * 1024
+# raised per the approved GPGPU-engine spec (docs/superpowers/specs/
+# 2026-07-17-gpgpu-physical-engine-design.md): the tier-1 engine +
+# governor + debug instrumentation earn the growth; tripwires stay loud
+BUDGET_RAW = 512 * 1024
+BUDGET_GZIP = 280 * 1024
 
 # Glyphs intentionally rendered by system fallback fonts (not in the
 # embedded subsets): UI arrows and the scramble-effect block glyphs.

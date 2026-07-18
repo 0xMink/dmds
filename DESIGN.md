@@ -369,8 +369,8 @@ Enforced by `check.py` on every build; measured values as of v6:
 
 | Metric | Budget | Measured |
 |---|---|---|
-| dist raw | ≤ 320 KB | ~215 KB |
-| dist gzip | ≤ 200 KB | ~100 KB |
+| dist raw | ≤ 512 KB | ~321 KB (v6 + tier-1 GPGPU engine + governor) |
+| dist gzip | ≤ 280 KB | ~130 KB |
 | Requests on load | 0 | 0 — verified by artifact inspection + browser network test; with no endpoint configured, `connect-src 'none'` also makes requests *impossible* (CSP constrains destinations, it can't count requests) |
 | Loader cap | ≤ 2.6 s | hard timeout |
 
