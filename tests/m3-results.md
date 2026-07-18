@@ -115,3 +115,32 @@ Deferred to M4 (per review): sway-frozen parallax isolation (fold
 into the per-scale matrix) and the promotion gate's full CPU+GPU
 memory/copy/latency accounting. Suite: 21 → 23 checks; M1 59/59,
 M2 55/55.
+
+## Hardening pass (pre-M4, per review)
+
+- **Stagger factor proven, not assumed**: with preA.w=0/preB.w=1 the
+  frozen w IS the blend factor — the test now asserts |w − t| ≤ 0.02
+  against the t recovered from positions (0 mismatches/256) and
+  t ∈ [0,1]. A shader using any other varied factor (hash11(id)
+  directly, etc.) passes spread+segment but fails this.
+- **One GLSL definition of hash/stagger** (`GLSL_STAG`) injected into
+  all four consumers (sim, render, convergence map, freeze) — manual
+  duplication can no longer diverge silently.
+- **freezeTargA exception-safe**: try/finally restores bindings on any
+  exit; both FBO completeness states checked explicitly (WebGL errors
+  don't throw). **Persistent scratch + warmup compilation**: the
+  freeze programs and the N×N scratch/FBOs are built in
+  buildGLResources — no 16 MiB alloc/free per interrupt, no shader
+  compile on the first typed character. Full lifecycle coverage
+  (destroy deletes, restore forgets).
+- **Degradation is honest**: on freeze failure the engine falls back
+  to the named-formation upload, logs it, and counts it
+  (`freezeDegraded` in debugGLHealth) — the exact-continuity invariant
+  is explicitly scoped to successful freezes. Injected-failure test:
+  degrades once, zero GL errors, recovers on the next interrupt,
+  field finite throughout.
+- **"Texel-for-texel" made true**: the restoration comparison reads
+  the FULL 64² texture (all 4,096 texels), not a 256-texel sample.
+  Production-N reference diffs via reduction → M4 scale matrix.
+
+Suite: 23 → 30 checks; M1 59/59, M2 55/55.

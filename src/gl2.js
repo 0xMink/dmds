@@ -49,6 +49,14 @@
   var JITTER = 6.0;      // per-axis seed jitter on release, wu/s
 
   /* ═══ shaders ═══ */
+  // ONE definition of the hash/stagger math — injected into every shader
+  // that blends targets (sim, render, convergence map, freeze), so the
+  // per-particle factor can never silently diverge between passes
+  var GLSL_STAG = [
+    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "float stagOf(float id, float m){ float s = clamp((m - hash11(id * 0.1031 + 0.13) * 0.35) / 0.65, 0.0, 1.0); return s * s * (3.0 - 2.0 * s); }"
+  ].join("\n");
+
   var SIM_VS = "#version 300 es\nvoid main(){vec2 v=vec2(gl_VertexID==1?3.0:-1.0,gl_VertexID==2?3.0:-1.0);gl_Position=vec4(v,0.,1.);}";
 
   var SIM_FS = [
@@ -70,7 +78,7 @@
     "layout(location=0) out vec4 oPos;",
     "layout(location=1) out vec4 oVel;",
     // particle identity from the output texel — gl_VertexID does not exist here
-    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    GLSL_STAG,
     "vec3 unproj(vec2 xy, float z){ vec4 w = uInvVP * vec4(xy, z, 1.0); return w.xyz / w.w; }",
     "void main(){",
     "  ivec2 c = ivec2(gl_FragCoord.xy);",
@@ -82,8 +90,7 @@
     "  float r1 = hash11(id * 0.1031 + 0.13), r2 = hash11(id * 0.2711 + 0.53),",
     "        r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
     // staggered morph: each particle chases its own blend of the two targets
-    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
-    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  float stag = stagOf(id, uMix);",
     "  vec3 target = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stag);",
     // ── grab state machine (spec: exact transition table) ──
     // capture: pointerdown edge only — membership can never grow mid-drag
@@ -163,7 +170,7 @@
     "out float vDepth;",
     "out float vGrab;",
     "out float vDust;",
-    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    GLSL_STAG,
     "void main(){",
     "  ivec2 c = ivec2(gl_VertexID % uN, gl_VertexID / uN);",
     "  float id = float(gl_VertexID);",
@@ -171,10 +178,7 @@
     "  vGrab = texelFetch(uVel, c, 0).w;", // held particles declare themselves
     // dust factor rides target.w and blends with the same stagger as
     // position, so a particle fades to dust as it travels to a dust target
-    "  float r1 = hash11(id * 0.1031 + 0.13);",
-    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
-    "  stag = stag * stag * (3.0 - 2.0 * stag);",
-    "  vDust = mix(texelFetch(uTargA, c, 0).w, texelFetch(uTargB, c, 0).w, stag);",
+    "  vDust = mix(texelFetch(uTargA, c, 0).w, texelFetch(uTargB, c, 0).w, stagOf(id, uMix));",
     "  float r2 = hash11(id * 0.2711 + 0.53), r3 = hash11(id * 0.4177 + 0.29), r4 = hash11(id * 0.7331 + 0.71);",
     "  vec4 mv = uView * vec4(pos, 1.0);",
     "  gl_Position = uProj * mv;",
@@ -685,6 +689,17 @@
     gl.uniform3f(state.renLoc.uBone, 0.93, 0.92, 0.89);
     gl.uniform3f(state.renLoc.uSignal, 1.0, 0.29, 0.0);
 
+    // freeze machinery compiles and allocates at warmup, not on the first
+    // typed character (persistent scratch: one N×N RGBA32F + two FBOs)
+    state.freezeProg = makeProgram(gl, SIM_VS, FREEZE_FS);
+    state.copyProg = makeProgram(gl, SIM_VS, COPYT_FS);
+    state.frzTex = makeStateTex(gl, null);
+    state.frzFb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.frzTex, 0);
+    state.frzFbA = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
     // test hook (?debug=1): failure AFTER state textures, FBOs and both
     // programs exist — destroy() must clean partially-built resources
     if (DEBUG && window.__DMDS_GL2_BREAK_LATE__) throw new Error("injected late build failure");
@@ -802,7 +817,14 @@
       uploadTarget(gl, state.targA, prev, dustOf(state.currentName));
     } else {
       try { freezeTargA(); }
-      catch (e) { uploadTarget(gl, state.targA, prev, dustOf(state.currentName)); }
+      catch (e) {
+        // honest degradation, not silent: the invariant of exact
+        // per-particle continuity holds only for successful freezes —
+        // this fallback snaps targets to the last NAMED formation
+        if (window.console) console.warn("[DMDS] freeze failed — target continuity degraded to named formation:", e && e.message);
+        state.freezeDegraded = (state.freezeDegraded || 0) + 1;
+        uploadTarget(gl, state.targA, prev, dustOf(state.currentName));
+      }
     }
     uploadTarget(gl, state.targB, target, dustOf(name));
     state.currentName = name;
@@ -828,13 +850,11 @@
     "uniform float uMix;",
     "uniform int uN;",
     "out vec4 o;",
-    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    GLSL_STAG,
     "void main(){",
     "  ivec2 c = ivec2(gl_FragCoord.xy);",
     "  float id = float(c.y * uN + c.x);",
-    "  float r1 = hash11(id * 0.1031 + 0.13);",
-    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
-    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  float stag = stagOf(id, uMix);",
     "  vec4 a = texelFetch(uTargA, c, 0), b = texelFetch(uTargB, c, 0);",
     "  o = vec4(mix(a.xyz, b.xyz, stag), mix(a.w, b.w, stag));",
     "}"
@@ -847,37 +867,40 @@
     "void main(){ o = texelFetch(uT, ivec2(gl_FragCoord.xy), 0); }"
   ].join("\n");
   function freezeTargA() {
+    // persistent scratch + programs (compiled at warmup in
+    // buildGLResources): rapid typing interrupts morphs many times per
+    // second, and a 16 MiB alloc/free per interrupt — or a shader compile
+    // on the first typed character — is the wrong place to pay
     var gl = state.gl;
-    if (!state.freezeProg) state.freezeProg = makeProgram(gl, SIM_VS, FREEZE_FS);
-    if (!state.copyProg) state.copyProg = makeProgram(gl, SIM_VS, COPYT_FS);
-    // one-off scratch per call — interrupts are rare, lifecycle stays simple
-    var scratch = makeStateTex(gl, null);
-    var fb1 = gl.createFramebuffer(), fb2 = gl.createFramebuffer();
-    gl.bindVertexArray(state.vao);
-    gl.disable(gl.BLEND);
-    gl.viewport(0, 0, N, N);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb1);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, scratch, 0);
-    gl.useProgram(state.freezeProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.targA);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.targB);
-    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargA"), 0);
-    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
-    gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
-    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    // scratch → targA (RGBA16F is color-renderable under EXT_color_buffer_float)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb2);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.targA, 0);
-    gl.useProgram(state.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scratch);
-    gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindVertexArray(null);
-    gl.deleteTexture(scratch);
-    gl.deleteFramebuffer(fb1);
-    gl.deleteFramebuffer(fb2);
+    try {
+      if (DEBUG && window.__DMDS_FREEZE_BREAK__) throw new Error("injected freeze failure");
+      gl.bindVertexArray(state.vao);
+      gl.disable(gl.BLEND);
+      gl.viewport(0, 0, N, N);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFb);
+      // WebGL errors don't throw — completeness must be checked explicitly
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("freeze scratch fbo incomplete");
+      gl.useProgram(state.freezeProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.targA);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.targB);
+      gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargA"), 0);
+      gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
+      gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
+      gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      // scratch → targA (RGBA16F is renderable under EXT_color_buffer_float)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFbA);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.targA, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("freeze target fbo incomplete");
+      gl.useProgram(state.copyProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.frzTex);
+      gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    } finally {
+      // never leave freeze state bound, success or not
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindVertexArray(null);
+    }
   }
   function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 
@@ -1129,6 +1152,9 @@
         [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
         if (state.freezeProg) { gl.deleteProgram(state.freezeProg); state.freezeProg = null; }
         if (state.copyProg) { gl.deleteProgram(state.copyProg); state.copyProg = null; }
+        if (state.frzTex) { gl.deleteTexture(state.frzTex); state.frzTex = null; }
+        if (state.frzFb) { gl.deleteFramebuffer(state.frzFb); state.frzFb = null; }
+        if (state.frzFbA) { gl.deleteFramebuffer(state.frzFbA); state.frzFbA = null; }
         if (state.quadBuf) gl.deleteBuffer(state.quadBuf);
         if (state.vao) gl.deleteVertexArray(state.vao);
         destroyConvChain();
@@ -1195,6 +1221,7 @@
         state.trailA = null; state.trailB = null; state.glowA = null; state.glowB = null;
         state.conv = null; // reduction chain is also dead-epoch
         state.freezeProg = null; state.copyProg = null; // ditto freeze passes
+        state.frzTex = null; state.frzFb = null; state.frzFbA = null;
         // a restored context also forgets its extensions — re-enable float
         // rendering or RGBA32F FBOs come back incomplete
         if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");
@@ -1362,16 +1389,13 @@
     "uniform float uMix, uNear, uFinal;",
     "uniform int uN;",
     "out vec4 o;",
-    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    GLSL_STAG,
     "void main(){",
     "  ivec2 c = ivec2(gl_FragCoord.xy);",
     "  float id = float(c.y * uN + c.x);",
     "  vec4 P = texelFetch(uPos, c, 0);",
     "  vec4 V = texelFetch(uVel, c, 0);",
-    "  float r1 = hash11(id * 0.1031 + 0.13);",
-    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
-    "  stag = stag * stag * (3.0 - 2.0 * stag);",
-    "  vec3 t = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stag);",
+    "  vec3 t = mix(texelFetch(uTargA, c, 0).xyz, texelFetch(uTargB, c, 0).xyz, stagOf(id, uMix));",
     "  float d = distance(P.xyz, t);",
     "  bool bad = isnan(P.x) || isinf(P.x) || isnan(P.y) || isinf(P.y) || isnan(P.z) || isinf(P.z) || V.w != 0.0;",
     "  o = vec4(d > uNear ? 1.0 : 0.0, d > uFinal ? 1.0 : 0.0, bad ? 1.0 : 0.0, d);",
@@ -1506,7 +1530,7 @@
   function debugGLHealth() {
     if (!DEBUG) throw new Error("debugGLHealth requires ?debug=1");
     var gl = state.gl;
-    var out = { error: gl.getError(), oob: state.oob, grabActive: state.grab.active, fbo: [] };
+    var out = { error: gl.getError(), oob: state.oob, grabActive: state.grab.active, freezeDegraded: state.freezeDegraded || 0, fbo: [] };
     for (var d = 0; d < 2; d++) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.simFbo[d]);
       out.fbo.push(gl.checkFramebufferStatus(gl.FRAMEBUFFER));

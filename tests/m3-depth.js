@@ -159,7 +159,7 @@ async function readyPage(browser, query, opts) {
       // texels — restoration is judged against these, never against status
       sf('neural', 0.2);
       E.pause(); E.debugStep(30, 1 / 60); // settle mix deterministically
-      const neuralRef = Array.from(E.debugReadTargets(16).b);
+      const neuralRef = Array.from(E.debugReadTargets(64).b); // FULL 64² texture — all 4096 texels
       sf('logo', 0.2); E.debugStep(30, 1 / 60); E.resume();
       smp('logo', 'grid', 0.3); // pre-loss scrub pair, uploaded
       const lose = document.querySelector('#gl').getContext('webgl2').getExtension('WEBGL_lose_context');
@@ -171,7 +171,7 @@ async function readyPage(browser, query, opts) {
       await new Promise(r2 => setTimeout(r2, 1500));
       const nameAfter = E.status().formation;
       // the rebuilt textures must CONTAIN neural, not merely claim it
-      const restA = E.debugReadTargets(16).a, restB = E.debugReadTargets(16).b;
+      const restA = E.debugReadTargets(64).a, restB = E.debugReadTargets(64).b;
       let refDiff = 0;
       for (let i = 0; i < neuralRef.length; i++) {
         refDiff = Math.max(refDiff, Math.abs(restA[i] - neuralRef[i]), Math.abs(restB[i] - neuralRef[i]));
@@ -265,7 +265,7 @@ async function readyPage(browser, query, opts) {
       sf('grid', 1.0);                       // interrupt → targA = GPU freeze
       const frozen = E.debugReadTargets(16, 0, 400).a; // overflow indices
       E.resume();
-      let minW = 2, maxW = -1, finite = true, offSegment = 0, n = frozen.length / 4;
+      let minW = 2, maxW = -1, finite = true, offSegment = 0, wtMismatch = 0, tOutOfRange = 0, n = frozen.length / 4;
       for (let i = 0; i < n; i++) {
         const w = frozen[i * 4 + 3];
         minW = Math.min(minW, w); maxW = Math.max(maxW, w);
@@ -285,15 +285,62 @@ async function readyPage(browser, query, opts) {
           const exp = preA[i * 4 + k] + (preB[i * 4 + k] - preA[i * 4 + k]) * t;
           if (Math.abs(frozen[i * 4 + k] - exp) > 0.05) offSegment++;
         }
+        // the decisive check: preA.w=0, preB.w=1 here, so frozen.w IS the
+        // blend factor — positions and dust must use the SAME per-particle
+        // factor, and it must be a valid blend. A shader using any OTHER
+        // varied factor (e.g. hash11(id) directly) passes spread+segment
+        // but fails this.
+        if (Math.abs(w - t) > 0.02) wtMismatch++;
+        if (t < -0.02 || t > 1.02) tOutOfRange++;
       }
-      return { midMix, minW, maxW, spread: maxW - minW, finite, offSegment, n };
+      return { midMix, minW, maxW, spread: maxW - minW, finite, offSegment, wtMismatch, tOutOfRange, n };
     });
     check('dust:interrupt-mid-morph', r.midMix > 0.05 && r.midMix < 0.95, 'mix=' + r.midMix.toFixed(2));
     // per-particle stagger ⇒ the frozen dust factors VARY (a uniform value
     // is the fingerprint of a global blend — the previous bug)
     check('dust:freeze-is-per-particle', r.spread > 0.2, 'w∈[' + r.minW.toFixed(3) + ',' + r.maxW.toFixed(3) + '] spread=' + r.spread.toFixed(3));
     check('dust:freeze-on-own-segment', r.offSegment === 0, 'off=' + r.offSegment + '/' + r.n * 2);
+    check('dust:freeze-w-equals-position-t', r.wtMismatch === 0, 'mismatch=' + r.wtMismatch + '/' + r.n);
+    check('dust:freeze-t-in-range', r.tOutOfRange === 0, 'out=' + r.tOutOfRange);
     check('dust:frozen-blend-finite', r.finite);
+    await page.close();
+  }
+
+  // ── 7b. freeze failure: honest degradation (named-formation fallback,
+  //        degraded counter, engine intact), then recovery ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 60000 });
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      const sf = E.setFormation.bind(E);
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      E.pause();
+      sf('neural', 2.0);
+      E.debugStep(30, 1 / 60); // mid-morph
+      window.__DMDS_FREEZE_BREAK__ = true;
+      sf('grid', 1.0); // interrupt → freeze throws → named fallback
+      const degraded = E.debugGLHealth().freezeDegraded;
+      const health1 = E.debugGLHealth();
+      // recovery: hook cleared, next interrupt freezes normally
+      window.__DMDS_FREEZE_BREAK__ = false;
+      E.debugStep(20, 1 / 60);
+      sf('device', 1.0);
+      const degraded2 = E.debugGLHealth().freezeDegraded;
+      E.debugStep(60, 1 / 60);
+      const s = E.debugReadState();
+      let finite = true;
+      for (let i = 0; i < s.positions.length; i += 4) {
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(s.positions[i + k])) finite = false;
+      }
+      E.resume();
+      return { degraded, degraded2, glError: health1.error, finite };
+    });
+    check('freeze:failure-degrades-honestly', r.degraded === 1, 'count=' + r.degraded);
+    check('freeze:no-gl-error-after-failure', r.glError === 0, 'err=' + r.glError);
+    check('freeze:recovers-next-interrupt', r.degraded2 === 1, 'count=' + r.degraded2);
+    check('freeze:field-finite-throughout', r.finite);
+    check('freeze:no-page-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }
 
