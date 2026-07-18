@@ -145,6 +145,151 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
+  // ── 5. commands during context loss: newest wins, pair cache invalidated ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 60000 });
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      // keep real refs, stub the public API so page choreography can't
+      // fight the scripted command sequence
+      const sf = E.setFormation.bind(E), smp = E.setMorphPair.bind(E);
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      smp('logo', 'grid', 0.3); // pre-loss scrub pair, uploaded
+      const lose = document.querySelector('#gl').getContext('webgl2').getExtension('WEBGL_lose_context');
+      lose.loseContext();
+      await new Promise(r2 => setTimeout(r2, 400));
+      sf('device', 0.2);  // requested while lost
+      sf('neural', 0.2);  // newer request while lost — must win
+      lose.restoreContext();
+      await new Promise(r2 => setTimeout(r2, 1500));
+      const nameAfter = E.status().formation;
+      // the stale-pair hazard: SAME pair as pre-loss — with the bug the
+      // guard skips re-upload and both textures hold 'neural'
+      smp('logo', 'grid', 0.7);
+      await new Promise(r2 => setTimeout(r2, 300));
+      const t = E.debugReadTargets(16);
+      let abDiff = 0;
+      for (let i = 0; i < t.a.length; i++) abDiff = Math.max(abDiff, Math.abs(t.a[i] - t.b[i]));
+      // convergence sanity after the whole sequence — leave scrub mode via
+      // a formation that is NOT the scrub's current name ('grid' at t=0.7
+      // would early-return and leave the shader targeting the pair blend)
+      sf('device', 0.2);
+      E.pause();
+      E.debugStep(30, 1 / 60); // mix → 1 deterministically
+      const tb = E.debugReadTargets(4).b;
+      E.debugPoke(2, tb[8] + 8, tb[9], tb[10]);
+      E.debugStep(120);
+      const s = E.debugReadState();
+      const conv = Math.hypot(s.positions[8] - tb[8], s.positions[9] - tb[9], s.positions[10] - tb[10]);
+      E.resume();
+      return { nameAfter, abDiff, conv };
+    });
+    check('loss:newest-request-wins', r.nameAfter === 'neural', r.nameAfter);
+    check('loss:pair-cache-invalidated', r.abDiff > 1.0, 'A↔B maxDiff=' + r.abDiff.toFixed(2));
+    check('loss:converges-after-sequence', r.conv < 1.0, 'dist=' + r.conv.toFixed(3));
+    await page.close();
+  }
+
+  // ── 6. parallax amplitude (fixed-step, exact) + depth differential ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64');
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      const mm = (x, y) => window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+      E.pause();
+      mm(1440, 450); // mouse.x = +1
+      E.debugStep(600, 1 / 60); // lerp fully settles, deterministically
+      const camR = E.debugCamera();
+      mm(0, 450); // mouse.x = -1
+      E.debugStep(600, 1 / 60);
+      const camL = E.debugCamera();
+      // depth differential on the SCROLL axis: scroll trucks the camera
+      // without touching the sway rotation (mouse.x feeds both, so the
+      // pointer axis can't isolate trucking from rotation)
+      mm(720, 450); // recenter pointer
+      const sc = E.setScroll.bind(E);
+      E.setScroll = function () {}; // page raf must not override
+      sc(0);
+      E.debugStep(600, 1 / 60);
+      const nearT = E.debugProject([[0, 0, 6]])[0], farT = E.debugProject([[0, 0, -6]])[0];
+      sc(1);
+      E.debugStep(600, 1 / 60);
+      const nearB = E.debugProject([[0, 0, 6]])[0], farB = E.debugProject([[0, 0, -6]])[0];
+      E.resume();
+      return {
+        camR, camL,
+        expR: camR.mouseX * 0.4, expL: camL.mouseX * 0.4,
+        nearShift: nearB[1] - nearT[1], farShift: farB[1] - farT[1],
+      };
+    });
+    check('par:amplitude-exact-right', Math.abs(r.camR.parX - r.expR) < 0.02, 'parX=' + r.camR.parX.toFixed(3) + ' want=' + r.expR.toFixed(3));
+    check('par:amplitude-exact-left', Math.abs(r.camL.parX - r.expL) < 0.02, 'parX=' + r.camL.parX.toFixed(3));
+    // trucking must produce DEPTH-DEPENDENT shift — a uniform screen
+    // translation would fail this (near points shift more than far)
+    check('par:depth-differential', Math.abs(r.nearShift) > Math.abs(r.farShift) * 1.15,
+      'near=' + r.nearShift.toFixed(4) + ' far=' + r.farShift.toFixed(4));
+    await page.close();
+  }
+
+  // ── 7. interrupted type morph: dust factor blends, no binary pop ──
+  {
+    const page = await readyPage(browser, '?debug=1'); // 512², dust exists
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 120000 });
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      const sf = E.setFormation.bind(E);
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      // deterministic stepping — wall-clock waits can't hit a mid-morph
+      // window under SwiftShader's seconds-per-frame at 512²
+      E.pause();
+      sf('text:AB', 2.5);                    // long morph toward dusty text
+      E.debugStep(54, 1 / 60);               // 0.9 sim-s → mix ≈ 0.36
+      const midMix = E.status().mix;
+      sf('grid', 1.0);                       // interrupt → targA = frozen blend
+      const dustRegion = E.debugReadTargets(16, 0, 400).a; // overflow indices
+      E.resume();
+      let minW = 2, maxW = -1, finite = true;
+      for (let i = 0; i < dustRegion.length / 4; i++) {
+        const w = dustRegion[i * 4 + 3];
+        minW = Math.min(minW, w); maxW = Math.max(maxW, w);
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(dustRegion[i * 4 + k])) finite = false;
+      }
+      return { midMix, minW, maxW, finite };
+    });
+    check('dust:interrupt-mid-morph', r.midMix > 0.05 && r.midMix < 0.95, 'mix=' + r.midMix.toFixed(2));
+    check('dust:factor-blended-not-binary', r.minW > 0.02 && r.maxW < 0.98, 'w∈[' + r.minW.toFixed(2) + ',' + r.maxW.toFixed(2) + ']');
+    check('dust:frozen-blend-finite', r.finite);
+    await page.close();
+  }
+
+  // ── 8. the deepened device formation is measurably volumetric ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64');
+    await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 60000 });
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      const sf = E.setFormation.bind(E);
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      sf('device', 0.2);
+      await new Promise(r2 => setTimeout(r2, 200));
+      const t = E.debugReadTargets(64).b;
+      let minZ = 1e9, maxZ = -1e9, sum = 0, sum2 = 0, n = t.length / 4, finite = true;
+      for (let i = 0; i < n; i++) {
+        const z = t[i * 4 + 2];
+        if (!Number.isFinite(z)) finite = false;
+        minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+        sum += z; sum2 += z * z;
+      }
+      const std = Math.sqrt(sum2 / n - (sum / n) * (sum / n));
+      return { minZ, maxZ, std, finite };
+    });
+    check('depth:device-z-range', r.minZ <= -1.2 && r.maxZ >= 0.7, 'z∈[' + r.minZ.toFixed(2) + ',' + r.maxZ.toFixed(2) + ']');
+    check('depth:device-z-variance', r.std > 0.4, 'std=' + r.std.toFixed(3));
+    check('depth:device-z-finite', r.finite);
+    await page.close();
+  }
+
   await browser.close();
   const pass = results.every(r => r.ok);
   results.forEach(r => console.log((r.ok ? '  ok  ' : '  FAIL'), r.name, r.detail));

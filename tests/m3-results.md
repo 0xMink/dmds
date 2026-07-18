@@ -48,3 +48,39 @@ consecutively after the fix.
   reduced-motion stop, full crisp-lock physical verification at
   governor scale), M5 (orange proof band, form grammar), M6 (docs,
   `build.sh --test`, provenance tamper-evidence).
+
+## Gap-closure pass (after external review)
+
+Review verdict accepted; its two "close before M4" items both drew
+blood:
+
+- **Bug #12 — stale scrub-pair cache across context restore** (the
+  review's concurrency scenario, which I had wrongly waved off as
+  "test race only"): restore rebuilt both target textures as the
+  current formation but left `pairA/pairB` cached, so a post-restore
+  `setMorphPair` with the pre-loss pair hit the same-pair guard,
+  skipped its re-upload, and scroll-scrubbing went silently inert.
+  Restore now invalidates the pair cache (spec amended with the
+  commands-during-loss semantics: newest request wins, uploads while
+  lost are CPU-state-only, pair cache invalidated).
+- **Bug #13 — interrupted-morph freeze reconstructed the "from" state
+  by name**: a tween's from-state is the *previous blend*, which no
+  formation name can name. `blendedTargets` blended destination-vs-
+  destination (dust factor snapped binary; frozen positions could be
+  wrong after interrupt chains). Slot A now keeps a CPU mirror
+  (`state.fromArr`, maintained at every upload site), and frozen
+  blends — positions AND dust factor — derive from what the texture
+  actually holds. Verified: interrupt at mix 0.36 leaves overflow dust
+  factors at exactly 0.30 (= smooth01(0.36)), not binary.
+
+Also added, per review: `debugCamera()`; exact fixed-step amplitude
+checks (parX = mouse.x·0.4 to ±0.02 both directions); **depth
+differential** on the scroll axis (near points shift 1.76× far points
+— proving true 3D trucking, uncontaminated by the sway rotation that
+the pointer axis also drives); device-formation z distribution
+(range −2.0…+0.9, σ 0.67). Total: 9 → 21 checks; M1 59/59 and
+M2 55/55 regression green.
+
+Deferred to M4 with the review's agreement: render-level dust
+image-energy measurements and per-scale parallax repeats (they belong
+in the governor scale matrix, which re-runs at every promoted N).

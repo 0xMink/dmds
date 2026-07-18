@@ -346,6 +346,15 @@ current governor size. **No restoration within 4 s → canvas
 replacement → tier 2.** Footer status reflects the stall throughout —
 never a frozen `ALL SYSTEMS NOMINAL`.
 
+**Commands during loss (rev 3.1 amendment, from M3 review)**: formation
+requests issued while the context is lost update CPU state only (GL
+uploads are no-ops on a lost context); restoration materializes the
+**newest** requested formation — earlier requests are never
+resurrected — and **invalidates the scrub-pair cache**, so a
+post-restore `setMorphPair` with the pre-loss pair re-uploads instead
+of hitting the same-pair guard and scrubbing between two copies of one
+formation.
+
 ## Reduced motion
 
 Formations render and converge; after the last formation change the

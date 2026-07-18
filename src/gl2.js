@@ -594,16 +594,30 @@
   // dustStart: particle index where a formation's ambient dust begins
   // (COUNT = no dust); rides target.w so the renderer can dim/shrink it
   function uploadTarget(gl, tex, xyz, dustStart) {
-    if (!targScratch) targScratch = new Float32Array(COUNT * 4);
-    if (dustStart === undefined) dustStart = COUNT;
-    for (var i = 0; i < COUNT; i++) {
-      targScratch[i * 4] = xyz[i * 3];
-      targScratch[i * 4 + 1] = xyz[i * 3 + 1];
-      targScratch[i * 4 + 2] = xyz[i * 3 + 2];
-      targScratch[i * 4 + 3] = i >= dustStart ? 1 : 0;
+    var rgba;
+    if (xyz.length === COUNT * 4) {
+      // RGBA arrays (blended targets, dust already in .w) upload verbatim
+      rgba = xyz;
+    } else {
+      if (!targScratch) targScratch = new Float32Array(COUNT * 4);
+      if (dustStart === undefined) dustStart = COUNT;
+      for (var i = 0; i < COUNT; i++) {
+        targScratch[i * 4] = xyz[i * 3];
+        targScratch[i * 4 + 1] = xyz[i * 3 + 1];
+        targScratch[i * 4 + 2] = xyz[i * 3 + 2];
+        targScratch[i * 4 + 3] = i >= dustStart ? 1 : 0;
+      }
+      rgba = targScratch;
     }
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, targScratch);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, rgba);
+    // CPU mirror of slot A: a tween's "from" state is the PREVIOUS blend,
+    // which has no formation name — freezing an interrupted morph must
+    // blend from what the texture actually holds
+    if (tex === state.targA) {
+      if (!state.fromArr) state.fromArr = new Float32Array(COUNT * 4);
+      state.fromArr.set(rgba);
+    }
   }
   function dustOf(name) {
     return (name && state.dustStart[name] !== undefined) ? state.dustStart[name] : COUNT;
@@ -807,11 +821,24 @@
   // mid-morph state into slot A when a new formation interrupts
   var blendScratch = null;
   function blendedTargets() {
-    if (!blendScratch) blendScratch = new Float32Array(COUNT * 3);
-    var a = formationFor(state.pairA || state.currentName) || state.formations.ambient;
-    var b = formationFor(state.pairB || state.currentName) || a;
+    // RGBA: positions AND the dust factor blend together — freezing a
+    // mid-morph state with a binary dust flag would pop dust size/alpha
+    // while positions stay continuous. The "from" side is the CPU mirror
+    // of the targA texture (state.fromArr) — in tween mode the from-state
+    // is the previous blend, which no formation name can reconstruct.
+    if (!blendScratch) blendScratch = new Float32Array(COUNT * 4);
+    var bn = state.pairB || state.currentName;
+    var b = formationFor(bn) || state.formations.ambient;
+    var db = dustOf(bn);
+    var a = state.fromArr; // always populated: every targA upload mirrors here
     var t = smooth01(state.mix);
-    for (var i = 0; i < COUNT * 3; i++) blendScratch[i] = a[i] + (b[i] - a[i]) * t;
+    for (var i = 0; i < COUNT; i++) {
+      var bw = i >= db ? 1 : 0;
+      blendScratch[i * 4] = a[i * 4] + (b[i * 3] - a[i * 4]) * t;
+      blendScratch[i * 4 + 1] = a[i * 4 + 1] + (b[i * 3 + 1] - a[i * 4 + 1]) * t;
+      blendScratch[i * 4 + 2] = a[i * 4 + 2] + (b[i * 3 + 2] - a[i * 4 + 2]) * t;
+      blendScratch[i * 4 + 3] = a[i * 4 + 3] + (bw - a[i * 4 + 3]) * t;
+    }
     return blendScratch;
   }
   function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
@@ -1137,6 +1164,12 @@
         uploadTarget(state.gl, state.targA, curF, dustOf(state.currentName));
         uploadTarget(state.gl, state.targB, curF, dustOf(state.currentName));
         state.mix = 1;
+        state.mode = "tween";
+        // the scrub-pair cache is now stale: both textures hold the current
+        // formation, so a post-restore setMorphPair with the PRE-LOSS pair
+        // must not hit the same-pair guard and skip its re-upload — that
+        // would scrub between two copies of one formation (inert scroll)
+        state.pairA = null; state.pairB = null;
         state.running = true;
         state.lastT = performance.now() * 0.001;
         state.raf = requestAnimationFrame(frame);
@@ -1408,6 +1441,11 @@
     });
     return maxErr;
   }
+  // the camera's actual state — amplitude tests read this, not pixels
+  function debugCamera() {
+    if (!DEBUG) throw new Error("debugCamera requires ?debug=1");
+    return { parX: state.parX, parY: state.parY, scroll: state.scroll, mouseX: state.mouse.x, mouseY: state.mouse.y };
+  }
   // project world points with the live camera — parallax tests observe
   // the camera through this, not through wall-clock screenshots
   function debugProject(pts) {
@@ -1537,6 +1575,7 @@
     debugConvergence: debugConvergence,
     debugRoundTrip: debugRoundTrip,
     debugProject: debugProject,
+    debugCamera: debugCamera,
     debugGLHealth: debugGLHealth
   };
 })();
