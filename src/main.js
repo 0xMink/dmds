@@ -133,11 +133,14 @@
     if (window.DMDS_GL2 && window.DMDS_GL2.probe()) {
       return window.DMDS_GL2.init(canvas, onMilestone).then(function () {
         GL = window.DMDS_GL2;
-        GL.onLostTimeout(function () {
-          // context gone >4s: tear down tier 1, boot tier 2 on a fresh canvas
+        function toTier2() {
+          // tear down tier 1, boot tier 2 on a fresh canvas — used by both
+          // the context-restore timeout and the governor's perf demotion
           try { window.DMDS_GL2.destroy(); } catch (e) {}
           bootTier2(replaceCanvas($("#gl"))).catch(function () {});
-        });
+        }
+        GL.onLostTimeout(toTier2);
+        if (GL.onDemote) GL.onDemote(toTier2);
       }, function (err) {
         if (window.console) console.warn("[DMDS] gl2 init failed → tier 2:", err && err.message);
         try { window.DMDS_GL2.destroy(); } catch (e) {}
@@ -805,7 +808,10 @@
     if (!sysStatus) return;
     if (!glOK) { sysStatus.textContent = "STATIC RENDER · CONTENT NOMINAL"; return; }
     var s = GL.status();
-    sysStatus.textContent = s.count < s.max
+    // tier 1 reports a governed `degraded` flag (post rungs count too, not
+    // just particle cuts); tier 2 keeps the count<max convention
+    var degraded = s.degraded !== undefined ? s.degraded : s.count < s.max;
+    sysStatus.textContent = degraded
       ? "RENDER DEGRADED · CORE NOMINAL"
       : "ALL SYSTEMS NOMINAL";
   }
