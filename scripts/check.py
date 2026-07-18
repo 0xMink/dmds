@@ -30,8 +30,10 @@ DIST = os.path.join(ROOT, "dist", "index.html")
 # raised per the approved GPGPU-engine spec (docs/superpowers/specs/
 # 2026-07-17-gpgpu-physical-engine-design.md): the tier-1 engine +
 # governor + debug instrumentation earn the growth; tripwires stay loud
-BUDGET_RAW = 512 * 1024
+BUDGET_RAW = 512 * 1024   # hard ceiling (spec)
 BUDGET_GZIP = 280 * 1024
+WARN_RAW = 352 * 1024     # loud warning near current size — growth must be
+WARN_GZIP = 160 * 1024    # explained, not silently absorbed by the ceiling
 
 # Glyphs intentionally rendered by system fallback fonts (not in the
 # embedded subsets): UI arrows and the scramble-effect block glyphs.
@@ -138,8 +140,12 @@ if os.path.exists(DIST):
           f"(budget {BUDGET_RAW//1024}/{BUDGET_GZIP//1024})")
     if raw > BUDGET_RAW:
         errors.append(f"dist: {raw/1024:.0f} KB raw exceeds {BUDGET_RAW//1024} KB budget")
+    elif raw > WARN_RAW:
+        warnings.append(f"dist: {raw/1024:.0f} KB raw past the {WARN_RAW//1024} KB warning line")
     if gz > BUDGET_GZIP:
         errors.append(f"dist: {gz/1024:.0f} KB gzip exceeds {BUDGET_GZIP//1024} KB budget")
+    elif gz > WARN_GZIP:
+        warnings.append(f"dist: {gz/1024:.0f} KB gzip past the {WARN_GZIP//1024} KB warning line")
 else:
     warnings.append("dist/index.html not built yet — artifact checks skipped")
 

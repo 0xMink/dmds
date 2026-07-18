@@ -217,3 +217,36 @@ Suite: 69 → 72 checks; regression M1 59/59, M2 55/55, M3 35/35 — 221.
   bidirectional real-device validation case, not full verification.
   Baseline / promotion-availability / promotion-ceiling are recorded
   as three separate decisions.
+
+## Review-closure pass — 80 → 88 checks, full regression rerun
+
+1. **Different-pair test added (the prescribed missing case)**: a
+   42000↔21000 suspicion does NOT transfer to a 21000↔10500
+   oscillation — the suspect is replaced, no cross-pair lock; the new
+   pair locks only on its own repeat.
+2. **History-ring semantics proven**: field fidelity (window p90 +
+   classification, rung targets), chronological order, cap at 120
+   with OLDEST evicted, copy-not-reference, survival across a managed
+   promotion reinit, and — critically — **survival through live
+   demotion** (the run that demotes is the run whose trajectory
+   matters: 9 entries ending in `demote`, readable from tier 2).
+3. **Full four-suite regression rerun after changing both engines**
+   (the review's own founding-rule citation, accepted):
+   M1 59/59 · M2 55/55 · M3 35/35 · M4 88/88 — **237 checks**.
+4. **Budget tripwire re-tightened**: WARN at 352/160 KB near current
+   size (currently warns at 321 KB — growth must be explained), hard
+   FAIL at the spec ceiling 512/280.
+5. **`?telemetry=1` read-only mode**: exposes debugGov/debugGovHistory
+   with ZERO behavior change (live governor runs exactly as
+   production; no fault hooks, no readbacks). Hardware retests use
+   this instead of debug mode — the measured run IS the production
+   experience, no equivalence argument needed.
+6. Server durability: nohup + pidfile (`/tmp/dmds-http.pid`), survives
+   session/SSH end; explicitly a temporary unauthenticated LAN
+   process, not deployment.
+
+One test flake fixed en route: the unlock test's visibility dance
+re-armed the LIVE governor on a page whose real SwiftShader frames
+could tick between deterministic ticks — the real loop is now stopped
+before the post-unlock assertions (governor state persists; ticks are
+pure).

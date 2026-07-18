@@ -546,11 +546,18 @@ async function readyPage(browser, query, opts) {
     // walk happens on its own: warm-up → emergencies/windows → rungs →
     // sizes (idle-deferred) → post off → demote → tier 2 boots
     await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady && window.DMDS_GL.isReady(), { timeout: 300000 });
-    const r = await page.evaluate(() => window.DMDS_GL.status());
+    const r = await page.evaluate(() => ({
+      status: window.DMDS_GL.status(),
+      // the trajectory is MOST valuable on the run that demoted — it must
+      // survive tier-1 teardown and end with the demote event
+      history: (() => { try { return window.DMDS_GL2.debugGovHistory(); } catch (e) { return null; } })(),
+    }));
     const crash = page.errs.filter(e => /bindVertexArray|null/.test(e));
-    check('live:demotes-cleanly-to-tier2', r.tier === 'gl1' && r.running === true, JSON.stringify(r));
+    check('live:demotes-cleanly-to-tier2', r.status.tier === 'gl1' && r.status.running === true, JSON.stringify(r.status));
     check('live:no-mid-frame-lifecycle-crash', crash.length === 0, crash.join('; '));
     check('live:no-page-errors-at-all', page.errs.length === 0, page.errs.join('; '));
+    check('live:history-survives-demotion', r.history && r.history.length > 3 && r.history.some(e => e.event === 'demote'),
+      r.history ? r.history.length + ' entries, events=' + [...new Set(r.history.map(e => e.event))] : 'null');
     await page.close();
   }
 
@@ -602,7 +609,10 @@ async function readyPage(browser, query, opts) {
       document.dispatchEvent(new Event('visibilitychange'));
       Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
-      await new Promise(r2 => setTimeout(r2, 300));
+      // the unlock just re-armed the LIVE governor too — on SwiftShader its
+      // genuinely slow frames can tick between our deterministic ticks.
+      // Stop the real loop (destroy keeps governor state; ticks are pure).
+      window.DMDS_GL.destroy();
       // unlocked, but fresh evidence required: ONE good tick must not restore
       out.oneGood = T(60, 190);
       out.twoGood = T(60, 192); // second consecutive good → restore permitted
@@ -631,6 +641,80 @@ async function readyPage(browser, query, opts) {
       };
     }, [BAD, GOOD]);
     check('history:records-trajectory', r.len >= 4 && r.hasWindow && r.hasRung, JSON.stringify(r));
+    await page.close();
+  }
+
+  // ── 19. oscillation lock: a DIFFERENT pair must not inherit suspicion ──
+  {
+    const page = await readyPage(browser, '');
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) { return t === 'webgl2' ? null : orig.call(this, t, o); };
+    });
+    await page.goto(DIST + '?debug=1');
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const r = await page.evaluate(() => {
+      const T = (fps, t) => window.DMDS_GL.debugGovTick(fps, t);
+      const out = {};
+      // suspect the 42000↔21000 pair
+      T(30, 100); T(60, 102); T(60, 104); T(30, 106);   // suspect=42000, at 21000
+      // now the DIFFERENT pair oscillates: 21000↔10500 — the 42000
+      // suspicion must not combine with it into a lock
+      T(30, 108);                                        // 21000 → 10500 (no recent restore for this pair? restoredAt=104, within 12 → high=21000 ≠ suspect 42000 → suspect replaced)
+      out.afterDifferentPair = T(60, 110);               // building restore streak
+      T(60, 112);                                        // → 21000 restored
+      out.cross = T(30, 114);                            // 21000 drops again: suspect===21000 now → this pair MAY lock on ITS OWN repeat
+      return out;
+    });
+    check('lock:different-pair-does-not-inherit', r.afterDifferentPair.locked === false && r.afterDifferentPair.suspect === 21000,
+      JSON.stringify(r.afterDifferentPair));
+    check('lock:new-pair-locks-only-on-own-repeat', r.cross.locked === true && r.cross.drawCount === 10500,
+      JSON.stringify(r.cross));
+    await page.close();
+  }
+
+  // ── 20. history-ring semantics: order, cap+eviction, field fidelity,
+  //        copy-not-reference, survival across a managed reinit ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([GOOD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      // field fidelity + order on a known sequence
+      E.debugGovInject(Array(70).fill(30));  // window(bad) + rung(1)
+      const h1 = E.debugGovHistory();
+      const winEntry = h1.find(e => e.event === 'window');
+      const rungEntry = h1.find(e => e.event === 'rung');
+      // copy-not-reference
+      const stolen = E.debugGovHistory();
+      stolen.length = 0;
+      const stillThere = E.debugGovHistory().length;
+      // cap + eviction: flood with action-free alternating windows
+      for (let i = 0; i < 140; i++) {
+        E.debugGovInject(Array(70).fill(i % 2 ? 10 : 20)); // good/hold alternation → no actions
+      }
+      const h2 = E.debugGovHistory();
+      let ordered = true;
+      for (let i = 1; i < h2.length; i++) if (h2[i].t < h2[i - 1].t) ordered = false;
+      const evictedOldest = !h2.some(e => e.event === 'rung'); // the early rung entry fell off
+      // survival across a managed reinit (promotion resize)
+      E.debugGovInject(Array(70).fill(10)); E.debugGovInject(Array(70).fill(10));
+      E.debugGovInject(Array(70).fill(10)); E.debugGovInject(Array(70).fill(10));
+      for (let i = 0; i < 40 && E.status().count !== 16384; i++) await new Promise(r2 => setTimeout(r2, 1000));
+      const h3 = E.debugGovHistory();
+      return {
+        winOK: winEntry && winEntry.p90 === 30 && winEntry.action === 'bad',
+        rungOK: rungEntry && rungEntry.to === 1,
+        stillThere,
+        capped: h2.length === 120, ordered, evictedOldest,
+        survivedReinit: E.status().count === 16384 && h3.some(e => e.event === 'resize-commit') && h3.some(e => e.event === 'window'),
+      };
+    }, [GOOD]);
+    check('history:window-fields-faithful', r.winOK === true);
+    check('history:rung-fields-faithful', r.rungOK === true);
+    check('history:returns-a-copy', r.stillThere > 0, 'len=' + r.stillThere);
+    check('history:caps-at-120-evicting-oldest', r.capped && r.ordered && r.evictedOldest, JSON.stringify({ capped: r.capped, ordered: r.ordered, evictedOldest: r.evictedOldest }));
+    check('history:survives-managed-reinit', r.survivedReinit === true);
     await page.close();
   }
 

@@ -20,6 +20,11 @@
 
   // ── debug/test configuration: only honored under ?debug=1 ──
   var DEBUG = /[?&]debug=1/.test(location.search);
+  // ?telemetry=1: READ-ONLY observability (status/gov/history getters) with
+  // zero behavior change — the live governor runs exactly as production,
+  // no fault injection, no readbacks, no debug branches. Hardware retests
+  // use this so the measured run IS the production experience.
+  var TELEMETRY = /[?&]telemetry=1/.test(location.search);
   // sim-size ladder (governor moves along it; count = N*N). Desktop
   // baseline 512², floor 256², promotion ceiling 1024²; mobile pinned low.
   var SIZES = (MOBILE || SAVEDATA) ? [256, 384] : [256, 384, 512, 768, 1024];
@@ -2033,7 +2038,7 @@
     debugCamera: debugCamera,
     debugGLHealth: debugGLHealth,
     debugGov: function () {
-      if (!DEBUG) throw new Error("debugGov requires ?debug=1");
+      if (!DEBUG && !TELEMETRY) throw new Error("debugGov requires ?debug=1 or ?telemetry=1");
       var g = state.gov, gl = state.gl;
       var aberr = null;
       try { if (state.post && state.progComp) aberr = gl.getUniform(state.progComp.p, state.progComp.uAberr); } catch (e) {}
@@ -2067,7 +2072,7 @@
       finally { g.liveOff = saved; state.time = savedTime; }
     },
     debugGovHistory: function () {
-      if (!DEBUG) throw new Error("debugGovHistory requires ?debug=1");
+      if (!DEBUG && !TELEMETRY) throw new Error("debugGovHistory requires ?debug=1 or ?telemetry=1");
       return (state.gov.history || []).slice();
     },
     debugGovInject: function (frameMs, opts) {
