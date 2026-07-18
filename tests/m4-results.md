@@ -131,3 +131,36 @@ All eight review items adopted; three more engine bugs found (total 21):
    keeps its own convention; the console banner uses the live count).
 
 Full regression: M1 59/59, M2 55/55, M3 35/35 — **202 checks**.
+
+## Second correction pass — 53 → 69 checks
+
+1. **Policy fix (the review's "immediately" item)**: a bad window now
+   cancels a queued promotion AND applies its degradation in the same
+   evaluation — a performance collapse is never consumed merely
+   updating the calendar. (Emergency likewise: cancel + two rungs.)
+2. **Transaction observability + state integrity**: `resizeTxn` phases
+   (building-target / rolling-back / idle+last) exposed in debugGov;
+   the rollback test now waits on the transaction rather than
+   inferring from the blacklist, and verifies: formation survives and
+   converges onto its GPU targets (reduction: 0 outside ε), pending
+   cleared, poisoned size never retried after cooldown, the resize
+   machinery still works for non-poisoned sizes (downsize to 32²
+   lands), zero listener/RAF leak across the multi-reinit transaction
+   (baseline sampled after the loader's RAF dies — the M1 lesson,
+   re-learned).
+3. **DPR rung observed under a real 2× device scale**
+   (deviceScaleFactor 2): baseline caps at 1.75, rung 3 at exactly
+   1.0 with the backing store shrunk to CSS size and post buffers
+   reallocated against it, CSS dimensions untouched, recovery
+   restores 1.75.
+4. **Sleep boundary is CRISP, not merely near**: 0 outside 0.03,
+   ≤2% outside ε_snap (0.012), maxDist < 0.03, max residual velocity
+   < 0.1, zero flags. The production sleep decision remains a
+   validated TIMING gate (sim-time + excitement), per review wording;
+   runtime physical gating is not claimed.
+5. **Collector invalidation sources**: browser-resize and
+   hidden→resume contamination each leave their window inert while
+   the following clean window acts normally. Context-restore/alloc/
+   suspend-gap invalidation + staged async transaction races → part 2.
+
+Full regression: M1 59/59, M2 55/55, M3 35/35 — **218 checks**.

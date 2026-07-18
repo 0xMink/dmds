@@ -1253,12 +1253,12 @@
   }
   function govDegradeOnce() {
     var g = state.gov;
-    // bad evidence cancels a queued PROMOTION outright — the appointment
-    // was made under conditions that no longer hold
+    // bad evidence cancels a queued PROMOTION — and the SAME window still
+    // degrades below. Consuming a performance collapse merely to cancel
+    // an appointment would leave full quality running for another window.
     if (g.pendingResize && g.pendingResize.dir === "promote") {
       g.pendingResize = null;
       if (window.console) console.info("[DMDS] governor: pending promotion cancelled (performance dropped)");
-      return;
     }
     if (g.rung < 3) applyRung(g.rung + 1);
     else if (g.pendingResize) {
@@ -1381,10 +1381,12 @@
     // build at the target size marks it unavailable and rolls back to the
     // previous known-good size. Tier demotion happens only if the
     // rollback also fails. (A speculative promotion must never destroy a
-    // healthy tier 1.)
+    // healthy tier 1.) The phase is observable so tests wait on the
+    // transaction, not on side-effect inference.
     var canvas = state.canvas, ms = state.ms;
     var g = state.gov;
     var oldIdx = g.sizeIdx, keepName = state.currentName || "logo";
+    g.txn = { phase: "building-target", from: SIZES[oldIdx], to: SIZES[idx] };
     function attempt(i) {
       govPersist = g;
       g.sizeIdx = i;
@@ -1397,11 +1399,17 @@
       targScratch = null; // sized per COUNT
       return init(canvas, ms);
     }
-    return attempt(idx).catch(function (e) {
+    return attempt(idx).then(function () {
+      g.txn = { phase: "idle", last: "committed", from: SIZES[oldIdx], to: SIZES[idx] };
+    }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
       g.trialFailed[SIZES[idx]] = true;
-      return attempt(oldIdx).catch(function (e2) {
+      g.txn = { phase: "rolling-back", from: SIZES[oldIdx], to: SIZES[idx] };
+      return attempt(oldIdx).then(function () {
+        g.txn = { phase: "idle", last: "rolled-back", from: SIZES[oldIdx], to: SIZES[idx] };
+      }, function (e2) {
         if (window.console) console.warn("[DMDS] rollback failed -> demoting:", e2 && e2.message);
+        g.txn = { phase: "idle", last: "demoted", from: SIZES[oldIdx], to: SIZES[idx] };
         if (state.onDemote) state.onDemote();
       });
     });
@@ -2013,6 +2021,7 @@
         warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
         pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir } : null,
         post: state.post, demoted: g.demoted,
+        txn: g.txn || { phase: "idle" },
         trialFailed: Object.keys(g.trialFailed),
         // ACTUAL rendered-state evidence, not commanded rung numbers:
         trail: state.trailA ? [state.trailA.w, state.trailA.h] : null,

@@ -31,9 +31,13 @@ const BAD = Array(70).fill(30);   // p90 = 30ms → degrade
 const GOOD = Array(70).fill(10);  // p90 = 10ms → good window
 
 async function readyPage(browser, query, opts) {
-  const page = await browser.newPage(Object.assign({ viewport: { width: 1440, height: 900 } }, opts || {}));
+  opts = opts || {};
+  const init = opts.init;
+  delete opts.init;
+  const page = await browser.newPage(Object.assign({ viewport: { width: 1440, height: 900 } }, opts));
   page.errs = [];
   page.on('pageerror', e => page.errs.push(String(e)));
+  if (init) await page.addInitScript(init);
   await page.goto(DIST + query);
   await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 120000 });
   await page.waitForFunction(() => window.DMDS_GL2.status().mix === 1, { timeout: 120000 });
@@ -216,21 +220,28 @@ async function readyPage(browser, query, opts) {
         return window.DMDS_GL2.status();
       };
       const slept = await waitSleep();
-      // sleep may only be claimed over a PHYSICALLY settled field
-      const conv = E.debugConvergence(0.05, 0.1);
+      // sleep may only be claimed over a CRISP field: within snap/final
+      // epsilons, tiny residual velocities, zero flags
+      const conv = E.debugConvergence(0.012, 0.03);
+      const st = E.debugReadState();
+      let maxV = 0;
+      for (let i = 0; i < st.velocities.length; i += 4) {
+        maxV = Math.max(maxV, Math.hypot(st.velocities[i], st.velocities[i + 1], st.velocities[i + 2]));
+      }
       sf('grid', 0.2); // a real command must wake it
       await new Promise(r2 => setTimeout(r2, 500));
       const awake = E.status();
       const reslept = await waitSleep();
       return {
         slept: { running: slept.running, sleeping: slept.sleeping, excite: slept.excite },
-        conv: { nearOut: conv.nearOut, bad: conv.bad, count: conv.count },
+        conv: { nearOut: conv.nearOut, finalOut: conv.finalOut, bad: conv.bad, maxDist: conv.maxDist, maxV, count: conv.count },
         awake: { running: awake.running, formation: awake.formation },
         reslept: { running: reslept.running, sleeping: reslept.sleeping },
       };
     });
     check('rm:stops-after-settle', r.slept.running === false && r.slept.sleeping === true, JSON.stringify(r.slept));
-    check('rm:sleep-is-physically-settled', r.conv.nearOut === 0 && r.conv.bad === 0, JSON.stringify(r.conv));
+    check('rm:sleep-is-crisp', r.conv.finalOut === 0 && r.conv.bad === 0 && r.conv.maxDist < 0.03 && r.conv.maxV < 0.1, JSON.stringify(r.conv));
+    check('rm:sleep-mostly-snapped', r.conv.nearOut <= r.conv.count * 0.02, 'outside-snap-eps=' + r.conv.nearOut + '/' + r.conv.count);
     check('rm:command-wakes', r.awake.running === true && r.awake.formation === 'grid', JSON.stringify(r.awake));
     check('rm:sleeps-again', r.reslept.running === false && r.reslept.sleeping === true, JSON.stringify(r.reslept));
     check('rm:no-page-errors', page.errs.length === 0, page.errs.join('; '));
@@ -260,24 +271,78 @@ async function readyPage(browser, query, opts) {
   // ── 9. transactional resize: failed promotion rolls back to the
   //       known-good size; only a failed rollback demotes ──
   {
-    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
-    const r = await page.evaluate(async ([GOOD]) => {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1', {
+      init: () => {
+        // listener + RAF accounting across the multi-reinit transaction
+        window.__LN = 0;
+        const ae = EventTarget.prototype.addEventListener, re = EventTarget.prototype.removeEventListener;
+        EventTarget.prototype.addEventListener = function () { window.__LN++; return ae.apply(this, arguments); };
+        EventTarget.prototype.removeEventListener = function () { window.__LN--; return re.apply(this, arguments); };
+        window.__RAFP = new Set();
+        const oraf = window.requestAnimationFrame.bind(window), ocaf = window.cancelAnimationFrame.bind(window);
+        window.requestAnimationFrame = cb => { let id; id = oraf(ts => { window.__RAFP.delete(id); cb(ts); }); window.__RAFP.add(id); return id; };
+        window.cancelAnimationFrame = id => { window.__RAFP.delete(id); ocaf(id); };
+      }
+    });
+    const r = await page.evaluate(async ([GOOD, BAD]) => {
       const E = window.DMDS_GL2;
       E.setFormation = function () {}; E.setMorphPair = function () {};
+      const rafCount = async () => {
+        const s = [];
+        for (let i = 0; i < 7; i++) { await new Promise(r2 => setTimeout(r2, 80)); s.push(window.__RAFP.size); }
+        return s.sort((a, b) => a - b)[3];
+      };
+      // the loader's own RAF must be gone before the baseline (M1 lesson)
+      for (let i = 0; i < 60 && document.querySelector('#loader'); i++) {
+        await new Promise(r2 => setTimeout(r2, 500));
+      }
+      const lnBefore = window.__LN, rafBefore = await rafCount();
       window.__DMDS_GL2_BREAK_N__ = [128]; // the promotion target will fail to build
       E.debugGovInject(GOOD); E.debugGovInject(GOOD); // queue promotion
-      for (let i = 0; i < 40 && !E.debugGov().trialFailed.length; i++) {
+      // wait on the TRANSACTION, not on side-effect inference
+      for (let i = 0; i < 60 && !(E.debugGov().txn.phase === 'idle' && E.debugGov().txn.last); i++) {
         await new Promise(r2 => setTimeout(r2, 1000));
       }
       window.__DMDS_GL2_BREAK_N__ = null;
-      await new Promise(r2 => setTimeout(r2, 1500));
+      const txn = E.debugGov().txn;
       const g = E.debugGov();
       const s = E.status();
-      return { count: s.count, running: s.running, tier: s.tier, trialFailed: g.trialFailed, demoted: g.demoted, sizeIdx: g.sizeIdx };
-    }, [GOOD]);
-    check('txn:failed-promotion-rolls-back', r.count === 4096 && r.running === true && r.tier === 'gl2' && r.sizeIdx === 1, JSON.stringify(r));
+      // state integrity after rollback: formation survives, field converges
+      // onto its GPU targets
+      let conv = { finalOut: -1 };
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r2 => setTimeout(r2, 1000));
+        conv = E.debugConvergence(0.05, 0.1);
+        if (conv.finalOut === 0 && conv.nearOut === 0) break;
+      }
+      const lnAfter = window.__LN, rafAfter = await rafCount();
+      // no retry of the poisoned size after cooldown
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);
+      const retried = E.debugGov().pending;
+      // the resize machinery is still healthy for non-poisoned sizes
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      for (let i = 0; i < 60 && E.status().count !== 1024; i++) {
+        await new Promise(r2 => setTimeout(r2, 1000));
+      }
+      const downsized = E.status().count;
+      return {
+        count: s.count, running: s.running, tier: s.tier,
+        trialFailed: g.trialFailed, demoted: g.demoted, sizeIdx: g.sizeIdx,
+        txn, formation: s.formation, pending: g.pending,
+        convOK: conv.finalOut === 0 && conv.nearOut === 0 && conv.bad === 0,
+        lnDelta: lnAfter - lnBefore, rafBefore, rafAfter,
+        retried, downsized,
+      };
+    }, [GOOD, BAD]);
+    check('txn:failed-promotion-rolls-back', r.count === 4096 && r.running === true && r.tier === 'gl2' && r.sizeIdx === 1, JSON.stringify({ count: r.count, sizeIdx: r.sizeIdx }));
+    check('txn:phase-observable', r.txn.phase === 'idle' && r.txn.last === 'rolled-back', JSON.stringify(r.txn));
     check('txn:failed-size-marked', r.trialFailed.indexOf('128') > -1, JSON.stringify(r.trialFailed));
     check('txn:no-demotion-on-rollback', r.demoted === false);
+    check('txn:formation-survives-and-converges', r.formation === 'logo' && r.convOK === true, JSON.stringify({ f: r.formation, conv: r.convOK }));
+    check('txn:pending-cleared', r.pending === null);
+    check('txn:no-listener-or-raf-leak', r.lnDelta === 0 && r.rafAfter === r.rafBefore, 'ln±' + r.lnDelta + ' raf ' + r.rafBefore + '→' + r.rafAfter);
+    check('txn:poisoned-size-never-retried', r.retried === null, JSON.stringify(r.retried));
+    check('txn:machinery-healthy-after', r.downsized === 1024, 'count=' + r.downsized);
     check('txn:no-page-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }
@@ -306,9 +371,9 @@ async function readyPage(browser, query, opts) {
       const queuedPromo = (E.debugGov().pending || {}).dir;
       E.debugGovInject(BAD);
       const afterBad = E.debugGov();
-      // downsize queued (three rungs first, the FOURTH bad queues size),
-      // then recovery → downsize cancels
-      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      // downsize queued (rung is already 1 after cancel-and-degrade; three
+      // more bads walk 2→3→size request), then recovery → downsize cancels
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
       const queuedDown = (E.debugGov().pending || {}).dir;
       E.debugGovInject(GOOD); E.debugGovInject(GOOD);
       const afterRecover = E.debugGov();
@@ -319,7 +384,7 @@ async function readyPage(browser, query, opts) {
                queuedDown, downCancelled: afterRecover.pending === null, finalCount };
     }, [BAD, GOOD]);
     check('stale:promotion-queued', r.queuedPromo === 'promote');
-    check('stale:bad-window-cancels-promotion', r.promoCancelled === true && r.rungAfterBad === 0, JSON.stringify(r));
+    check('stale:bad-window-cancels-AND-degrades', r.promoCancelled === true && r.rungAfterBad === 1, JSON.stringify(r));
     check('stale:downsize-queued', r.queuedDown === 'degrade', r.queuedDown);
     check('stale:recovery-cancels-downsize', r.downCancelled === true);
     check('stale:no-spurious-resize', r.finalCount === 4096, 'count=' + r.finalCount);
@@ -403,6 +468,73 @@ async function readyPage(browser, query, opts) {
       return { count: s.count, baseline: s.baseline, ceiling: s.ceiling, hasMax: 'max' in s, degraded: s.degraded };
     });
     check('status:honest-fields', r.count === 4096 && r.baseline === 4096 && r.ceiling === 16384 && r.hasMax === false && r.degraded === false, JSON.stringify(r));
+    await page.close();
+  }
+
+  // ── 14. the DPR rung, observed under a real 2× device scale ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1', { deviceScaleFactor: 2 });
+    const r = await page.evaluate(async ([BAD, GOOD]) => {
+      const E = window.DMDS_GL2;
+      const wait = () => new Promise(r2 => setTimeout(r2, 700));
+      const g0 = E.debugGov();
+      const css0 = document.querySelector('#gl').clientWidth;
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); await wait();
+      const g3 = E.debugGov();
+      const css3 = document.querySelector('#gl').clientWidth;
+      for (let i = 0; i < 8; i++) E.debugGovInject(GOOD);
+      await wait();
+      const gr = E.debugGov();
+      return {
+        dpr0: g0.dprEff, px0: g0.canvasPx, css0,
+        rung3: g3.rung, dpr3: g3.dprEff, px3: g3.canvasPx, trail3: g3.trail, css3,
+        dprR: gr.dprEff, pxR: gr.canvasPx,
+      };
+    }, [BAD, GOOD]);
+    check('dpr:baseline-caps-at-1.75', Math.abs(r.dpr0 - 1.75) < 0.01, 'dpr=' + r.dpr0 + ' px=' + r.px0);
+    check('dpr:rung3-caps-at-1.0', r.rung3 === 3 && Math.abs(r.dpr3 - 1.0) < 0.01 && r.px3[0] === r.css3, 'dpr=' + r.dpr3 + ' px=' + r.px3 + ' css=' + r.css3);
+    check('dpr:post-realloc-tracks-backing', r.trail3 && r.trail3[0] === Math.round(r.px3[0] / 2), 'trail=' + r.trail3 + ' (rung3 keeps half-res trail)');
+    check('dpr:css-size-unchanged', r.css0 === r.css3, r.css0 + ' vs ' + r.css3);
+    check('dpr:recovery-restores', Math.abs(r.dprR - 1.75) < 0.01 && r.pxR[0] === r.px0[0], 'dpr=' + r.dprR);
+    await page.close();
+  }
+
+  // ── 15. collector invalidation sources: a contaminated window acts
+  //        never, the following clean window acts normally ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(() => {
+      const E = window.DMDS_GL2;
+      let t = 5000;
+      const feed = (n, ms) => { for (let i = 0; i < n; i++) { t += ms / 1000; E.debugGovFrame(ms, t); } };
+      feed(30, 16); // warm
+      t += 4; // past fast path
+      const out = {};
+      // browser resize mid-window → invalid → no action
+      feed(150, 30);
+      window.dispatchEvent(new Event('resize'));
+      feed(60, 30); // closes a ~6s window, plenty of frames, marked invalid
+      out.afterResizeEvt = E.debugGov().rung;
+      // clean bad window after → acts
+      feed(200, 30);
+      out.afterClean = E.debugGov().rung;
+      // hidden→resume mid-window → invalid → no action
+      Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      feed(210, 30);
+      out.afterResume = E.debugGov().rung;
+      // and the next clean window acts again
+      t += 6; // past cooldown
+      feed(200, 30);
+      out.afterClean2 = E.debugGov().rung;
+      return out;
+    });
+    check('invalidate:resize-event-window-inert', r.afterResizeEvt === 0, 'rung=' + r.afterResizeEvt);
+    check('invalidate:clean-window-acts', r.afterClean === 1, 'rung=' + r.afterClean);
+    check('invalidate:resume-window-inert', r.afterResume === 1, 'rung=' + r.afterResume);
+    check('invalidate:clean-window-acts-again', r.afterClean2 === 2, 'rung=' + r.afterClean2);
     await page.close();
   }
 
