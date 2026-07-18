@@ -1217,7 +1217,10 @@
     // three times and spent half the run in cooldown
     var g = state.gov;
     if (!g.history) g.history = [];
-    var e = { t: Math.round(state.time * 10) / 10, event: event, rung: g.rung, n: SIZES[g.sizeIdx], post: state.post };
+    // seq disambiguates order where t can't: injected/debug entries can
+    // share a timestamp, and the ring must stay reconstructible anyway
+    g.historySeq = (g.historySeq || 0) + 1;
+    var e = { seq: g.historySeq, t: Math.round(state.time * 10) / 10, event: event, rung: g.rung, n: SIZES[g.sizeIdx], post: state.post };
     if (extra) for (var k in extra) e[k] = extra[k];
     g.history.push(e);
     if (g.history.length > 120) g.history.shift();
@@ -2044,7 +2047,7 @@
       try { if (state.post && state.progComp) aberr = gl.getUniform(state.progComp.p, state.progComp.uAberr); } catch (e) {}
       return {
         rung: g.rung, sizeIdx: g.sizeIdx, n: SIZES[g.sizeIdx], count: COUNT,
-        sizes: SIZES.slice(), baseIdx: BASE_IDX,
+        sizes: SIZES.slice(), baseIdx: BASE_IDX, liveOff: !!g.liveOff,
         warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
         pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir } : null,
         post: state.post, demoted: g.demoted,
@@ -2073,7 +2076,13 @@
     },
     debugGovHistory: function () {
       if (!DEBUG && !TELEMETRY) throw new Error("debugGovHistory requires ?debug=1 or ?telemetry=1");
-      return (state.gov.history || []).slice();
+      // clone entries too, not just the array — a caller must not be able
+      // to rewrite the internal record through shared references
+      return (state.gov.history || []).map(function (e) {
+        var c = {};
+        for (var k in e) c[k] = e[k];
+        return c;
+      });
     },
     debugGovInject: function (frameMs, opts) {
       // drives the SAME production evaluation/emergency functions the

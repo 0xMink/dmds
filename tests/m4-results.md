@@ -251,3 +251,59 @@ re-armed the LIVE governor on a page whose real SwiftShader frames
 could tick between deterministic ticks — the real loop is now stopped
 before the post-unlock assertions (governor state persists; ticks are
 pure).
+
+## Review closure round 2 (2026-07-18) — pair-scoped restoration evidence
+
+The previous round's "different-pair" test was itself the bug's
+accomplice: its own inline comment narrated the forged credential
+("restoredAt=104, within 12 → high=21000 ≠ suspect 42000 → suspect
+replaced") without noticing that the restore at t=104 belonged to the
+42000↔21000 pair. The tier-2 lock keyed *suspicion* by pair but the
+*restoration credential* was global — so a monotonic double
+degradation (42000 → 21000 → 10500) minted the first strike of a
+21000↔10500 "oscillation" that had never cycled, and one real cycle
+later the lock fired on half the required evidence.
+
+**Fix (src/gl.js)**: restores now record `govRestoredTo` (the budget
+restored TO); a drop counts as a strike only when it undoes a restore
+to that exact budget (`govRestoredTo === high`), inside the existing
+12s window. Evidence is now pair-local end to end.
+
+**Corrected test asserts the true semantics** (3 checks, was 2):
+- `lock:monotonic-degradation-mints-no-strike` — 21000→10500 inside
+  the 42000-restore window leaves suspect=42000, locked=false
+- `lock:new-pair-first-own-cycle-suspect-only` — the 10500↔21000
+  pair's first OWN cycle produces suspicion only
+- `lock:new-pair-locks-on-own-second-cycle` — lock on the second
+  complete own cycle
+
+All pre-existing lock tests (true repeat, decay, unlock, fresh
+evidence) pass unchanged under the stricter rule — every legitimate
+strike in them already followed a restore to the same budget.
+
+Also closed this round:
+1. **History entries carry a monotonic `seq`** (persisted with the gov
+   object, so it survives managed reinit uninterrupted). Order is now
+   proven by seq, not timestamps — injected entries share a `t`, and
+   the test requires strict seq growth exactly where t repeats.
+   Time answers "when"; seq answers "in what order".
+2. **debugGovHistory returns cloned entries**, not shared references —
+   `h[0].event = "everything-was-fine"` no longer rewrites the
+   internal record; tested by mutation.
+3. **Telemetry "zero behavior change" is now measured, not asserted**
+   (differential test): plain vs ?telemetry=1 pages snapshot at the
+   ready instant → identical {count, baseline, ceiling, degraded,
+   sleeping, canvas dims}; plain page fully gated; telemetry read
+   paths (debugGov/debugGovHistory) open; write/instrument paths
+   (debugStep/debugPoke/debugGovInject/debugReadState) closed; live
+   governor armed (liveOff=false, now exposed in the debugGov
+   snapshot). Caveat kept honest: this measures the load-time surface
+   + gating; fault hooks are statically `DEBUG &&`-gated in source.
+4. **Server ownership verified**: pidfile 59691 is alive, is
+   `python3 -m http.server 8080 --bind 0.0.0.0`, cwd
+   `/root/dmds/dist`, and `ss -ltnp` shows the :8080 listener is
+   owned by that pid (fd 3). HTTP 200 provenance no longer
+   circumstantial.
+
+Full regression after changing both engines:
+M1 59/59 · M2 55/55 · M3 35/35 · M4 97/97 — **246 checks**.

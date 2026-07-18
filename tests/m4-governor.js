@@ -656,20 +656,29 @@ async function readyPage(browser, query, opts) {
     const r = await page.evaluate(() => {
       const T = (fps, t) => window.DMDS_GL.debugGovTick(fps, t);
       const out = {};
-      // suspect the 42000↔21000 pair
-      T(30, 100); T(60, 102); T(60, 104); T(30, 106);   // suspect=42000, at 21000
-      // now the DIFFERENT pair oscillates: 21000↔10500 — the 42000
-      // suspicion must not combine with it into a lock
-      T(30, 108);                                        // 21000 → 10500 (no recent restore for this pair? restoredAt=104, within 12 → high=21000 ≠ suspect 42000 → suspect replaced)
-      out.afterDifferentPair = T(60, 110);               // building restore streak
-      T(60, 112);                                        // → 21000 restored
-      out.cross = T(30, 114);                            // 21000 drops again: suspect===21000 now → this pair MAY lock on ITS OWN repeat
+      // genuinely suspect the 42000↔21000 pair
+      T(30, 100); T(60, 102); T(60, 104); T(30, 106);   // drop, restore→42000, drop: suspect=42000, at 21000
+      // monotonic continuation 21000 → 10500: the only recent restore was
+      // TO 42000 — a different pair's credential. It must NOT mint a
+      // first strike for 21000↔10500 (that's plain degradation, not a cycle)
+      out.forged = T(30, 108);
+      // the new pair earns its own first strike: restore to 21000, drop
+      T(60, 110); T(60, 112);                            // → 21000 (restoredTo=21000)
+      out.firstStrike = T(30, 114);                      // suspect→21000, NOT locked
+      // and locks only on its own SECOND complete cycle
+      T(60, 116); T(60, 118);                            // → 21000 again
+      out.lock = T(30, 120);
       return out;
     });
-    check('lock:different-pair-does-not-inherit', r.afterDifferentPair.locked === false && r.afterDifferentPair.suspect === 21000,
-      JSON.stringify(r.afterDifferentPair));
-    check('lock:new-pair-locks-only-on-own-repeat', r.cross.locked === true && r.cross.drawCount === 10500,
-      JSON.stringify(r.cross));
+    check('lock:monotonic-degradation-mints-no-strike',
+      r.forged.locked === false && r.forged.suspect === 42000 && r.forged.drawCount === 10500,
+      JSON.stringify(r.forged));
+    check('lock:new-pair-first-own-cycle-suspect-only',
+      r.firstStrike.locked === false && r.firstStrike.suspect === 21000,
+      JSON.stringify(r.firstStrike));
+    check('lock:new-pair-locks-on-own-second-cycle',
+      r.lock.locked === true && r.lock.drawCount === 10500,
+      JSON.stringify(r.lock));
     await page.close();
   }
 
@@ -689,33 +698,101 @@ async function readyPage(browser, query, opts) {
       const stolen = E.debugGovHistory();
       stolen.length = 0;
       const stillThere = E.debugGovHistory().length;
+      // entries must be clones too, not shared references
+      const grab = E.debugGovHistory();
+      grab[0].event = 'everything-was-fine';
+      const entryTampered = E.debugGovHistory()[0].event === 'everything-was-fine';
       // cap + eviction: flood with action-free alternating windows
       for (let i = 0; i < 140; i++) {
         E.debugGovInject(Array(70).fill(i % 2 ? 10 : 20)); // good/hold alternation → no actions
       }
       const h2 = E.debugGovHistory();
-      let ordered = true;
-      for (let i = 1; i < h2.length; i++) if (h2[i].t < h2[i - 1].t) ordered = false;
+      // order is proven by seq, not t: injections don't advance state.time,
+      // so timestamps repeat — sequence must stay STRICTLY monotonic anyway
+      let seqStrict = true, equalTDistinctSeq = false;
+      for (let i = 1; i < h2.length; i++) {
+        if (!(h2[i].seq > h2[i - 1].seq)) seqStrict = false;
+        if (h2[i].t === h2[i - 1].t && h2[i].seq !== h2[i - 1].seq) equalTDistinctSeq = true;
+      }
       const evictedOldest = !h2.some(e => e.event === 'rung'); // the early rung entry fell off
       // survival across a managed reinit (promotion resize)
       E.debugGovInject(Array(70).fill(10)); E.debugGovInject(Array(70).fill(10));
       E.debugGovInject(Array(70).fill(10)); E.debugGovInject(Array(70).fill(10));
       for (let i = 0; i < 40 && E.status().count !== 16384; i++) await new Promise(r2 => setTimeout(r2, 1000));
       const h3 = E.debugGovHistory();
+      // seq continuity: if the counter reset across reinit, post-reinit
+      // entries would break strict growth against the surviving ring
+      let seqContinuous = true;
+      for (let i = 1; i < h3.length; i++) if (!(h3[i].seq > h3[i - 1].seq)) seqContinuous = false;
       return {
         winOK: winEntry && winEntry.p90 === 30 && winEntry.action === 'bad',
         rungOK: rungEntry && rungEntry.to === 1,
-        stillThere,
-        capped: h2.length === 120, ordered, evictedOldest,
+        stillThere, entryTampered,
+        capped: h2.length === 120, seqStrict, equalTDistinctSeq, evictedOldest,
         survivedReinit: E.status().count === 16384 && h3.some(e => e.event === 'resize-commit') && h3.some(e => e.event === 'window'),
+        seqContinuous,
       };
     }, [GOOD]);
     check('history:window-fields-faithful', r.winOK === true);
     check('history:rung-fields-faithful', r.rungOK === true);
     check('history:returns-a-copy', r.stillThere > 0, 'len=' + r.stillThere);
-    check('history:caps-at-120-evicting-oldest', r.capped && r.ordered && r.evictedOldest, JSON.stringify({ capped: r.capped, ordered: r.ordered, evictedOldest: r.evictedOldest }));
+    check('history:entries-are-clones-not-references', r.entryTampered === false);
+    check('history:seq-strictly-monotonic-where-t-repeats', r.seqStrict && r.equalTDistinctSeq, JSON.stringify({ seqStrict: r.seqStrict, equalTDistinctSeq: r.equalTDistinctSeq }));
+    check('history:caps-at-120-evicting-oldest', r.capped && r.evictedOldest, JSON.stringify({ capped: r.capped, evictedOldest: r.evictedOldest }));
     check('history:survives-managed-reinit', r.survivedReinit === true);
+    check('history:seq-survives-reinit-uninterrupted', r.seqContinuous === true);
     await page.close();
+  }
+
+  // ── 21. ?telemetry=1 differential: measured evidence for "zero behavior
+  //        change" — identical production config at ready-instant, read
+  //        paths open, write/instrument paths closed, live governor armed ──
+  {
+    const snapAtReady = async (query) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      await page.goto(DIST + query);
+      // snapshot in the same frame isReady first reads true — before the
+      // governor can have taken any size/DPR action (warm-up + cooldowns
+      // put those tens of seconds away)
+      const snap = await page.evaluate(() => new Promise(res => {
+        (function poll() {
+          const E = window.DMDS_GL2;
+          if (E && E.isReady()) {
+            const s = E.status();
+            const c = document.querySelector('canvas');
+            res({ count: s.count, baseline: s.baseline, ceiling: s.ceiling,
+                  degraded: s.degraded, sleeping: s.sleeping, cw: c.width, ch: c.height });
+          } else requestAnimationFrame(poll);
+        })();
+      }));
+      const gates = await page.evaluate(() => {
+        const E = window.DMDS_GL2;
+        const probe = (name, args) => { try { E[name].apply(null, args || []); return 'open'; } catch (e) { return 'closed'; } };
+        return {
+          gov: probe('debugGov'), hist: probe('debugGovHistory'),
+          step: probe('debugStep', [1, 1 / 60]), poke: probe('debugPoke', [0, 0, 0, 0]),
+          inject: probe('debugGovInject', [[10]]), readback: probe('debugReadState', [1]),
+          liveOff: (() => { try { return E.debugGov().liveOff; } catch (e) { return 'n/a'; } })(),
+        };
+      });
+      await page.close();
+      return { snap, gates };
+    };
+    const plain = await snapAtReady('');
+    const telem = await snapAtReady('?telemetry=1');
+    const g1 = plain.gates, g2 = telem.gates;
+    check('telemetry:config-identical-to-production',
+      JSON.stringify(plain.snap) === JSON.stringify(telem.snap),
+      JSON.stringify({ plain: plain.snap, telem: telem.snap }));
+    check('telemetry:plain-page-fully-gated',
+      g1.gov === 'closed' && g1.hist === 'closed' && g1.step === 'closed'
+      && g1.poke === 'closed' && g1.inject === 'closed' && g1.readback === 'closed',
+      JSON.stringify(g1));
+    check('telemetry:read-paths-open', g2.gov === 'open' && g2.hist === 'open', JSON.stringify(g2));
+    check('telemetry:write-and-instrument-paths-closed',
+      g2.step === 'closed' && g2.poke === 'closed' && g2.inject === 'closed' && g2.readback === 'closed',
+      JSON.stringify(g2));
+    check('telemetry:live-governor-armed', g2.liveOff === false, String(g2.liveOff));
   }
 
   await browser.close();

@@ -572,12 +572,16 @@
   // high→low reversal, repeated within a bounded window after restores,
   // grants the lower budget tenure — a transient drop, or an unrelated
   // lower step, never locks. Suspicion decays after 40s without repeat.
+  // The restoration credential is PAIR-SCOPED (govRestoredTo): a drop
+  // only counts as a strike when it undoes a restore to that exact
+  // budget — a monotonic second degradation happening to fall inside
+  // another pair's restore window must not mint a first strike.
   function govTick(now, fps) {
     if (state.govSuspect && now - state.govSuspectT > 40) state.govSuspect = null;
     if (fps < 40 && state.drawCount > COUNT / 4) {
       state.govGood = 0;
       var high = state.drawCount;
-      if (state.govRestoredAt && now - state.govRestoredAt < 12) {
+      if (state.govRestoredAt && now - state.govRestoredAt < 12 && state.govRestoredTo === high) {
         if (state.govSuspect === high) {
           state.govLocked = true;
           if (window.console) console.info("[DMDS] governor: repeated " + high + "\u2194" + Math.floor(high / 2) + " oscillation \u2014 locking budget (re-armed on tab revisit)");
@@ -594,6 +598,7 @@
         state.govGood = 0;
         state.govRestoredAt = now;
         state.drawCount = Math.min(COUNT, state.drawCount * 2);
+        state.govRestoredTo = state.drawCount;
         if (window.console) console.info("[DMDS] governor: particle budget \u2192 " + state.drawCount);
       }
     } else {
