@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-PAaIFIarSgl3BtBmqhvNld9n1hOhY4hia3sYg6kMFBk=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-8X8x3XZcWlpfiS3xn8BFo5bYM9EWLeoCEzLGZ1kH6SA='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-GDkw2tNBJ1zrNlUSRXgfO9AK3OZoTfFppypmwHinYkk=' 'sha256-x56eRLb70uolqEAkP9aXJQpQt3OFakZRCB9tm3YHtxM=' 'sha256-8X8x3XZcWlpfiS3xn8BFo5bYM9EWLeoCEzLGZ1kH6SA='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="08e4ede 2026-07-18T03:58:31Z">
+<meta name="dmds-build" content="77ec769 2026-07-18T04:10:26Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2198,16 +2198,21 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     // 3=post-freeze-draw, 4=post-target-bind, 5=post-copy-draw — the
     // finally block's job is only proven by mid-pass failures
     function brk(stage) { if (DEBUG && window.__DMDS_FREEZE_BREAK__ === stage) throw new Error("injected freeze failure @" + stage); }
-    // WebGL errors don't throw. Clear any stale flag so post-draw checks
-    // attribute errors to THIS pass, then check after every draw.
-    function draws(stage) {
+    // WebGL errors don't throw, and more than one distinct flag can be
+    // queued — DRAIN the state so post-draw checks attribute errors to
+    // THIS pass, then check after every draw.
+    function draws(stage, which) {
+      // GL-error injection (?debug=1): sets a real error flag (INVALID_ENUM
+      // via gl.enable(0)) so the detector itself is exercised, not just the
+      // JS-exception path
+      if (DEBUG && window.__DMDS_FREEZE_GLERR__ === which) gl.enable(0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       var e = gl.getError();
       if (e !== gl.NO_ERROR) throw new Error("freeze " + stage + " GL error 0x" + e.toString(16));
     }
     try {
       brk(1);
-      gl.getError(); // clear stale error state
+      for (var d = 0; d < 8 && gl.getError() !== gl.NO_ERROR; d++) {} // drain stale flags (bounded)
       gl.bindVertexArray(state.vao);
       gl.disable(gl.BLEND);
       gl.viewport(0, 0, N, N);
@@ -2221,7 +2226,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
       gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
       gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
-      draws("blend-pass");
+      draws("blend-pass", 1);
       brk(3);
       // scratch → targA (RGBA16F is renderable under EXT_color_buffer_float)
       gl.bindFramebuffer(gl.FRAMEBUFFER, state.frzFbA);
@@ -2231,7 +2236,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       gl.useProgram(state.copyProg);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.frzTex);
       gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
-      draws("copy-pass");
+      draws("copy-pass", 2);
       brk(5);
     } finally {
       // exit contract: no freeze FBO/VAO bound, texture unit back to 0 —
@@ -4718,4 +4723,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 08e4ede 2026-07-18T03:58:31Z -->
+<!-- dmds build 77ec769 2026-07-18T04:10:26Z -->
