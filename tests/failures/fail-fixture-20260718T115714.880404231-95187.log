@@ -1,0 +1,24 @@
+== env preamble ==
+Sat Jul 18 11:57:14 UTC 2026
+ 11:57:14 up 15:28,  3 users,  load average: 0.45, 0.67, 1.86
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi       1.5Gi        13Gi       0.0Ki       780Mi        14Gi
+Swap:         8.0Gi       1.3Gi       6.7Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 3  0 1315240 14455388      0 798876    2   22   245   137   94   45  8  0 92  0  0
+ 2  0 1315240 14455020      0 798876    0    0     4   168 2673 12894  5  0 95  0  0
+ 0  0 1315240 14454916      0 798876    4    0     4     0 2434 10480  4  0 96  0  0
+95208 S     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+== suite: fail-fixture ==
+FIXTURE RUN FAILED Error: simulated launch failure
+    at /root/dmds/tests/fail-fixture.js:7:53
+    at Object.<anonymous> (/root/dmds/tests/fail-fixture.js:11:3)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at node:internal/main/run_main_module:28:49
+exit=2

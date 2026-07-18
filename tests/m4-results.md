@@ -401,3 +401,43 @@ tests/logs/, exit=0 each):
 Defensible totals: M2 55 and M3 35 passed post-change earlier this
 round (pre-runner, verdict lines only — the last such runs); M1 59
 and M4 103 passed under the runner with retained logs. 252 checks.
+
+## Review closure round 5 (2026-07-18) — evidence workflow acceptance
+
+1. **M1 incident reclassified, wording accepted verbatim**:
+   *unclassified historical M1 failure, not reproduced in five
+   subsequent runs; a separate browser-launch timeout is classified
+   as host/harness infrastructure failure.* The earlier "classified
+   infrastructure" claim let the first event inherit the second's
+   diagnosis; its evidence is gone, so its cause is not a knowable
+   fact. The infra label now attaches only to the launch timeout.
+2. **Load numbers are now interpretable**: this host has 8 cores
+   (Xeon E5-4620). The incident's ~16 was 2× oversubscription; the
+   passing runs' 8–9 were at capacity. The runner preamble now
+   records nproc + CPU model, cgroup cpu.max/memory.max, and
+   `vmstat 1 3` alongside uptime/free.
+3. **Exit-taxonomy pushback (evidence, not assertion)**: all four
+   suites deliberately exit 1 on a failed check
+   (`process.exit(pass ? 0 : 1)`) and 2 from their catch-all
+   (`process.exit(2)`) — the observed launch timeout itself took the
+   exit-2 path (its "M1 RUN FAILED" prefix is that catch handler).
+   The taxonomy is real per-suite behavior, documented in run.sh.
+   Structured JSON result lines remain a possible future nicety.
+4. **Runner failure path TESTED, not inspected**: committed
+   tests/fail-fixture.js simulates both failure classes through the
+   real runner — assertion mode propagated exit 1, harness mode
+   exit 2; both runs archived to tests/failures/ and manifested with
+   distinct nanosecond+pid stamps (same-second collision impossible
+   in practice).
+5. **All-suite path exercised end to end**: `tests/run.sh` (no args)
+   ran M1→M2→M3→M4 in order — 59/55/35/103, four distinct logs,
+   four manifest lines, exit 0 only after all four. **This is the
+   first single uninterrupted 252-check runner execution**, at
+   recorded loads 0.75→7.88 on 8 cores, superseding the earlier
+   per-suite accounting.
+6. **Evidence durability**: tests/run-manifest.jsonl is COMMITTED
+   (commit, suite, stamp, exit, checks, log SHA-256 per run) so
+   every run's identity+hash survives workspace loss; failure logs
+   are copied to committed tests/failures/; passing logs stay
+   gitignored on disk. The two fixture failure logs are retained in
+   tests/failures/ as the acceptance evidence.
