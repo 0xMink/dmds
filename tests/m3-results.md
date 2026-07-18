@@ -84,3 +84,34 @@ M2 55/55 regression green.
 Deferred to M4 with the review's agreement: render-level dust
 image-energy measurements and per-scale parallax repeats (they belong
 in the governor scale matrix, which re-runs at every promoted N).
+
+## Second gap-closure pass (per-particle freeze + GPU-backed restoration)
+
+- **Bug #14 — the freeze blended with a GLOBAL factor while every
+  particle chases its own STAGGERED blend.** The previous test's
+  "all dust factors exactly 0.30" was the bug's fingerprint, not a
+  pass. Fixed the way the review's aside suggested: the freeze now
+  runs ON the GPU (a freeze pass using the sim shader's exact
+  per-particle hash/stagger math, copied into targA) — no CPU/GLSL
+  float32 hash drift possible, and the 20 MiB of CPU mirror arrays
+  added by the previous fix were deleted again (its memory concern
+  resolved by construction). Verified: frozen dust factors span
+  0.001–0.581 at mix 0.36 (the exact stagger range; uniform values
+  now FAIL), and every frozen point lies on its own A→B segment at
+  its own recovered blend factor (dominant-axis conditioning).
+- **Bug #15 — found by the new loss test**: the freeze pass compiles
+  its program lazily, and shader compilation THROWS on a lost context
+  (uploads only no-op) — a formation change during a lost context
+  crashed the caller. Freeze is now skipped on lost contexts
+  (commands-during-loss stay CPU-state-only per spec) and degrades to
+  the plain upload on any freeze failure.
+- **Restoration proven GPU-backed, not status-backed**: a neural
+  target reference is materialized and sampled pre-loss; after
+  lose → request device → request neural → restore, the REBUILT
+  textures match the reference texel-for-texel (maxDiff 0). Status no
+  longer testifies anywhere in the loss path.
+
+Deferred to M4 (per review): sway-frozen parallax isolation (fold
+into the per-scale matrix) and the promotion gate's full CPU+GPU
+memory/copy/latency accounting. Suite: 21 → 23 checks; M1 59/59,
+M2 55/55.

@@ -594,30 +594,16 @@
   // dustStart: particle index where a formation's ambient dust begins
   // (COUNT = no dust); rides target.w so the renderer can dim/shrink it
   function uploadTarget(gl, tex, xyz, dustStart) {
-    var rgba;
-    if (xyz.length === COUNT * 4) {
-      // RGBA arrays (blended targets, dust already in .w) upload verbatim
-      rgba = xyz;
-    } else {
-      if (!targScratch) targScratch = new Float32Array(COUNT * 4);
-      if (dustStart === undefined) dustStart = COUNT;
-      for (var i = 0; i < COUNT; i++) {
-        targScratch[i * 4] = xyz[i * 3];
-        targScratch[i * 4 + 1] = xyz[i * 3 + 1];
-        targScratch[i * 4 + 2] = xyz[i * 3 + 2];
-        targScratch[i * 4 + 3] = i >= dustStart ? 1 : 0;
-      }
-      rgba = targScratch;
+    if (!targScratch) targScratch = new Float32Array(COUNT * 4);
+    if (dustStart === undefined) dustStart = COUNT;
+    for (var i = 0; i < COUNT; i++) {
+      targScratch[i * 4] = xyz[i * 3];
+      targScratch[i * 4 + 1] = xyz[i * 3 + 1];
+      targScratch[i * 4 + 2] = xyz[i * 3 + 2];
+      targScratch[i * 4 + 3] = i >= dustStart ? 1 : 0;
     }
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, rgba);
-    // CPU mirror of slot A: a tween's "from" state is the PREVIOUS blend,
-    // which has no formation name — freezing an interrupted morph must
-    // blend from what the texture actually holds
-    if (tex === state.targA) {
-      if (!state.fromArr) state.fromArr = new Float32Array(COUNT * 4);
-      state.fromArr.set(rgba);
-    }
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.FLOAT, targScratch);
   }
   function dustOf(name) {
     return (name && state.dustStart[name] !== undefined) ? state.dustStart[name] : COUNT;
@@ -807,7 +793,17 @@
     // physical engine: particles are wherever they are — the outgoing
     // blend becomes the new A so the spring path stays continuous
     var prev = formationFor(state.currentName) || target;
-    uploadTarget(gl, state.targA, state.mix >= 1 ? prev : blendedTargets(), dustOf(state.currentName));
+    // order matters: the freeze reads BOTH current target textures, so it
+    // must run before targB is overwritten with the new destination.
+    // On a lost context GL uploads are silent no-ops but shader COMPILES
+    // throw — commands during loss must stay CPU-state-only (spec), so
+    // the freeze is skipped there and degrades to the plain upload
+    if (state.mix >= 1 || (gl.isContextLost && gl.isContextLost())) {
+      uploadTarget(gl, state.targA, prev, dustOf(state.currentName));
+    } else {
+      try { freezeTargA(); }
+      catch (e) { uploadTarget(gl, state.targA, prev, dustOf(state.currentName)); }
+    }
     uploadTarget(gl, state.targB, target, dustOf(name));
     state.currentName = name;
     state.pairA = null; state.pairB = null;
@@ -819,27 +815,69 @@
   }
   // CPU blend of the current pair at the current mix — used to freeze a
   // mid-morph state into slot A when a new formation interrupts
-  var blendScratch = null;
-  function blendedTargets() {
-    // RGBA: positions AND the dust factor blend together — freezing a
-    // mid-morph state with a binary dust flag would pop dust size/alpha
-    // while positions stay continuous. The "from" side is the CPU mirror
-    // of the targA texture (state.fromArr) — in tween mode the from-state
-    // is the previous blend, which no formation name can reconstruct.
-    if (!blendScratch) blendScratch = new Float32Array(COUNT * 4);
-    var bn = state.pairB || state.currentName;
-    var b = formationFor(bn) || state.formations.ambient;
-    var db = dustOf(bn);
-    var a = state.fromArr; // always populated: every targA upload mirrors here
-    var t = smooth01(state.mix);
-    for (var i = 0; i < COUNT; i++) {
-      var bw = i >= db ? 1 : 0;
-      blendScratch[i * 4] = a[i * 4] + (b[i * 3] - a[i * 4]) * t;
-      blendScratch[i * 4 + 1] = a[i * 4 + 1] + (b[i * 3 + 1] - a[i * 4 + 1]) * t;
-      blendScratch[i * 4 + 2] = a[i * 4 + 2] + (b[i * 3 + 2] - a[i * 4 + 2]) * t;
-      blendScratch[i * 4 + 3] = a[i * 4 + 3] + (bw - a[i * 4 + 3]) * t;
-    }
-    return blendScratch;
+  // freeze an interrupted morph ON the GPU with the sim's exact per-
+  // particle stagger math: each particle's frozen target equals the target
+  // it was chasing on the previous step. A CPU reconstruction can't do
+  // this — a global blend ignores stagger, and a JS hash replica drifts
+  // from the GLSL float32 hash at large particle ids. Bonus: no CPU
+  // mirror arrays (16 MiB each at 1024²) are needed at all.
+  var FREEZE_FS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uTargA, uTargB;",
+    "uniform float uMix;",
+    "uniform int uN;",
+    "out vec4 o;",
+    "float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }",
+    "void main(){",
+    "  ivec2 c = ivec2(gl_FragCoord.xy);",
+    "  float id = float(c.y * uN + c.x);",
+    "  float r1 = hash11(id * 0.1031 + 0.13);",
+    "  float stag = clamp((uMix - r1 * 0.35) / 0.65, 0.0, 1.0);",
+    "  stag = stag * stag * (3.0 - 2.0 * stag);",
+    "  vec4 a = texelFetch(uTargA, c, 0), b = texelFetch(uTargB, c, 0);",
+    "  o = vec4(mix(a.xyz, b.xyz, stag), mix(a.w, b.w, stag));",
+    "}"
+  ].join("\n");
+  var COPYT_FS = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uT;",
+    "out vec4 o;",
+    "void main(){ o = texelFetch(uT, ivec2(gl_FragCoord.xy), 0); }"
+  ].join("\n");
+  function freezeTargA() {
+    var gl = state.gl;
+    if (!state.freezeProg) state.freezeProg = makeProgram(gl, SIM_VS, FREEZE_FS);
+    if (!state.copyProg) state.copyProg = makeProgram(gl, SIM_VS, COPYT_FS);
+    // one-off scratch per call — interrupts are rare, lifecycle stays simple
+    var scratch = makeStateTex(gl, null);
+    var fb1 = gl.createFramebuffer(), fb2 = gl.createFramebuffer();
+    gl.bindVertexArray(state.vao);
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, N, N);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb1);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, scratch, 0);
+    gl.useProgram(state.freezeProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, state.targA);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, state.targB);
+    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargA"), 0);
+    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uTargB"), 1);
+    gl.uniform1f(gl.getUniformLocation(state.freezeProg, "uMix"), state.mode === "scrub" ? smooth01(state.mix) : state.mix);
+    gl.uniform1i(gl.getUniformLocation(state.freezeProg, "uN"), N);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // scratch → targA (RGBA16F is color-renderable under EXT_color_buffer_float)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb2);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state.targA, 0);
+    gl.useProgram(state.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scratch);
+    gl.uniform1i(gl.getUniformLocation(state.copyProg, "uT"), 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    gl.deleteTexture(scratch);
+    gl.deleteFramebuffer(fb1);
+    gl.deleteFramebuffer(fb2);
   }
   function smooth01(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 
@@ -1089,6 +1127,8 @@
         state.simFbo.forEach(function (f) { if (f) gl.deleteFramebuffer(f); });
         [state.simProg, state.renProg].forEach(function (p) { if (p) gl.deleteProgram(p); });
         [state.progFade, state.progBlur, state.progComp].forEach(function (pr) { if (pr) gl.deleteProgram(pr.p); });
+        if (state.freezeProg) { gl.deleteProgram(state.freezeProg); state.freezeProg = null; }
+        if (state.copyProg) { gl.deleteProgram(state.copyProg); state.copyProg = null; }
         if (state.quadBuf) gl.deleteBuffer(state.quadBuf);
         if (state.vao) gl.deleteVertexArray(state.vao);
         destroyConvChain();
@@ -1154,6 +1194,7 @@
         state.quadBuf = null; state.vao = null;
         state.trailA = null; state.trailB = null; state.glowA = null; state.glowB = null;
         state.conv = null; // reduction chain is also dead-epoch
+        state.freezeProg = null; state.copyProg = null; // ditto freeze passes
         // a restored context also forgets its extensions — re-enable float
         // rendering or RGBA32F FBOs come back incomplete
         if (!state.gl.getExtension("EXT_color_buffer_float")) throw new Error("float render unavailable after restore");

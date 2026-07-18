@@ -155,6 +155,12 @@ async function readyPage(browser, query, opts) {
       // fight the scripted command sequence
       const sf = E.setFormation.bind(E), smp = E.setMorphPair.bind(E);
       E.setFormation = function () {}; E.setMorphPair = function () {};
+      // GPU-backed reference: materialize neural once and save its target
+      // texels — restoration is judged against these, never against status
+      sf('neural', 0.2);
+      E.pause(); E.debugStep(30, 1 / 60); // settle mix deterministically
+      const neuralRef = Array.from(E.debugReadTargets(16).b);
+      sf('logo', 0.2); E.debugStep(30, 1 / 60); E.resume();
       smp('logo', 'grid', 0.3); // pre-loss scrub pair, uploaded
       const lose = document.querySelector('#gl').getContext('webgl2').getExtension('WEBGL_lose_context');
       lose.loseContext();
@@ -164,6 +170,12 @@ async function readyPage(browser, query, opts) {
       lose.restoreContext();
       await new Promise(r2 => setTimeout(r2, 1500));
       const nameAfter = E.status().formation;
+      // the rebuilt textures must CONTAIN neural, not merely claim it
+      const restA = E.debugReadTargets(16).a, restB = E.debugReadTargets(16).b;
+      let refDiff = 0;
+      for (let i = 0; i < neuralRef.length; i++) {
+        refDiff = Math.max(refDiff, Math.abs(restA[i] - neuralRef[i]), Math.abs(restB[i] - neuralRef[i]));
+      }
       // the stale-pair hazard: SAME pair as pre-loss — with the bug the
       // guard skips re-upload and both textures hold 'neural'
       smp('logo', 'grid', 0.7);
@@ -183,9 +195,10 @@ async function readyPage(browser, query, opts) {
       const s = E.debugReadState();
       const conv = Math.hypot(s.positions[8] - tb[8], s.positions[9] - tb[9], s.positions[10] - tb[10]);
       E.resume();
-      return { nameAfter, abDiff, conv };
+      return { nameAfter, refDiff, abDiff, conv };
     });
     check('loss:newest-request-wins', r.nameAfter === 'neural', r.nameAfter);
+    check('loss:restored-textures-hold-newest', r.refDiff < 1e-3, 'maxDiff-vs-neural-ref=' + r.refDiff);
     check('loss:pair-cache-invalidated', r.abDiff > 1.0, 'A↔B maxDiff=' + r.abDiff.toFixed(2));
     check('loss:converges-after-sequence', r.conv < 1.0, 'dist=' + r.conv.toFixed(3));
     await page.close();
@@ -246,19 +259,40 @@ async function readyPage(browser, query, opts) {
       sf('text:AB', 2.5);                    // long morph toward dusty text
       E.debugStep(54, 1 / 60);               // 0.9 sim-s → mix ≈ 0.36
       const midMix = E.status().mix;
-      sf('grid', 1.0);                       // interrupt → targA = frozen blend
-      const dustRegion = E.debugReadTargets(16, 0, 400).a; // overflow indices
+      // per-particle expectation: each particle's frozen target must equal
+      // the STAGGERED blend it was chasing — capture A/B before interrupt
+      const preA = E.debugReadTargets(16, 0, 400).a, preB = E.debugReadTargets(16, 0, 400).b;
+      sf('grid', 1.0);                       // interrupt → targA = GPU freeze
+      const frozen = E.debugReadTargets(16, 0, 400).a; // overflow indices
       E.resume();
-      let minW = 2, maxW = -1, finite = true;
-      for (let i = 0; i < dustRegion.length / 4; i++) {
-        const w = dustRegion[i * 4 + 3];
+      let minW = 2, maxW = -1, finite = true, offSegment = 0, n = frozen.length / 4;
+      for (let i = 0; i < n; i++) {
+        const w = frozen[i * 4 + 3];
         minW = Math.min(minW, w); maxW = Math.max(maxW, w);
-        for (let k = 0; k < 3; k++) if (!Number.isFinite(dustRegion[i * 4 + k])) finite = false;
+        for (let k = 0; k < 3; k++) if (!Number.isFinite(frozen[i * 4 + k])) finite = false;
+        // frozen point must lie on the A→B segment at ITS OWN blend factor:
+        // recover t from the DOMINANT axis (a small-span axis amplifies
+        // 16F quantization into a garbage t) and verify the other axes
+        let bestK = 0, bestSpan = 0;
+        for (const k of [0, 1, 2]) {
+          const span = Math.abs(preB[i * 4 + k] - preA[i * 4 + k]);
+          if (span > bestSpan) { bestSpan = span; bestK = k; }
+        }
+        if (bestSpan < 0.5) continue; // degenerate segment — nothing to verify
+        const t = (frozen[i * 4 + bestK] - preA[i * 4 + bestK]) / (preB[i * 4 + bestK] - preA[i * 4 + bestK]);
+        for (const k of [0, 1, 2]) {
+          if (k === bestK) continue;
+          const exp = preA[i * 4 + k] + (preB[i * 4 + k] - preA[i * 4 + k]) * t;
+          if (Math.abs(frozen[i * 4 + k] - exp) > 0.05) offSegment++;
+        }
       }
-      return { midMix, minW, maxW, finite };
+      return { midMix, minW, maxW, spread: maxW - minW, finite, offSegment, n };
     });
     check('dust:interrupt-mid-morph', r.midMix > 0.05 && r.midMix < 0.95, 'mix=' + r.midMix.toFixed(2));
-    check('dust:factor-blended-not-binary', r.minW > 0.02 && r.maxW < 0.98, 'w∈[' + r.minW.toFixed(2) + ',' + r.maxW.toFixed(2) + ']');
+    // per-particle stagger ⇒ the frozen dust factors VARY (a uniform value
+    // is the fingerprint of a global blend — the previous bug)
+    check('dust:freeze-is-per-particle', r.spread > 0.2, 'w∈[' + r.minW.toFixed(3) + ',' + r.maxW.toFixed(3) + '] spread=' + r.spread.toFixed(3));
+    check('dust:freeze-on-own-segment', r.offSegment === 0, 'off=' + r.offSegment + '/' + r.n * 2);
     check('dust:frozen-blend-finite', r.finite);
     await page.close();
   }
