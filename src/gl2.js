@@ -1079,6 +1079,10 @@
     state.lastT = now;
     state.time = now;
     if (dtMs > 0 && dtMs < 10000) govFrame(dtMs, now);
+    // a demotion inside govFrame destroys the engine mid-frame (found on
+    // real hardware: null-GL crash) — the SAME lifecycle-boundary rule as
+    // resizes applies to every teardown path
+    if (state.destroyed || !state.running || !state.gl) return;
     // a resize destroys and reinitializes the engine — this frame must not
     // touch GL on the far side of that boundary
     if (govMaybeResize(now)) return;
@@ -1194,7 +1198,7 @@
       // Decision logic is exercised via debugGovInject, which calls the
       // SAME production functions; live windowing is validated on real
       // hardware, where ?debug=1 is never present.
-      liveOff: DEBUG,
+      liveOff: DEBUG && !/[?&]govlive=1/.test(location.search),
       rung: 0, sizeIdx: BASE_IDX,
       frames: [], recent: [], winStart: 0,
       good: 0, cool: 0, invalid: false,

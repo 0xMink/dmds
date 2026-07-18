@@ -538,6 +538,22 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
+  // ── 16. LIVE-path demotion end-to-end (the real-hardware crash repro):
+  //       SwiftShader's genuinely slow frames drive the LIVE collector
+  //       down the whole ladder to demotion — with zero page errors ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govlive=1');
+    // walk happens on its own: warm-up → emergencies/windows → rungs →
+    // sizes (idle-deferred) → post off → demote → tier 2 boots
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady && window.DMDS_GL.isReady(), { timeout: 300000 });
+    const r = await page.evaluate(() => window.DMDS_GL.status());
+    const crash = page.errs.filter(e => /bindVertexArray|null/.test(e));
+    check('live:demotes-cleanly-to-tier2', r.tier === 'gl1' && r.running === true, JSON.stringify(r));
+    check('live:no-mid-frame-lifecycle-crash', crash.length === 0, crash.join('; '));
+    check('live:no-page-errors-at-all', page.errs.length === 0, page.errs.join('; '));
+    await page.close();
+  }
+
   await browser.close();
   const pass = results.every(r => r.ok);
   results.forEach(r => console.log((r.ok ? '  ok  ' : '  FAIL'), r.name, r.detail));

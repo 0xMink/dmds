@@ -164,3 +164,35 @@ Full regression: M1 59/59, M2 55/55, M3 35/35 — **202 checks**.
    suspend-gap invalidation + staged async transaction races → part 2.
 
 Full regression: M1 59/59, M2 55/55, M3 35/35 — **218 checks**.
+
+## Real-hardware incident (Dennis, 2026-07-18) — 3 fixes
+
+Console evidence from Dennis's machine: governor walked the full ladder
+and demoted; a null-GL crash fired mid-frame; tier 2 then oscillated
+42000↔21000↔10500 indefinitely.
+
+- **Bug #22 — mid-frame demotion crash**: govDemote fires inside
+  govFrame inside frame(); destroy() nulls the GL handle and the SAME
+  frame continued into simStep. The lifecycle-boundary rule now covers
+  every teardown path (frame returns if destroyed/stopped/GL-less
+  after govFrame). Reproduced and fixed via a new LIVE-path test:
+  `?govlive=1` lets SwiftShader's genuinely slow frames drive the real
+  collector down the entire ladder to demotion — tier 2 boots with
+  zero page errors (this also closes part of the "live windowing is
+  hardware-only" gap).
+- **Bug #23 — tier-2 governor oscillation** (shipped since v2, first
+  machine to straddle the hysteresis gap): a drop within 12s of a
+  restore now locks the budget at the stable lower value instead of
+  pulsing forever.
+- The demotion itself may have been CORRECT for the machine's state at
+  the time (see open question): the same machine did 70–80fps at 512²
+  the previous day. Prime suspect: Windows dual-GPU power policy
+  (battery → iGPU). Tier-2 also failing 40fps at 42k supports
+  "machine genuinely slow right now" over "governor misjudged".
+
+Open question for Dennis: was the laptop on battery / power-saver?
+Retest plugged in. If the discrete GPU returns, the governor should
+hold full quality (and promote) — that comparison is the promotion-
+default datapoint.
+
+Suite: 69 → 72 checks; regression M1 59/59, M2 55/55, M3 35/35 — 221.

@@ -602,12 +602,20 @@
       state.govT = now;
       if (state.fps < 40 && state.drawCount > COUNT / 4) {
         state.govGood = 0;
+        // a drop soon after a restore = the machine straddles the
+        // hysteresis gap; lock at the stable lower budget rather than
+        // pulsing between the two forever
+        if (state.govRestoredAt && now - state.govRestoredAt < 12) {
+          state.govLocked = true;
+          if (window.console) console.info("[DMDS] governor: oscillation detected — locking budget");
+        }
         state.drawCount = Math.floor(state.drawCount / 2);
         if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
       } else if (state.fps > 56 && state.drawCount < COUNT) {
         state.govGood++;
         if (state.govGood >= 2) {
           state.govGood = 0;
+          state.govRestoredAt = now;
           state.drawCount = Math.min(COUNT, state.drawCount * 2);
           if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
         }
