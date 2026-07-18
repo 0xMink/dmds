@@ -233,9 +233,10 @@ Suite: 69 → 72 checks; regression M1 59/59, M2 55/55, M3 35/35 — 221.
 3. **Full four-suite regression rerun after changing both engines**
    (the review's own founding-rule citation, accepted):
    M1 59/59 · M2 55/55 · M3 35/35 · M4 88/88 — **237 checks**.
-4. **Budget tripwire re-tightened**: WARN at 352/160 KB near current
-   size (currently warns at 321 KB — growth must be explained), hard
-   FAIL at the spec ceiling 512/280.
+4. **Budget tripwire re-tightened**: WARN at 352/160 KB — the current
+   321/130 KB build sits 31 KB under the warning line, so ~30 KB of
+   unexplained growth trips it — hard FAIL at the spec ceiling
+   512/280.
 5. **`?telemetry=1` read-only mode**: exposes debugGov/debugGovHistory
    with ZERO behavior change (live governor runs exactly as
    production; no fault hooks, no readbacks). Hardware retests use
