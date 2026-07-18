@@ -554,7 +554,12 @@ const LIFECYCLE_INSTRUMENTS = () => {
     await page.waitForFunction(() => window.DMDS_GL2 && window.DMDS_GL2.isReady(), { timeout: 60000 });
     await page.waitForTimeout(25000);
     const excite = await page.evaluate(() => window.DMDS_GL2.status().excite);
-    await page.screenshot({ path: path.join(__dirname, 'm1-settled.png') });
+    // run ARTIFACT, not tracked evidence: writing to a tracked path made
+    // every M1 run dirty the tree, poisoning later suites' provenance in
+    // the run manifest. The committed tests/m1-settled.png stays as the
+    // frozen M1-milestone capture; per-run captures land in gitignored logs/
+    fs.mkdirSync(path.join(__dirname, 'logs'), { recursive: true });
+    await page.screenshot({ path: path.join(__dirname, 'logs', 'm1-settled.png') });
     check('visual:settled-capture', excite < 0.1, 'excite=' + excite);
     await page.close();
   }

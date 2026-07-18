@@ -1,0 +1,18 @@
+== env preamble ==
+Sat Jul 18 12:14:58 UTC 2026
+ 12:14:58 up 15:46,  3 users,  load average: 1.29, 3.01, 3.57
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi       1.7Gi        13Gi       0.0Ki       813Mi        14Gi
+Swap:         8.0Gi       1.2Gi       6.8Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 1  0 1310376 14187836      0 832688    2   22   241   139   11   32  9  0 91  0  0
+ 0  0 1310376 14187352      0 832688    0    0     0    20 4351 25025  8  0 92  0  0
+ 2  0 1310376 14187152      0 832688    0    0     4   324 4247 29519 12  0 88  0  0
+ 4537 S     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+commit: 3dd86dfb00ec142922d1896a83fa342e0cbf6edc dirty: false
+== suite: fail-fixture ==
+  FAIL fixture:always-fails simulated assertion
+FIXTURE: FAIL
+exit=1
