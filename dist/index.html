@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-WRMXXWecAuUoULgVGzu9K62gyw5IlxFNWiv1t9EgnZs=' 'sha256-cJScwKze4NTlr4ZVEG3knf30pEW8AEpao3SIaOMEre0=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-6UWdyP+iqtnQNsrGAZJGIt708voAIRr203Nc5+e0RYQ=' 'sha256-fLFxF9ulhP79Tm50j9o2CvriD1gegjp4YD1sgIBIZnU=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="e12fa9a 2026-07-18T07:31:07Z">
+<meta name="dmds-build" content="9cd0818 2026-07-18T07:54:57Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2528,6 +2528,17 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       pendingResize: null, trialFailed: {}, demoted: false
     };
   }
+  function govLog(event, extra) {
+    // trajectory ring (always recorded, ~120 entries, exposed under
+    // debug): the final state says "512²"; the path says it tried 768²
+    // three times and spent half the run in cooldown
+    var g = state.gov;
+    if (!g.history) g.history = [];
+    var e = { t: Math.round(state.time * 10) / 10, event: event, rung: g.rung, n: SIZES[g.sizeIdx], post: state.post };
+    if (extra) for (var k in extra) e[k] = extra[k];
+    g.history.push(e);
+    if (g.history.length > 120) g.history.shift();
+  }
   function applyRung(r) {
     var g = state.gov;
     g.rung = r;
@@ -2541,6 +2552,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     else if (state.progFade && !MOBILE && !SAVEDATA) state.post = true;
     if (state.post) { try { allocPostTargets(); } catch (e) { state.post = false; } }
     resize(); // re-evaluates the DPR cap for rung 3
+    govLog("rung", { to: r });
     if (window.console) console.info("[DMDS] governor: quality rung -> " + r + (state.post ? "" : " (post off)"));
   }
   function govTrialAlloc(n) {
@@ -2568,12 +2580,14 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     g.pendingResize = { idx: idx, dir: dir };
     g.cool = state.time + 5;
     g.invalid = true;
+    govLog("resize-request", { dir: dir, to: SIZES[idx] });
     if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[idx] + "^2 (" + dir + ", deferred until idle)");
   }
   function govDemote() {
     var g = state.gov;
     if (g.demoted) return;
     g.demoted = true;
+    govLog("demote");
     if (window.console) console.warn("[DMDS] governor: tier 1 cannot hold frame rate at the floor -> demoting to tier 2");
     if (state.onDemote) state.onDemote();
   }
@@ -2619,7 +2633,8 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   // both call this, so tests exercise production decision logic
   function govEvaluate(p90, fast) {
     var g = state.gov;
-    if (state.time < g.cool) return "cooldown";
+    if (state.time < g.cool) { govLog("window", { p90: Math.round(p90 * 10) / 10, action: "cooldown" }); return "cooldown"; }
+    govLog("window", { p90: Math.round(p90 * 10) / 10, action: p90 > 25 ? "bad" : p90 < 17.9 ? "good" : "hold" });
     if (p90 > 25) {
       g.good = 0; g.mid = 0;
       govDegradeOnce();
@@ -2643,6 +2658,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
   function govEmergency() {
     var g = state.gov;
     if (state.time < g.cool) return "cooldown";
+    govLog("emergency");
     govDegradeOnce();
     govDegradeOnce();
     g.good = 0;
@@ -2727,12 +2743,14 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     }
     return attempt(idx).then(function () {
       g.txn = { phase: "idle", last: "committed", from: SIZES[oldIdx], to: SIZES[idx] };
+      govLog("resize-commit", { from: SIZES[oldIdx], to: SIZES[idx] });
     }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
       g.trialFailed[SIZES[idx]] = true;
       g.txn = { phase: "rolling-back", from: SIZES[oldIdx], to: SIZES[idx] };
       return attempt(oldIdx).then(function () {
         g.txn = { phase: "idle", last: "rolled-back", from: SIZES[oldIdx], to: SIZES[idx] };
+        govLog("resize-rollback", { failed: SIZES[idx], back: SIZES[oldIdx] });
       }, function (e2) {
         if (window.console) console.warn("[DMDS] rollback failed -> demoting:", e2 && e2.message);
         g.txn = { phase: "idle", last: "demoted", from: SIZES[oldIdx], to: SIZES[idx] };
@@ -3370,6 +3388,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       try { govFrame(dtMs, nowSec); }
       finally { g.liveOff = saved; state.time = savedTime; }
     },
+    debugGovHistory: function () {
+      if (!DEBUG) throw new Error("debugGovHistory requires ?debug=1");
+      return (state.gov.history || []).slice();
+    },
     debugGovInject: function (frameMs, opts) {
       // drives the SAME production evaluation/emergency functions the
       // frame loop uses — tests exercise real decision logic
@@ -3961,6 +3983,39 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 
   function easeCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
+  // oscillation lock with PRECISE cycle identity: only the SAME
+  // high→low reversal, repeated within a bounded window after restores,
+  // grants the lower budget tenure — a transient drop, or an unrelated
+  // lower step, never locks. Suspicion decays after 40s without repeat.
+  function govTick(now, fps) {
+    if (state.govSuspect && now - state.govSuspectT > 40) state.govSuspect = null;
+    if (fps < 40 && state.drawCount > COUNT / 4) {
+      state.govGood = 0;
+      var high = state.drawCount;
+      if (state.govRestoredAt && now - state.govRestoredAt < 12) {
+        if (state.govSuspect === high) {
+          state.govLocked = true;
+          if (window.console) console.info("[DMDS] governor: repeated " + high + "\u2194" + Math.floor(high / 2) + " oscillation \u2014 locking budget (re-armed on tab revisit)");
+        } else {
+          state.govSuspect = high;
+          state.govSuspectT = now;
+        }
+      }
+      state.drawCount = Math.floor(state.drawCount / 2);
+      if (window.console) console.info("[DMDS] governor: particle budget \u2192 " + state.drawCount);
+    } else if (fps > 56 && state.drawCount < COUNT) {
+      state.govGood++;
+      if (state.govGood >= 2) {
+        state.govGood = 0;
+        state.govRestoredAt = now;
+        state.drawCount = Math.min(COUNT, state.drawCount * 2);
+        if (window.console) console.info("[DMDS] governor: particle budget \u2192 " + state.drawCount);
+      }
+    } else {
+      state.govGood = 0;
+    }
+  }
+
   function frame(now) {
     if (!state.running) return;
     state.raf = requestAnimationFrame(frame);
@@ -3988,37 +4043,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     var ry = REDUCED ? 0 : Math.sin(now * 0.07) * 0.09 + state.mouse.x * 0.05;
     var rx = REDUCED ? 0 : Math.sin(now * 0.05) * 0.04 + state.mouse.y * 0.035;
 
-    // adaptive quality governor: protect frame rate before aesthetics.
-    // drops immediately on a slow window; restores only after two
-    // consecutive fast windows so it can't oscillate at a tier boundary
+    // adaptive quality governor: protect frame rate before aesthetics
     if (!state.govLocked && now - state.govT > 2 && state.fpsT > 3) {
       state.govT = now;
-      if (state.fps < 40 && state.drawCount > COUNT / 4) {
-        state.govGood = 0;
-        // a drop soon after a restore is ONE oscillation event; locking on
-        // the first could mistake a transient (background task, thermal
-        // blip) for a stable hysteresis conflict — require the cycle to
-        // repeat before granting the lower budget tenure
-        if (state.govRestoredAt && now - state.govRestoredAt < 12) {
-          state.govOsc = (state.govOsc || 0) + 1;
-          if (state.govOsc >= 2) {
-            state.govLocked = true;
-            if (window.console) console.info("[DMDS] governor: repeated oscillation — locking budget (returns on tab revisit)");
-          }
-        }
-        state.drawCount = Math.floor(state.drawCount / 2);
-        if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
-      } else if (state.fps > 56 && state.drawCount < COUNT) {
-        state.govGood++;
-        if (state.govGood >= 2) {
-          state.govGood = 0;
-          state.govRestoredAt = now;
-          state.drawCount = Math.min(COUNT, state.drawCount * 2);
-          if (window.console) console.info("[DMDS] governor: particle budget → " + state.drawCount);
-        }
-      } else {
-        state.govGood = 0;
-      }
+      govTick(now, state.fps);
     }
 
     function drawPoints() {
@@ -4254,7 +4282,8 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
           // the conditions that caused an oscillation lock may be gone
           if (state.govLocked) {
             state.govLocked = false;
-            state.govOsc = 0;
+            state.govSuspect = null;
+            state.govGood = 0; // fresh evidence required before restoring
             if (window.console) console.info("[DMDS] governor: budget lock released on tab revisit");
           } state.running = true; state.lastT = performance.now() * 0.001; requestAnimationFrame(frame); }
       });
@@ -4284,9 +4313,16 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     state.gl = null;
   }
 
+  var DEBUG = /[?&]debug=1/.test(location.search);
+
   window.DMDS_GL = {
     init: init,
     destroy: destroy,
+    debugGovTick: function (fps, nowSec) {
+      if (!DEBUG) throw new Error("debugGovTick requires ?debug=1");
+      govTick(nowSec, fps);
+      return { drawCount: state.drawCount, locked: !!state.govLocked, suspect: state.govSuspect || null, good: state.govGood };
+    },
     setFormation: function (n, dur) { setFormation(n, false, dur); },
     setMorphPair: setMorphPair,
     setDim: function (v) { state.dimTarget = v; },
@@ -5147,4 +5183,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build e12fa9a 2026-07-18T07:31:07Z -->
+<!-- dmds build 9cd0818 2026-07-18T07:54:57Z -->
