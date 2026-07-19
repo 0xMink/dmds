@@ -17,9 +17,19 @@
 #     never a traceback
 # The attestation (schema 4) records attest_sha256 — the hash of THIS
 # script, i.e. the exact verifier that performed the proof (the output
-# file is not hashed into itself, so no self-reference loop). Issuance
-# is atomic (tmp + fsync + rename): a refusal or crash NEVER creates,
-# replaces, or truncates an existing standing attestation.
+# file is not hashed into itself, so no self-reference loop).
+# Snapshot stability: every attested input (manifest bytes, dist,
+# runner, evidence objects, this script) is fingerprinted before the
+# expensive verification phase and revalidated under the issuance
+# lock — with a SECOND fetch of the serving boundary — so a
+# certificate is never issued over observations that went stale while
+# they were being verified. Issuance is serialized (flock), uses a
+# unique tmp + file/dir fsync + atomic rename, and is resistant to
+# partial-file corruption: after any interruption the standing path
+# contains either the old complete certificate or the new complete
+# certificate — a refusal never creates, replaces, or truncates it.
+# (Directory fsync/flock are Linux-appropriate; portability would
+# need platform handling.)
 #   - unverified serving boundary: HTTP verification is REQUIRED — the
 #     bytes the server returns must equal the attested bytes. Pass
 #     --no-http to explicitly produce a disk-only attestation
@@ -44,8 +54,9 @@ if [ "$require_http" -eq 1 ]; then
 else
   echo "NOTE: --no-http — producing a DISK-ONLY attestation (serving boundary not verified)"
 fi
-HTTP_SHA="$http_sha" REQUIRE_HTTP="$require_http" ATTEST_BEFORE="$attest_before" python3 - <<'PY'
-import fcntl, gzip, hashlib, json, os, sys, tempfile, zlib
+HTTP_SHA="$http_sha" REQUIRE_HTTP="$require_http" ATTEST_BEFORE="$attest_before" \
+ATTEST_URL="$url" ATTEST_HOLD="${DMDS_ATTEST_HOLD_SECONDS:-}" python3 - <<'PY'
+import fcntl, gzip, hashlib, json, os, sys, tempfile, time, urllib.request, zlib
 def sha_file(p):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -60,8 +71,9 @@ EXPECTED = [("m1-core", 59), ("m2-grab", 55), ("m3-depth", 35), ("m4-governor", 
 # below indexes into these entries, so malformed input must be refused
 # here, in-band, rather than surfacing as JSONDecodeError/KeyError
 try:
-    with open("tests/run-manifest.jsonl", encoding="utf-8") as f:
-        ledger = [json.loads(l) for l in f]
+    with open("tests/run-manifest.jsonl", "rb") as f:
+        raw_ledger = f.read()
+    ledger = [json.loads(l) for l in raw_ledger.decode("utf-8").splitlines()]
 except (OSError, ValueError) as exc:
     refuse("ledger malformed: %s" % type(exc).__name__)
 if not ledger:
@@ -91,6 +103,20 @@ for e in entries:
             refuse("ledger malformed: entry missing %s" % k)
         if not well_typed(e[k], t):
             refuse("ledger malformed: %s has wrong type" % k)
+for req in ("dist/index.html", "tests/run.sh"):
+    if not os.path.isfile(req):
+        refuse("required file missing: %s" % req)
+# input snapshot: fingerprint everything this certificate will vouch
+# for BEFORE the expensive verification phase; revalidated under the
+# issuance lock so stale observations can never be certified
+def sha_maybe(p):
+    return sha_file(p) if p and os.path.isfile(p) else "missing:%s" % p
+def snapshot(manifest_sha):
+    parts = [manifest_sha, sha_maybe("dist/index.html"),
+             sha_maybe("tests/run.sh"), sha_maybe("tests/attest.sh")]
+    parts += [sha_maybe(e.get("evidence_path") or "") for e in entries]
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+snap0 = snapshot(hashlib.sha256(raw_ledger).hexdigest())
 dist = sha_file("dist/index.html")
 runner = sha_file("tests/run.sh")
 problems = []
@@ -143,10 +169,6 @@ if os.environ.get("REQUIRE_HTTP") == "1" and http_sha != dist:
 if problems:
     print("ATTESTATION REFUSED: " + "; ".join(problems))
     sys.exit(1)
-# the verifier's tree_stable: refuse if this script's bytes changed
-# between the pre-hash and issuance
-if sha_file("tests/attest.sh") != os.environ["ATTEST_BEFORE"]:
-    refuse("verifier changed during attestation")
 att = {
     "schema": 4,
     "attest_sha256": os.environ["ATTEST_BEFORE"],
@@ -161,11 +183,38 @@ att = {
 }
 # atomic, serialized issuance: an exclusive lock plus a UNIQUE tmp
 # file (a fixed tmp name lets two concurrent verifiers write through
-# each other's inode), fsync of file AND directory — a crash or a
-# racing verifier must never leave a truncated or post-replacement-
-# mutated certificate where a valid standing one used to be
+# each other's inode), fsync of file AND directory. Resistant to
+# partial-file corruption: after any interruption the standing path
+# holds either the old complete certificate or the new complete one.
+# ALL final stability checks happen AFTER acquiring the lock, so a
+# writer queued behind another verifier must revalidate its
+# conclusions before it may replace the certificate.
 with open("tests/attestation.lock", "w") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
+    # test-only delay seam: can only stall issuance (widening the
+    # window the checks below must then survive) — it cannot bypass
+    # or weaken any validation
+    try:
+        hold = float(os.environ.get("ATTEST_HOLD") or 0)
+    except ValueError:
+        hold = 0.0
+    if hold > 0:
+        time.sleep(hold)
+    # the verifier's own bytes: the certificate must name what RAN
+    if sha_file("tests/attest.sh") != os.environ["ATTEST_BEFORE"]:
+        refuse("verifier changed during attestation")
+    # every attested input, re-fingerprinted under the lock
+    if snapshot(sha_maybe("tests/run-manifest.jsonl")) != snap0:
+        refuse("attested inputs changed during verification")
+    # the serving boundary can change independently of the disk:
+    # fetch it a second time immediately before replacement
+    if os.environ.get("REQUIRE_HTTP") == "1":
+        try:
+            body = urllib.request.urlopen(os.environ["ATTEST_URL"], timeout=5).read()
+        except Exception:
+            refuse("HTTP boundary changed during attestation")
+        if hashlib.sha256(body).hexdigest() != dist:
+            refuse("HTTP boundary changed during attestation")
     fd, tmp = tempfile.mkstemp(prefix=".attestation.", suffix=".tmp", dir="tests")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:

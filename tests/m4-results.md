@@ -954,3 +954,54 @@ run_ids 33–36, source fb69476, dist = http = 28507038….
 Suite: **ATTEST ACCEPTANCE: PASS (30 cases)** — every refusal
 banner-carrying, traceback-free, standing-certificate-preserving,
 tmp-litter-free.
+
+## Round 15 — snapshot stability: nothing may change while everyone is busy proving nothing changed (2026-07-19)
+
+Five findings, all adopted; items 1–3 are one design completed: the
+verifier had byte-stability for itself (round 14) but not for the
+objects it vouches for, and the lock serialized the write but not the
+conclusions behind it.
+
+**1–3. Input snapshot + revalidation under the lock.** Every attested
+input — manifest bytes (hashed from the exact bytes that were
+parsed), dist, runner, evidence objects, the verifier itself — is
+fingerprinted BEFORE the expensive verification phase and
+re-fingerprinted AFTER acquiring the issuance lock; mismatch →
+"attested inputs changed during verification". The serving boundary
+is fetched a SECOND time under the lock (it can change independently
+of the disk) → "HTTP boundary changed during attestation". The
+verifier's own ATTEST_BEFORE comparison moved under the lock, closing
+its check-to-replace window. A writer queued behind another verifier
+must revalidate everything before it may replace the certificate.
+
+**5. The races are now deterministically injected** via a delay-only
+seam (DMDS_ATTEST_HOLD_SECONDS: it can stall issuance — widening the
+window the checks must survive — but cannot bypass validation).
+Case 31: dist mutated while the lock is held → snapshot refusal,
+even though the semantic dist check had already passed. Case 32:
+served bytes swapped mid-attestation with the disk untouched — only
+the second fetch can catch it, and it does. Case 33: holder A stalls
+in the lock while B attests concurrently; both succeed, B is proven
+to QUEUE (elapsed-time floor), and the final certificate is one
+complete expected document, litter-free. Counterfactual note: these
+cases have no pre-patch discriminating run — the old verifier lacked
+the seam, so its windows existed but could not be held open; the
+protection is proven forward, not retro-demonstrated.
+
+**4. Crash-safety wording narrowed** to what is actually guaranteed:
+issuance is atomic and resistant to partial-file corruption — after
+any interruption the standing path holds either the old complete
+certificate or the new complete one. No claim that every failed
+invocation leaves the OLD one (a crash between rename and directory
+fsync may durably surface either). Linux-specificity of
+O_DIRECTORY-fsync/flock noted in the header.
+
+**Bonus gap found while building the snapshot: missing dist or runner
+TRACEBACKED.** sha_file raised FileNotFoundError uncaught —
+counterfactual vs pre-patch: exit 1, one Traceback, zero banners.
+Now refused in-band ("required file missing: …"), cases 34–35.
+
+Standing release re-issued: attest_sha256 = 6344d979… (verified
+against on-disk script), all else unchanged — same batch, run_ids
+33–36, source fb69476, dist = http = 28507038….
+Suite: **ATTEST ACCEPTANCE: PASS (35 cases)**.

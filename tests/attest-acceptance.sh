@@ -300,4 +300,64 @@ fresh
 if out="$(DMDS_ATTEST_BEFORE_OVERRIDE="$(printf '%064d' 0)" "$R/tests/attest.sh" --no-http 2>&1)"; then rc=0; else rc=$?; fi
 refused "verifier changed during attestation" "verifier-unstable"
 
-echo "ATTEST ACCEPTANCE: PASS (30 cases — positive control atomically replaces the sentinel and is byte-identical to the committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete/empty ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, bool-as-int exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner, malformed ledger [not-json/non-object/missing-key/wrong-type/unreadable], verifier-unstable; EVERY refusal asserted banner-carrying, traceback-free, standing-certificate-preserving, and tmp-litter-free)"
+# 31. attested inputs change DURING verification: dist mutated while
+#     the verifier holds the issuance lock (delay seam) — the
+#     under-lock snapshot revalidation must refuse, even though the
+#     semantic dist check passed before the mutation
+fresh
+( sleep 1; printf ' ' >> "$R/dist/index.html" ) &
+mut_pid=$!
+if out="$(DMDS_ATTEST_HOLD_SECONDS=3 "$R/tests/attest.sh" --no-http 2>&1)"; then rc=0; else rc=$?; fi
+wait "$mut_pid" || true
+refused "attested inputs changed during verification" "inputs-changed-mid-attest"
+
+# 32. serving boundary changes DURING attestation, disk untouched:
+#     first fetch passed, files stable — only the second fetch under
+#     the lock can catch it
+fresh
+cp dist/index.html "$SCRATCH/mut.html"
+( sleep 1; printf 'changed mid-attestation\n' > "$SCRATCH/mut.html" ) &
+mut_pid=$!
+if out="$(DMDS_ATTEST_HOLD_SECONDS=3 DMDS_HTTP_URL="http://127.0.0.1:$port/mut.html" "$R/tests/attest.sh" 2>&1)"; then rc=0; else rc=$?; fi
+wait "$mut_pid" || true
+refused "HTTP boundary changed during attestation" "http-changed-mid-attest"
+
+# 33. concurrent writers serialize: A holds the issuance lock (delay
+#     seam) while B runs the same attestation. Both must succeed, B
+#     must demonstrably QUEUE (elapsed >= lock-hold remainder), and
+#     the final certificate must be one complete expected document —
+#     never a mixture, never litter
+fresh
+run_attest --no-http
+[ "$rc" -eq 0 ] || fail "concurrency: reference attestation failed — $out"
+cp "$R/tests/attestation.json" "$SCRATCH/reference.json"
+printf 'old-attestation-sentinel\n' > "$R/tests/attestation.json"
+DMDS_ATTEST_HOLD_SECONDS=3 "$R/tests/attest.sh" --no-http > "$SCRATCH/A.out" 2>&1 &
+a_pid=$!
+sleep 1
+b_start="$(date +%s)"
+"$R/tests/attest.sh" --no-http > "$SCRATCH/B.out" 2>&1 &
+b_pid=$!
+if wait "$a_pid"; then a_rc=0; else a_rc=$?; fi
+if wait "$b_pid"; then b_rc=0; else b_rc=$?; fi
+b_elapsed=$(( $(date +%s) - b_start ))
+[ "$a_rc" -eq 0 ] || fail "concurrency: holder exited $a_rc — $(cat "$SCRATCH/A.out")"
+[ "$b_rc" -eq 0 ] || fail "concurrency: queued writer exited $b_rc — $(cat "$SCRATCH/B.out")"
+grep -q '^ATTESTED: ' "$SCRATCH/A.out" || fail "concurrency: holder did not attest"
+grep -q '^ATTESTED: ' "$SCRATCH/B.out" || fail "concurrency: queued writer did not attest"
+[ "$b_elapsed" -ge 1 ] || fail "concurrency: B finished in ${b_elapsed}s — it did not queue behind A's lock"
+diff -q "$R/tests/attestation.json" "$SCRATCH/reference.json" >/dev/null \
+  || fail "concurrency: final certificate is not one complete expected document"
+no_tmp_litter "concurrency"
+
+# 34. missing dist must refuse in-band, not traceback
+fresh; rm "$R/dist/index.html"
+run_attest --no-http
+refused "required file missing: dist/index.html" "dist-missing"
+
+# 35. missing runner must refuse in-band, not traceback
+fresh; rm "$R/tests/run.sh"
+run_attest --no-http
+refused "required file missing: tests/run.sh" "runner-missing"
+
+echo "ATTEST ACCEPTANCE: PASS (35 cases — positive control atomically replaces the sentinel and is byte-identical to the committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete/empty ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, bool-as-int exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner, malformed ledger [not-json/non-object/missing-key/wrong-type/unreadable], verifier-unstable, inputs-changed-mid-attest, http-changed-mid-attest, missing dist/runner; concurrent writers serialize at the issuance lock into one complete certificate; EVERY refusal asserted banner-carrying, traceback-free, standing-certificate-preserving, and tmp-litter-free)"
