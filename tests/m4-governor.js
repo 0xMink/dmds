@@ -1137,6 +1137,69 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
+  // ── 23c. duress side-selection, strictly-destination case: mix 0.75
+  //        reseeds at the DESTINATION — "both sides plus tie" is now
+  //        literally true instead of mathematically adjacent to true ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {};
+      E.setMorphPair('logo', 'device', 0.75);              // destination side
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      E.debugGovInject(BAD); E.debugGovInject(BAD);        // request + force
+      let settled = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r2 => setTimeout(r2, 500));
+        const s = E.status();
+        if (s.count === 1024 && s.mix === 1) { settled = s.formation; break; }
+      }
+      return { settled };
+    }, [BAD]);
+    check('force:mix-above-half-reseeds-at-destination', r.settled === 'device', 'formation=' + r.settled);
+    await page.close();
+  }
+
+  // ── 22g. full decision consequence through the REAL collector: a
+  //        contaminated bad window degrades but contributes NO strike —
+  //        proven by the lock arriving exactly two CLEAN bounces later ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(async ([BAD, GOOD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {};
+      E.debugGovInject(null, { allocFail: 128 });          // no promotion noise
+      const HOLD = Array(70).fill(20);
+      E.debugGovInject(BAD); E.debugGovInject(BAD);        // → rung 2
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);      // → rung 1 (trial recorded)
+      // hold a REAL grab, then a contaminated BAD window through the
+      // production collector (30ms frames while grab.active)
+      window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 720, clientY: 396, button: 0, pointerType: 'mouse' }));
+      await new Promise(r2 => setTimeout(r2, 800));
+      let t = 2000;
+      E.debugGovFrame(30, t);                               // stale window flushes invalid
+      for (let i = 0; i < 160; i++) { t += 0.08; E.debugGovFrame(30, t); }
+      const afterDirtyBad = { rung: E.debugGov().rung, lockAt: E.debugGov().rungLockAt };
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'mouse' }));
+      // one CLEAN bounce: if the contaminated window had counted, THIS
+      // would be strike 2 and lock — it must be strike 1
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);      // → rung 1
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);      // → rung 2
+      const afterOneClean = E.debugGov().rungLockAt;
+      // second clean bounce → lock (counting itself still works)
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);
+      const locked = E.debugGov().rungLockAt;
+      return { afterDirtyBad, afterOneClean, locked };
+    }, [BAD, GOOD]);
+    check('collector:contaminated-bad-degrades-without-strike',
+      r.afterDirtyBad.rung === 2 && r.afterDirtyBad.lockAt === 0, JSON.stringify(r.afterDirtyBad));
+    check('collector:one-clean-bounce-later-still-no-lock', r.afterOneClean === 0, 'lockAt=' + r.afterOneClean);
+    check('collector:second-clean-bounce-locks', r.locked === 2, 'lockAt=' + r.locked);
+    await page.close();
+  }
+
   // ── 21. ?telemetry=1 differential: measured evidence for "zero behavior
   //        change" — identical production config at ready-instant, read
   //        paths open, write/instrument paths closed, live governor armed ──
