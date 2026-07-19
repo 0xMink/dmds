@@ -1,4 +1,5 @@
 {
+ "attest_sha256": "00771c3e97e3aa49ff3b74adfac533ff488efed5391d00efc7d2a0c8620c0a0e",
  "batch": "20260719T053200.537652487-65471",
  "dist_sha256": "28507038432d353d844c8c7da93ea9b519637ce22df3e9e13f6acc291aeae225",
  "http_sha256": "28507038432d353d844c8c7da93ea9b519637ce22df3e9e13f6acc291aeae225",
@@ -9,7 +10,7 @@
   36
  ],
  "runner_sha256": "13795190787954d218cba865a1040f30b19c905ab2b529b3c9aa5017ce7b864b",
- "schema": 3,
+ "schema": 4,
  "source_commit": "fb69476b16929630f9e9266446f078f2753ba57c",
  "suites": {
   "m1-core": 59,

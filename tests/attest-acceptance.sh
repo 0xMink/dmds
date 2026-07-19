@@ -237,4 +237,43 @@ fresh; printf '# tampered\n' >> "$R/tests/run.sh"
 run_attest --no-http
 refused "used a different runner" "runner-changed"
 
-echo "ATTEST ACCEPTANCE: PASS (22 cases — positive control byte-identical to committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner; no refusal wrote an attestation or leaked a traceback)"
+# 23. the PRODUCTION invariant: a refusal never creates OR REPLACES a
+#     standing attestation — "present" must never be mistaken for
+#     "fresh" just because a later attempt failed
+fresh
+printf 'old-attestation-sentinel\n' > "$R/tests/attestation.json"
+before="$(sha256sum "$R/tests/attestation.json" | cut -d' ' -f1)"
+mutate_ledger 'ls[-1]["dirty"] = True'
+run_attest --no-http
+[ "$rc" -eq 1 ] || fail "standing-attestation: expected refusal, got $rc — $out"
+printf '%s' "$out" | grep -q "ATTESTATION REFUSED" || fail "standing-attestation: banner missing — $out"
+after="$(sha256sum "$R/tests/attestation.json" | cut -d' ' -f1)"
+[ "$before" = "$after" ] || fail "standing-attestation: refusal modified the standing attestation"
+[ ! -f "$R/tests/attestation.json.tmp" ] || fail "standing-attestation: refusal left a tmp file behind"
+
+# 24. malformed ledger: unparseable JSON line
+fresh; printf 'this is not json\n' >> "$R/tests/run-manifest.jsonl"
+run_attest --no-http
+refused "ledger malformed: JSONDecodeError" "ledger-not-json"
+
+# 25. malformed ledger: valid JSON that is not an object
+fresh; printf '[1, 2, 3]\n' >> "$R/tests/run-manifest.jsonl"
+run_attest --no-http
+refused "ledger malformed: non-object entry" "ledger-non-object"
+
+# 26. malformed ledger: required key missing
+fresh; mutate_ledger 'del ls[-1]["checks"]'
+run_attest --no-http
+refused "ledger malformed: entry missing checks" "ledger-missing-key"
+
+# 27. malformed ledger: wrong field type
+fresh; mutate_ledger 'ls[-1]["dirty"] = "false"'
+run_attest --no-http
+refused "ledger malformed: dirty has wrong type" "ledger-wrong-type"
+
+# 28. unreadable manifest
+fresh; rm "$R/tests/run-manifest.jsonl"
+run_attest --no-http
+refused "ledger malformed: FileNotFoundError" "ledger-unreadable"
+
+echo "ATTEST ACCEPTANCE: PASS (28 cases — positive control byte-identical to committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner, standing-attestation preserved across refusal, malformed ledger [not-json/non-object/missing-key/wrong-type/unreadable]; no refusal wrote or replaced an attestation or leaked a traceback)"

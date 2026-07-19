@@ -850,3 +850,54 @@ Reviewer's closing position stands: M4 and the 291-check release
 remain closed; this round was evidence-system hardening, "an argument
 over whether the evidence system deserves 'very extensively tested'
 or 'tested against literally every malformed universe.'"
+
+## Round 13 — the certificate office: standing certificates, atomic issuance, verifier identity, crayon (2026-07-19)
+
+Reviewer confirmed round 12 closed all prior findings; four
+certificate-office items followed. Three adopted, one adopted in half
+with a reasoned decline.
+
+**1. The production invariant was untested (adopted — sharpest catch).**
+Scratch replicas start with NO attestation.json, so "refusal creates
+no file" passed while the invariant production depends on — "a
+refusal never creates OR REPLACES the existing standing attestation"
+— had no case. Case 23: sentinel standing attestation + forced
+refusal → sentinel byte-identical after, and no .tmp litter.
+Honesty note: the pre-patch verifier also passed this case (refusals
+always exited before the write), so case 23 is regression armor for
+the issuance path, not a discriminator against old code.
+
+**2. Atomic issuance (adopted).** tmp + flush + fsync + os.replace —
+a crash mid-write can no longer leave a truncated certificate where a
+valid one used to be.
+
+**3. Verifier identity (adopted); acceptance_sha256 (declined).**
+Attestation schema 4 records attest_sha256 — the hash of the exact
+script that performed the proof (the output is not hashed into
+itself; no self-reference loop). The standing release was re-issued
+under schema 4 against the UNCHANGED run of record: same batch, same
+run_ids 33–36, same source fb69476, dist = http = 28507038… — only
+the certificate format and verifier identity changed, and the
+recorded attest_sha256 was verified against the on-disk script.
+Declined: binding acceptance_sha256 into the certificate. The
+attestation should identify the instrument that issued it; the
+acceptance suite is evidence ABOUT that instrument, already tracked
+by git. Baking its hash into the certificate would force re-issuing
+an unchanged release's certificate every time a test of the office
+improves — coupling in the wrong direction.
+
+**4. Malformed-ledger refusals (adopted).** Parse + shape validation
+now runs BEFORE the semantic predicates: unparseable JSON, empty
+ledger, non-object entries, missing required keys, wrong field types,
+unreadable manifest → in-band "ATTESTATION REFUSED: ledger
+malformed: …". Five new cases (24–28) inject each shape.
+Counterfactual vs the pre-patch verifier on an unparseable line:
+exit 1, one Traceback, zero refusal banners — the cases discriminate.
+
+Suite now **ATTEST ACCEPTANCE: PASS (28 cases)**; every refusal
+asserted banner-carrying, traceback-free, and standing-certificate-
+preserving. M4 and the 291-check release remain closed — per the
+reviewer, remaining work "concerns making the certificate office
+resilient when someone submits a document written in crayon or simply
+leaves last week's certificate sitting on the desk." Both are now
+tested behaviors.

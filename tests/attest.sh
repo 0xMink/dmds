@@ -12,6 +12,14 @@
 #     deliberately, which is the point)
 #   - missing/corrupt retained evidence (each object re-hashed and
 #     decompressed back to its log hash)
+#   - a malformed ledger (unparseable JSON, wrong shapes/types): the
+#     verifier distrusts its inputs, so crayon refuses in-band —
+#     never a traceback
+# The attestation (schema 4) records attest_sha256 — the hash of THIS
+# script, i.e. the exact verifier that performed the proof (the output
+# file is not hashed into itself, so no self-reference loop). Issuance
+# is atomic (tmp + fsync + rename): a refusal or crash NEVER creates,
+# replaces, or truncates an existing standing attestation.
 #   - unverified serving boundary: HTTP verification is REQUIRED — the
 #     bytes the server returns must equal the attested bytes. Pass
 #     --no-http to explicitly produce a disk-only attestation
@@ -38,9 +46,36 @@ def sha_file(p):
         for b in iter(lambda: f.read(65536), b""):
             h.update(b)
     return h.hexdigest()
+def refuse(msg):
+    print("ATTESTATION REFUSED: " + msg)
+    sys.exit(1)
 EXPECTED = [("m1-core", 59), ("m2-grab", 55), ("m3-depth", 35), ("m4-governor", 142)]
-ledger = [json.loads(l) for l in open("tests/run-manifest.jsonl", encoding="utf-8")]
+# parse + shape validation BEFORE the semantic predicates: everything
+# below indexes into these entries, so malformed input must be refused
+# here, in-band, rather than surfacing as JSONDecodeError/KeyError
+try:
+    with open("tests/run-manifest.jsonl", encoding="utf-8") as f:
+        ledger = [json.loads(l) for l in f]
+except (OSError, ValueError) as exc:
+    refuse("ledger malformed: %s" % type(exc).__name__)
+if not ledger:
+    refuse("ledger malformed: empty")
+if not all(isinstance(e, dict) for e in ledger):
+    refuse("ledger malformed: non-object entry")
 entries = ledger[-len(EXPECTED):]
+SHAPE = {
+    "schema": int, "kind": str, "suite": str, "run_id": int, "exit": int,
+    "checks": (int, type(None)), "commit": str, "dirty": bool,
+    "tree_stable": bool, "batch": str, "dist_sha256": str,
+    "runner_sha256": str, "log_sha256": str,
+    "evidence_path": (str, type(None)), "evidence_sha256": (str, type(None)),
+}
+for e in entries:
+    for k, t in SHAPE.items():
+        if k not in e:
+            refuse("ledger malformed: entry missing %s" % k)
+        if not isinstance(e[k], t):
+            refuse("ledger malformed: %s has wrong type" % k)
 dist = sha_file("dist/index.html")
 runner = sha_file("tests/run.sh")
 problems = []
@@ -94,7 +129,8 @@ if problems:
     print("ATTESTATION REFUSED: " + "; ".join(problems))
     sys.exit(1)
 att = {
-    "schema": 3,
+    "schema": 4,
+    "attest_sha256": sha_file("tests/attest.sh"),
     "source_commit": entries[0]["commit"],
     "batch": batch,
     "dist_sha256": dist,
@@ -104,8 +140,14 @@ att = {
     "suites": {e["suite"]: e["checks"] for e in entries},
     "total_checks": sum(e["checks"] for e in entries),
 }
-with open("tests/attestation.json", "w", encoding="utf-8") as f:
+# atomic issuance: a crash mid-write must never leave a truncated
+# certificate where a valid standing one used to be
+tmp = "tests/attestation.json.tmp"
+with open(tmp, "w", encoding="utf-8") as f:
     json.dump(att, f, indent=1, sort_keys=True)
     f.write("\n")
+    f.flush()
+    os.fsync(f.fileno())
+os.replace(tmp, "tests/attestation.json")
 print("ATTESTED: " + json.dumps(att, sort_keys=True))
 PY
