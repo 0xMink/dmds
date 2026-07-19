@@ -557,16 +557,72 @@ history, verbatim outcome — every mechanism fired per design:
   fix, live — the old code deadlocked on this exact path)
 - queued 256² downsize cancelled on 4 consecutive goods (stale-pending
   cancellation, live)
-- NO attempt to re-promote to the collapsed 512² (duress mark, live)
+- no 512² re-promotion occurred — CORRECTED (review): the trace is
+  CONSISTENT with the duress mark but does not isolate it: the run
+  never produced two consecutive good windows at rung 0, so promotion
+  eligibility was never reached and the mark was never independently
+  exercised in the field (the synthetic test covers it)
 - rung-1 promotion failed twice (t=225 strike 1, t=250 strike 2) →
-  rung-lock at 2 → three subsequent good windows produced NO churn
+  rung-lock at 2 → three subsequent good windows produced NO churn.
+  CORRECTED (review): strike 2 came from a p90 32.9ms BAD window —
+  likely an interaction burst, not boundary oscillation. Under the
+  workload-aware attribution shipped after this run, that window
+  would void the trial rather than count a strike; the lock proved
+  its MECHANISM live, not its attribution
 - **no demotion**
 
 Final state: tier 1 (gl2), 384² = 147,456 particles, rung 2, post on,
-p90 ~17ms ≈ 58fps, stable. Yesterday: tier-2 fallback at 42,000 CPU
-particles. Today: 3.5× the particles with full GPU physics on the
-same 2013 3GB-RAM laptop. Interaction bads (31–49ms p90) were
-absorbed by rung moves + one applied size step.
+p90 ~17ms ≈ 58fps, held through the ~20s of post-lock evidence the
+trace contains (observed stability, not long-term proof). Yesterday:
+tier-2 fallback at 42,000 CPU particles. Today: 3.5× the particles
+with full GPU physics on the same 2013 3GB-RAM laptop — an
+uncontrolled comparison (code changed, interaction differed, power
+state unknown), impressive but not an A/B experiment. Interaction
+bads (31–49ms p90) were absorbed by rung moves + one applied size
+step.
 
 Remaining open on this machine: subjective experience report; the
 plugged/battery variance question (optional A/B/A).
+
+## Review closure round 7 (2026-07-19) — policy refinements + runner v4
+
+Engine (all synthetic-tested, M4 127 checks):
+1. Forced resize releases an active grab through the standard release
+   path first — tested with a REAL held grab across the forced reinit
+   (capture applied, resize commits mid-grab, zero stuck clumps, zero
+   page errors, coherent pointer traffic after).
+2. Degradation never re-requests an alloc-failed size; a fully
+   poisoned size axis is exhausted → post-off → demotion at the
+   CURRENT size (tested: no resize-request events, demote at n=64).
+3. Workload-aware strikes: only sustained-hold degrades count toward
+   the rung lock; a bad-window degrade VOIDS the promotion trial
+   (interaction bursts and stalls are not boundary-oscillation
+   evidence). Tested both ways.
+4. allocFailed (hard, session) split from perfRejected (expires 300s
+   sim-time; cleared on tab revisit). debugGov exposes both plus the
+   merged legacy view.
+5. Every resize cancellation logged with a reason
+   (performance-dropped / recovery / stale / rung-not-zero) — no
+   interpretive archaeology.
+6. Rung locks reset on viewport change (fill-rate landscape moved).
+
+Field-record corrections applied in place (duress mark: consistent-
+with, not isolated; rung-lock strike 2 was an interaction burst that
+current attribution would void; "stable" = ~20s observed post-lock).
+
+Runner v4 (acceptance 8/8): untracked files in dirty + diff hash +
+ledger list; set -euo pipefail with distinguished fatal exits
+(74 log / 75 evidence / 76 ledger) FAULT-INJECTED via fake gzip and
+python3 on PATH — a passing suite cannot mask evidence loss and a
+failed archive appends no ledger entry; archive verified BEFORE the
+ledger names it; pre/post tree signatures → tree_stable; explicit
+PRODUCT/FIXTURE allowlists (unknown → 64); fixture failures to
+gitignored tests/runner-artifacts/ (previous committed fixture logs
+removed from tests/failures/ — git history retains them).
+
+The first v4 regression (run_ids 17–20, all exit 0, 276 checks,
+evidence objects verified) immediately demonstrated the new
+instruments on their author: m4-results.md was edited mid-run
+(these corrections), so M1 shows tree_stable:false and M2–M4 show
+dirty:true. The taint is a docs file — but the manifest cannot know
+that, which is the point. A clean run of record follows this commit.
