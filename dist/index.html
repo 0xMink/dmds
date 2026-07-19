@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-/NMNpZCc+lIZFRlNquPG95/pEdNdsdk2HopPOh+jix4=' 'sha256-2dsjK58zcrFJsHoFBKvr/bs5W9Tg5Dwuq0eb9/qiso4=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Khv7nuMiz15meoghzXkCL2+WexUdBQisjRGsm159c6w='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-SUdih4zEuGiyDgwUDvvpUgavfDut+zRvJKWp67Ii6Gk=' 'sha256-2dsjK58zcrFJsHoFBKvr/bs5W9Tg5Dwuq0eb9/qiso4=' 'sha256-t6TDDpE8P9NYCSkyd+VjRTFVuMtZv8A/LGeif5hro7s='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -680,7 +680,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="93c347b-dirty 2026-07-19T03:44:53Z">
+<meta name="dmds-build" content="1e2711b-dirty 2026-07-19T04:45:34Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -2527,7 +2527,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       // hardware, where ?debug=1 is never present.
       liveOff: DEBUG && !/[?&]govlive=1/.test(location.search),
       rung: 0, sizeIdx: BASE_IDX,
-      frames: [], recent: [], winStart: 0,
+      frames: [], recent: [], winStart: 0, winDirty: false,
       good: 0, cool: 0, invalid: false,
       warmed: false, warmFrames: 0, warmT0: 0, fastUntil: 0,
       // allocation failure is a hard capability fact for the session;
@@ -5337,4 +5337,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 93c347b-dirty 2026-07-19T03:44:53Z -->
+<!-- dmds build 1e2711b-dirty 2026-07-19T04:45:34Z -->
