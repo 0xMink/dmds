@@ -717,3 +717,37 @@ Acceptance 9/9 (batch field asserted). **Run of record: run_ids
 dirty:false + tree_stable:true. ATTESTED with
 dist_sha256 = http_sha256 = 1bf57f10… — the bytes tested, the bytes
 on disk, and the bytes the server returns are one object.**
+
+## Review closure round 10 (2026-07-19) — attestation hardening final
+
+Reviewer's correction acknowledged for the record: the round-9
+"winDirty += true → NaN" production bug was quoted from code that
+never existed (shipped line was boolean assignment); the reviewer
+confirmed the fabrication. The correction cycle works both ways —
+recorded because process honesty is the product here.
+
+All five hardening items adopted:
+1. **HTTP verification MANDATORY**: unreachable server → ATTESTATION
+   REFUSED. `--no-http` is the only disk-only path, announces itself,
+   and records http_sha256:null. Warnings are no longer load-bearing.
+2. **Check inventory enforced**: exactly (59, 55, 35, 142) — a
+   silently weakened suite refuses; intentional growth requires
+   deliberately editing the expected inventory in attest.sh.
+3. **Whole-batch membership**: all product entries carrying the
+   candidate batch id must equal exactly the attested four — extra
+   prefix runs in the batch refuse. kind:product + schema:3 asserted
+   per entry.
+4. **mix 0.75 → destination** tested: both sides plus tie now
+   literally covered (0.25→source, 0.5→destination tie, 0.75→dest).
+5. **Full decision consequence through the real collector** (adopted
+   though declared non-blocking): promotion trial → contaminated bad
+   window via production govFrame with a REAL held grab → degrades
+   with NO strike, proven discriminatingly — the lock arrives exactly
+   two CLEAN bounces later, impossible had the contaminated window
+   counted.
+
+**Run of record: run_ids 33–36, one batch, at fb69476 —
+59 · 55 · 35 · 142 = 291 checks, all dirty:false + tree_stable:true.
+ATTESTED (schema 3, all refusal gates green):
+dist = http = 28507038… — tested, on-disk, and served bytes one
+object, with the serving boundary now REQUIRED, not courteous.**
