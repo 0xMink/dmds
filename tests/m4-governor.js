@@ -392,14 +392,19 @@ async function readyPage(browser, query, opts) {
       // give idle machinery a chance — nothing may execute
       await new Promise(r2 => setTimeout(r2, 8000));
       const finalCount = E.status().count;
+      const cancels = E.debugGovHistory().filter(e => e.event === 'resize-cancel').map(e => e.reason);
       return { queuedPromo, promoCancelled: afterBad.pending === null, rungAfterBad: afterBad.rung,
-               queuedDown, downCancelled: afterRecover.pending === null, finalCount };
+               queuedDown, downCancelled: afterRecover.pending === null, finalCount, cancels };
     }, [BAD, GOOD]);
     check('stale:promotion-queued', r.queuedPromo === 'promote');
     check('stale:bad-window-cancels-AND-degrades', r.promoCancelled === true && r.rungAfterBad === 1, JSON.stringify(r));
     check('stale:downsize-queued', r.queuedDown === 'degrade', r.queuedDown);
     check('stale:recovery-cancels-downsize', r.downCancelled === true);
     check('stale:no-spurious-resize', r.finalCount === 4096, 'count=' + r.finalCount);
+    // cancellations are LOGGED with reasons — no interpretive archaeology
+    check('stale:cancels-logged-with-reasons',
+      r.cancels.indexOf('performance-dropped') >= 0 && r.cancels.indexOf('recovery') >= 0,
+      JSON.stringify(r.cancels));
     await page.close();
   }
 
@@ -858,6 +863,105 @@ async function readyPage(browser, query, opts) {
     check('runglock:second-bounce-locks', r.lockAt === 2 && r.lockedRung === 2 && r.lockLogged, JSON.stringify(r));
     check('runglock:good-evidence-cannot-repromote', r.afterGoodWhileLocked === 2, 'rung=' + r.afterGoodWhileLocked);
     check('runglock:bad-still-degrades-while-locked', r.afterBadWhileLocked === 3, 'rung=' + r.afterBadWhileLocked);
+    // a viewport change moves the fill-rate landscape → lock re-arms
+    await page.setViewportSize({ width: 1100, height: 700 });
+    await page.waitForTimeout(600);
+    const cleared = await page.evaluate(() => window.DMDS_GL2.debugGov().rungLockAt);
+    check('runglock:cleared-on-viewport-change', cleared === 0, 'lockAt=' + cleared);
+    await page.close();
+  }
+
+  // ── 22b. strike attribution is workload-aware: a BAD-window degrade
+  //        voids the promotion trial (interaction burst ≠ boundary
+  //        oscillation); only sustained-hold degrades count strikes ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD, GOOD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      const HOLD = Array(70).fill(20);
+      E.debugGovInject(BAD); E.debugGovInject(BAD);     // → rung 2
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);   // → rung 1 (trial)
+      E.debugGovInject(BAD);                            // → rung 2 via BAD: trial VOIDED
+      const afterBadBounce = E.debugGov().rungLockAt;
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);   // → rung 1
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);   // → rung 2 (strike 1 — first COUNTED)
+      const afterOneHoldBounce = E.debugGov().rungLockAt;
+      E.debugGovInject(GOOD); E.debugGovInject(GOOD);   // → rung 1
+      E.debugGovInject(HOLD); E.debugGovInject(HOLD);   // → rung 2 (strike 2) → LOCK
+      const locked = E.debugGov().rungLockAt;
+      return { afterBadBounce, afterOneHoldBounce, locked };
+    }, [BAD, GOOD]);
+    check('strike:bad-degrade-voids-trial-no-strike', r.afterBadBounce === 0, 'lockAt=' + r.afterBadBounce);
+    check('strike:one-hold-bounce-after-bad-still-no-lock', r.afterOneHoldBounce === 0, 'lockAt=' + r.afterOneHoldBounce);
+    check('strike:two-hold-bounces-lock', r.locked === 2, 'lockAt=' + r.locked);
+    await page.close();
+  }
+
+  // ── 22c. degradation never retries an alloc-failed size: the size axis
+  //        is exhausted past poisoned targets, descent continues ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {}; E.setMorphPair = function () {};
+      let demoteCalled = 0;
+      E.onDemote(() => demoteCalled++);
+      E.debugGovInject(null, { allocFail: 32 });          // the only lower size is poisoned
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); // rungs 1..3
+      E.debugGovInject(BAD);                              // size axis exhausted → post off
+      const afterExhausted = E.debugGov();
+      E.debugGovInject(BAD);                              // → demote (still at baseline n)
+      const hist = E.debugGovHistory();
+      return {
+        rung: afterExhausted.rung, post: afterExhausted.post, demoteCalled,
+        noRequest: !hist.some(e => e.event === 'resize-request'),
+        demoteEntry: hist.filter(e => e.event === 'demote')[0],
+      };
+    }, [BAD]);
+    check('allocskip:exhausted-axis-goes-post-off', r.rung === 5 && r.post === false, JSON.stringify({ rung: r.rung, post: r.post }));
+    check('allocskip:poisoned-size-never-requested', r.noRequest === true);
+    check('allocskip:demotes-at-baseline', r.demoteCalled >= 1 && r.demoteEntry && r.demoteEntry.n === 64, JSON.stringify(r.demoteEntry));
+    await page.close();
+  }
+
+  // ── 22d. forced resize during an ACTIVE GRAB: released through the
+  //        standard path, no stuck clump survives the rebuilt engine ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    await page.waitForTimeout(2500); // excitement decay before grabbing
+    const r = await page.evaluate(async ([BAD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {};
+      const grabCount = () => {
+        const s = E.debugReadState();
+        let n = 0;
+        for (let i = 0; i < s.velocities.length / 4; i++) if (s.velocities[i * 4 + 3] === 1) n++;
+        return n;
+      };
+      window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 720, clientY: 396, button: 0, pointerType: 'mouse' }));
+      await new Promise(r2 => setTimeout(r2, 800)); // live frames apply the capture
+      const heldBefore = grabCount();
+      // ladder to a forced downsize while the grab is HELD
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      E.debugGovInject(BAD);                        // request floor
+      E.debugGovInject(BAD);                        // sustained bad → force
+      let applied = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r2 => setTimeout(r2, 250));
+        if (E.status().count === 1024) { applied = 1024; break; }
+      }
+      const heldAfter = grabCount();
+      // post-reinit pointer traffic must be coherent (no stuck capture)
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 700, clientY: 380, pointerType: 'mouse' }));
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'mouse' }));
+      await new Promise(r2 => setTimeout(r2, 400));
+      return { heldBefore, applied, heldAfter };
+    }, [BAD]);
+    check('forcegrab:grab-held-before-resize', r.heldBefore > 0, 'held=' + r.heldBefore);
+    check('forcegrab:resize-applies-during-grab', r.applied === 1024, 'count=' + (r.applied || 'never'));
+    check('forcegrab:no-stuck-clump-after-reinit', r.heldAfter === 0, 'held=' + r.heldAfter);
+    check('forcegrab:no-page-errors', page.errs.length === 0, page.errs.join('; '));
     await page.close();
   }
 
@@ -882,12 +986,23 @@ async function readyPage(browser, query, opts) {
         await new Promise(r2 => setTimeout(r2, 250));
         if (E.status().count === 1024) { executed = 1024; break; }
       }
-      return { starved, executed };
+      // the abandoned size carries a PERF rejection (expiring), not a
+      // hard alloc failure — and tab revisit clears it
+      const marks = { perf: E.debugGov().perfRejected, alloc: E.debugGov().allocFailed };
+      Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      const marksAfterRevisit = E.debugGov().perfRejected;
+      return { starved, executed, marks, marksAfterRevisit };
     }, [BAD]);
     check('force:unforced-pending-starves-while-non-idle',
       r.starved.count === 4096 && r.starved.pending && r.starved.pending.idx === 0 && !r.starved.pending.forced && r.starved.mix === 0.5,
       JSON.stringify(r.starved));
     check('force:sustained-bad-overrides-idle-deferral', r.executed === 1024, 'count=' + (r.executed || 'never'));
+    check('force:duress-is-perf-rejection-not-alloc',
+      r.marks.perf.indexOf('64') >= 0 && r.marks.alloc.length === 0, JSON.stringify(r.marks));
+    check('force:perf-rejection-clears-on-revisit', r.marksAfterRevisit.length === 0, JSON.stringify(r.marksAfterRevisit));
     await page.close();
   }
 

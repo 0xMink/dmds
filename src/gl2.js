@@ -1208,7 +1208,9 @@
       frames: [], recent: [], winStart: 0,
       good: 0, cool: 0, invalid: false,
       warmed: false, warmFrames: 0, warmT0: 0, fastUntil: 0,
-      pendingResize: null, trialFailed: {}, demoted: false,
+      // allocation failure is a hard capability fact for the session;
+      // performance rejection is workload-dependent and expires
+      pendingResize: null, allocFailed: {}, perfRejected: {}, demoted: false,
       lastRungPromo: null, rungStrikes: null, rungLockAt: 0
     };
   }
@@ -1255,12 +1257,21 @@
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.deleteTexture(t);
       gl.deleteFramebuffer(fb);
-      if (!ok) state.gov.trialFailed[n] = true;
+      if (!ok) state.gov.allocFailed[n] = true;
       return ok;
     } catch (e) {
-      state.gov.trialFailed[n] = true;
+      state.gov.allocFailed[n] = true;
       return false;
     }
+  }
+  // a size is blocked from promotion by a hard allocation failure (whole
+  // session) or a fresh performance rejection (expires after 300s of sim
+  // time, and on tab revisit — conditions change; capability doesn't)
+  function sizeBlocked(n) {
+    var g = state.gov;
+    if (g.allocFailed[n]) return true;
+    var pr = g.perfRejected[n];
+    return !!pr && state.time - pr.t < 300;
   }
   function govRequestResize(idx, dir) {
     var g = state.gov;
@@ -1278,12 +1289,13 @@
     if (window.console) console.warn("[DMDS] governor: tier 1 cannot hold frame rate at the floor -> demoting to tier 2");
     if (state.onDemote) state.onDemote();
   }
-  function govDegradeOnce() {
+  function govDegradeOnce(viaHold) {
     var g = state.gov;
     // bad evidence cancels a queued PROMOTION — and the SAME window still
     // degrades below. Consuming a performance collapse merely to cancel
     // an appointment would leave full quality running for another window.
     if (g.pendingResize && g.pendingResize.dir === "promote") {
+      govLog("resize-cancel", { to: SIZES[g.pendingResize.idx], dir: "promote", reason: "performance-dropped" });
       g.pendingResize = null;
       if (window.console) console.info("[DMDS] governor: pending promotion cancelled (performance dropped)");
     }
@@ -1294,7 +1306,12 @@
       // ~30s forever — the rung axis had no promotion memory, unlike
       // sizes and tier 2). A promotion undone twice within its evidence
       // window locks the lower rung until tab revisit or a size change.
-      var promo = g.lastRungPromo;
+      // a strike is BOUNDARY-OSCILLATION evidence, so only a sustained-
+      // hold degradation counts: a severe bad window (interaction burst,
+      // browser stall, system load) still degrades immediately but says
+      // nothing about whether the promoted rung itself was too expensive
+      var promo = viaHold ? g.lastRungPromo : null;
+      if (!viaHold) g.lastRungPromo = null; // trial voided, not failed
       if (promo && promo.to === g.rung && state.time - promo.t < 120) {
         var strikes = g.rungStrikes;
         if (!strikes || strikes.to !== promo.to || state.time - strikes.t > 180) strikes = { to: promo.to, n: 0 };
@@ -1323,15 +1340,26 @@
       if (!g.pendingResize.forced) {
         g.pendingResize.forced = true;
         // duress mark: a size abandoned under sustained bad is not
-        // retried this session (same philosophy as trial-alloc no-retry) —
-        // without it the field bounces baseline↔smaller on minutes-scale
-        g.trialFailed[SIZES[g.sizeIdx]] = true;
+        // retried while the rejection is fresh — without it the field
+        // bounces baseline↔smaller on minutes-scale
+        g.perfRejected[SIZES[g.sizeIdx]] = { t: state.time };
         g.cool = state.time + 5;
         govLog("resize-forced", { to: SIZES[g.pendingResize.idx] });
         if (window.console) console.info("[DMDS] governor: sim size -> " + SIZES[g.pendingResize.idx] + "^2 (forced — sustained bad)");
       }
     }
-    else if (g.sizeIdx > 0) govRequestResize(g.sizeIdx - 1, "degrade");
+    else if (g.sizeIdx > 0) {
+      // never request a size whose allocation already failed — retrying a
+      // poisoned target loops forced-resize → rollback forever while the
+      // ladder waits outside a door it knows is welded shut. Skip past
+      // alloc-failed sizes; if none remain viable the size axis is
+      // exhausted and descent continues to post-off/demotion.
+      var di = g.sizeIdx - 1;
+      while (di >= 0 && g.allocFailed[SIZES[di]]) di--;
+      if (di >= 0) govRequestResize(di, "degrade");
+      else if (state.post) applyRung(5);
+      else govDemote();
+    }
     else if (state.post) applyRung(5);
     else govDemote();
   }
@@ -1340,6 +1368,7 @@
     // recovery evidence cancels a queued DOWNSIZE — don't shrink a field
     // that has already recovered
     if (g.pendingResize && g.pendingResize.dir === "degrade") {
+      govLog("resize-cancel", { to: SIZES[g.pendingResize.idx], dir: "degrade", reason: "recovery" });
       g.pendingResize = null;
       if (window.console) console.info("[DMDS] governor: pending downsize cancelled (performance recovered)");
       return;
@@ -1354,8 +1383,8 @@
       g.lastRungPromo = { to: g.rung - 1, t: state.time };
       applyRung(g.rung - 1);
     }
-    else if (g.sizeIdx < BASE_IDX && !g.pendingResize && !g.trialFailed[SIZES[g.sizeIdx + 1]]) govRequestResize(g.sizeIdx + 1, "promote");
-    else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && !g.pendingResize && !g.trialFailed[SIZES[g.sizeIdx + 1]]) {
+    else if (g.sizeIdx < BASE_IDX && !g.pendingResize && !sizeBlocked(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1, "promote");
+    else if (!MOBILE && !SAVEDATA && g.sizeIdx < SIZES.length - 1 && !g.pendingResize && !sizeBlocked(SIZES[g.sizeIdx + 1])) {
       if (govTrialAlloc(SIZES[g.sizeIdx + 1])) govRequestResize(g.sizeIdx + 1, "promote");
       else g.cool = state.time + 5;
     }
@@ -1383,7 +1412,7 @@
     // letting a machine sit below the floor forever
     g.good = 0;
     g.mid = (g.mid || 0) + 1;
-    if (g.mid >= 2) { g.mid = 0; govDegradeOnce(); return "degrade-sustained-hold"; }
+    if (g.mid >= 2) { g.mid = 0; govDegradeOnce(true); return "degrade-sustained-hold"; }
     return "hold";
   }
   function govEmergency() {
@@ -1439,15 +1468,19 @@
     if (!g.pendingResize) return false;
     var p = g.pendingResize;
     // stale/no-op requests never execute
-    if (p.idx === g.sizeIdx) { g.pendingResize = null; return false; }
+    if (p.idx === g.sizeIdx) { govLog("resize-cancel", { to: SIZES[p.idx], dir: p.dir, reason: "stale" }); g.pendingResize = null; return false; }
     // a promotion executes only from full quality with its evidence intact
-    if (p.dir === "promote" && g.rung > 0) { g.pendingResize = null; return false; }
+    if (p.dir === "promote" && g.rung > 0) { govLog("resize-cancel", { to: SIZES[p.idx], dir: p.dir, reason: "rung-not-zero" }); g.pendingResize = null; return false; }
     // idle-only (spec): no grab, no morph, calm field, 2s since a command —
     // unless FORCED by sustained bad evidence: nothing smooth left to protect
     if (!p.forced) {
       if (state.grab.active || state.mix < 1 || state.excite >= 0.1) return false;
       if (now - (state.lastCommandT || 0) < 2) return false;
     }
+    // a forced resize may fire mid-interaction — release the grab through
+    // the standard path FIRST so pointer capture is dropped exactly once
+    // and no held clump survives into the rebuilt engine
+    if (p.forced && state.grab.active && state.releaseGrab) state.releaseGrab();
     g.pendingResize = null;
     executeResize(p.idx);
     return true; // the caller's frame is now on the far side of a lifecycle
@@ -1485,7 +1518,7 @@
       govLog("resize-commit", { from: SIZES[oldIdx], to: SIZES[idx] });
     }, function (e) {
       if (window.console) console.warn("[DMDS] resize to " + SIZES[idx] + "^2 failed -> rolling back to " + SIZES[oldIdx] + "^2:", e && e.message);
-      g.trialFailed[SIZES[idx]] = true;
+      g.allocFailed[SIZES[idx]] = true;
       g.txn = { phase: "rolling-back", from: SIZES[oldIdx], to: SIZES[idx] };
       return attempt(oldIdx).then(function () {
         g.txn = { phase: "idle", last: "rolled-back", from: SIZES[oldIdx], to: SIZES[idx] };
@@ -1703,7 +1736,14 @@
       state.running = true;
 
       listen(window, "resize", function () {
-        if (state.gov) state.gov.invalid = true; // realloc window is invalid
+        if (state.gov) {
+          state.gov.invalid = true; // realloc window is invalid
+          // a viewport change moves the fill-rate landscape: a rung-cost
+          // judgment made at the old backing size no longer applies
+          state.gov.rungLockAt = 0;
+          state.gov.rungStrikes = null;
+          state.gov.lastRungPromo = null;
+        }
         resize();
         Object.keys(state.formations).forEach(function (k) {
           if (k.indexOf("text:") === 0) { delete state.formations[k]; delete state.dustStart[k]; }
@@ -1804,10 +1844,13 @@
           if (state.gov) {
             state.gov.invalid = true; // first window after resume is invalid
             // rung-lock re-arm on tab revisit (same policy as tier 2):
-            // the conditions behind the flicker may be gone
+            // the conditions behind the flicker may be gone. Performance
+            // rejections expire too — allocation failures do NOT (the
+            // GPU's capabilities didn't change while the tab was hidden)
             state.gov.rungLockAt = 0;
             state.gov.rungStrikes = null;
             state.gov.lastRungPromo = null;
+            state.gov.perfRejected = {};
           }
           state.running = true;
           state.lastT = performance.now() * 0.001; // dt clamp handles the gap
@@ -2113,7 +2156,11 @@
         rungLockAt: g.rungLockAt || 0,
         post: state.post, demoted: g.demoted,
         txn: g.txn || { phase: "idle" },
-        trialFailed: Object.keys(g.trialFailed),
+        // trialFailed is the merged blocked-size view; the split fields
+        // distinguish hard capability facts from expiring perf rejections
+        trialFailed: Object.keys(g.allocFailed).concat(Object.keys(g.perfRejected)),
+        allocFailed: Object.keys(g.allocFailed),
+        perfRejected: Object.keys(g.perfRejected),
         // ACTUAL rendered-state evidence, not commanded rung numbers:
         trail: state.trailA ? [state.trailA.w, state.trailA.h] : null,
         glow: state.glowA ? [state.glowA.w, state.glowA.h] : null,
@@ -2155,6 +2202,7 @@
                         // real SwiftShader frame times must not interleave
       if (!g.warmed) { g.warmed = true; g.fastUntil = 0; }
       if (!opts.respectCooldown) g.cool = 0;
+      if (opts.allocFail) { g.allocFailed[opts.allocFail] = true; return "allocFail"; }
       if (opts.invalid) { g.good = 0; return "invalid"; }
       if (opts.emergency) return govEmergency();
       var sorted = frameMs.slice().sort(function (a, b) { return a - b; });
