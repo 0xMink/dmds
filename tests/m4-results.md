@@ -751,3 +751,53 @@ All five hardening items adopted:
 ATTESTED (schema 3, all refusal gates green):
 dist = http = 28507038… — tested, on-disk, and served bytes one
 object, with the serving boundary now REQUIRED, not courteous.**
+
+## Round 11 — closure accepted; the refusal machinery gets its own trial (2026-07-19)
+
+Reviewer verdict: "M4 and the current release are closed … I do not
+see a substantive reason to send the governor back into the
+courtroom." One process improvement flagged, explicitly not a closure
+defect: attest.sh's refusal branches were implemented and inspected
+but never *forced to fire* — the same gap runner-acceptance.sh closed
+for the runner. Agreed and adopted.
+
+**tests/attest-acceptance.sh — 14 fault-injected cases.** All faults
+are injected into a scratch replica of the attestable state (ledger
+tail, dist, runner, evidence objects, and the attest script itself,
+byte-identical); the real tree, ledger, and standing attestation are
+never touched, and attest.sh itself is UNCHANGED — the machinery
+being proven keeps the bytes that produced the standing attestation.
+A throwaway local HTTP server exercises the serving-boundary
+branches. Cases:
+
+- Positive control: pristine replica + matching boundary attests and
+  reproduces the committed attestation **byte-for-byte** — the replay
+  is the same proof, not a similar one.
+- `--no-http` succeeds only as an explicit, self-announcing disk-only
+  attestation with http_sha256 recorded as null.
+- Refusals, each pinned to its branch-specific message so a fault
+  cannot pass by tripping a neighboring check: unreachable boundary;
+  boundary serving different bytes; altered check count (142→141);
+  extra product run hiding under the candidate batch id (inserted
+  BEFORE the attested four, so only whole-batch membership can catch
+  it); entries not sharing one batch (cherry-picking); run_id gap;
+  dirty run; missing evidence object; corrupt evidence object;
+  forged ledger log_sha256 (evidence intact, ledger lying — the
+  decompress-back-to-log branch is the only defense, and this is the
+  only way to reach it); rebuilt dist; changed runner.
+- Every refusal is additionally asserted NOT to have written an
+  attestation.json.
+
+One ordering guarantee documented while writing the corrupt-evidence
+case: the object-hash gate precedes decompression, so gzip.open only
+ever runs on byte-identical objects and cannot raise — the corrupt
+path refuses cleanly by construction, not by exception handling.
+
+Suite constraint (by design): meaningful only from a state that
+attests cleanly — every fault mutates a known-good baseline, and the
+positive control diffs against the committed attestation. Run it
+after a run of record + attest.sh, which is the only time an
+attestation claim exists to defend.
+
+First run: **ATTEST ACCEPTANCE: PASS (14 cases)** against the round-10
+release state; dist/attestation hashes verified unchanged after.
