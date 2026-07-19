@@ -1,19 +1,21 @@
 {
- "dist_sha256": "a8396aa000137d7a3ef76f3cfe2863996e2bf2eff8b9648157d2bf2cc0ddff17",
+ "batch": "20260719T044534.444577419-61160",
+ "dist_sha256": "1bf57f103f4f690f6dbed76dd48e46ccfc5f87446013fada9d3a9abbe90f2406",
+ "http_sha256": "1bf57f103f4f690f6dbed76dd48e46ccfc5f87446013fada9d3a9abbe90f2406",
  "run_ids": [
-  25,
-  26,
-  27,
-  28
+  29,
+  30,
+  31,
+  32
  ],
- "runner_sha256": "5665d328b78690d1f1f18a78e6f2c005dfdbe56233ff0d1880d3b1e81e370d09",
- "schema": 1,
- "source_commit": "fa66e1486f8dd813d0956cc0e5b63619a824651d",
+ "runner_sha256": "13795190787954d218cba865a1040f30b19c905ab2b529b3c9aa5017ce7b864b",
+ "schema": 2,
+ "source_commit": "403bc86593cf22b9ced122c520ee973eba9f84ef",
  "suites": {
   "m1-core": 59,
   "m2-grab": 55,
   "m3-depth": 35,
-  "m4-governor": 135
+  "m4-governor": 138
  },
- "total_checks": 284
+ "total_checks": 287
 }

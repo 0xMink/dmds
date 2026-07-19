@@ -680,3 +680,40 @@ Acceptance: 9 sections PASS (adds exit-77 enforcement drill).
 M4 135 = 284 checks, all dirty:false + tree_stable:true. Attested:
 dist a8396aa0… (independently re-hashed = served bytes). M4 phase +
 evidence workflow: CLOSED.**
+
+## Review closure round 9 (2026-07-19) — attestation earns its narrative
+
+1. **Pushback, evidence-backed**: the review's headline bug quoted
+   `g.winDirty += true` (undefined+true=NaN chain). The shipped line
+   (src/gl2.js:1452) was `g.winDirty = true` — plain boolean
+   assignment; no arithmetic ever existed on that flag. The adjacent
+   gap WAS real: winDirty was undeclared and worked by accident of
+   undefined-falsiness — now declared `winDirty: false` in initGov.
+2. **Collector-path contamination proven** (the injection tests
+   bypassed govFrame): a REAL held grab + production govFrame driven
+   with synthetic time → the closing valid window carries int:true;
+   after release + excitement decay the next window doesn't.
+   Accumulate → rollover → reset, end to end.
+3. **Attestation v2 enforces its narrative**: exact suite composition
+   AND order, one batch id per runner invocation (stamped into every
+   ledger entry — four cherry-picked m1-core runs can no longer pose
+   as a regression), contiguous run_ids, non-null check counts, and
+   per-entry evidence verification (object exists, re-hashes to
+   evidence_sha256, decompresses to log_sha256 — the attestation goes
+   red if the archives rot).
+4. **untracked enumeration fails closed** (|| true removed; tree_sig
+   captures the list so the failure propagates). Newline-pathological
+   filenames remain a documented limitation of the ledger's untracked
+   list; the signature hashes contents regardless.
+5. **HTTP boundary attested**: attest.sh curls the dev server and
+   REFUSES if the returned bytes differ from the attested dist.
+6. **Duress side-selection is a rule, not a point**: mix 0.25 →
+   source ('logo'); 0.5 tie → destination ('device'). Fling discard
+   is structural — velT recreated null-backed at reinit (WebGL2
+   zero-initializes); a magnitude test would re-measure the spec.
+
+Acceptance 9/9 (batch field asserted). **Run of record: run_ids
+29–32, one batch, at 403bc86 — 59 · 55 · 35 · 138 = 287 checks, all
+dirty:false + tree_stable:true. ATTESTED with
+dist_sha256 = http_sha256 = 1bf57f10… — the bytes tested, the bytes
+on disk, and the bytes the server returns are one object.**
