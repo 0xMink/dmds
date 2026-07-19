@@ -1205,7 +1205,7 @@
       // hardware, where ?debug=1 is never present.
       liveOff: DEBUG && !/[?&]govlive=1/.test(location.search),
       rung: 0, sizeIdx: BASE_IDX,
-      frames: [], recent: [], winStart: 0,
+      frames: [], recent: [], winStart: 0, winDirty: false,
       good: 0, cool: 0, invalid: false,
       warmed: false, warmFrames: 0, warmT0: 0, fastUntil: 0,
       // allocation failure is a hard capability fact for the session;

@@ -73,7 +73,7 @@ es = [json.loads(l) for l in sys.stdin]
 assert [e["exit"] for e in es] == [1, 2, 1, 0, 0], [e["exit"] for e in es]
 assert all(e["kind"] == "fixture" for e in es), "kind must be fixture"
 assert all(e["schema"] == 3 for e in es), "schema must be 3"
-assert all("tree_stable" in e and "untracked" in e for e in es), "schema-3 fields missing"
+assert all("tree_stable" in e and "untracked" in e and e.get("batch") for e in es), "schema-3 fields missing"
 assert es[-1]["tree_stable"] is False, "taint run must record tree_stable:false"
 assert all(e["tree_stable"] for e in es[:-1]), "non-taint fixtures must be tree-stable"
 ' || fail "acceptance ledger entries malformed"

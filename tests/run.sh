@@ -47,19 +47,27 @@ PROD_LEDGER=tests/run-manifest.jsonl
 ACCEPT_LEDGER=tests/runner-acceptance-manifest.jsonl
 LEDGER_EXCLUDES=(":(exclude)${PROD_LEDGER}" ":(exclude)${ACCEPT_LEDGER}")
 
-untracked_list() { git ls-files --others --exclude-standard 2>/dev/null || true; }
+# one batch id per runner invocation: the attestation requires all four
+# product entries to share it, so four cherry-picked single-suite runs
+# can never impersonate one complete regression
+BATCH_ID="$(date -u +%Y%m%dT%H%M%S.%N)-$$"
+
+# fail CLOSED: if git cannot enumerate untracked files, provenance must
+# not quietly degrade to "none" (set -e propagates the failure)
+untracked_list() { git ls-files --others --exclude-standard; }
 
 # working-state fingerprint: tracked diffs + untracked names AND contents
 # + the artifact, runner and suite actually being exercised.
 # REQUIRED inputs fail CLOSED — a signature computed from partially-read
 # state would look respectable while attesting an unobserved tree
 tree_sig() {
-  local suite="$1"
+  local suite="$1" u f
+  u="$(untracked_list)"  # captured so an enumeration failure fails the sig
   {
     git status --porcelain=v1 -- . "${LEDGER_EXCLUDES[@]}"
     git diff --binary -- . "${LEDGER_EXCLUDES[@]}"
     git diff --cached --binary -- . "${LEDGER_EXCLUDES[@]}"
-    while IFS= read -r f; do if [ -n "$f" ] && [ -f "$f" ]; then sha256sum "$f"; fi; done < <(untracked_list)
+    while IFS= read -r f; do if [ -n "$f" ] && [ -f "$f" ]; then sha256sum "$f"; fi; done <<< "$u"
     sha256sum dist/index.html tests/run.sh "tests/${suite}.js"
   } | sha256sum | cut -d' ' -f1
 }
@@ -140,7 +148,7 @@ run_suite() {
     evidence_sha="$(sha256sum "$evidence_path" | cut -d' ' -f1)"
   fi
 
-  LEDGER="$ledger" KIND="$kind" SUITE="$suite" STAMP="$stamp" EXIT_STATUS="$status" \
+  LEDGER="$ledger" KIND="$kind" SUITE="$suite" STAMP="$stamp" BATCH="$BATCH_ID" EXIT_STATUS="$status" \
   CHECKS="${checks:-}" COMMIT="$commit" DIRTY="$dirty" DIFF_SHA="$diff_sha" \
   UNTRACKED="$untracked" TREE_BEFORE="$tree_before" TREE_AFTER="$tree_after" \
   LOG_SHA="$log_sha" EVIDENCE_PATH="$evidence_path" EVIDENCE_SHA="$evidence_sha" \
@@ -158,6 +166,7 @@ entry = {
     "kind": e["KIND"],
     "suite": e["SUITE"],
     "stamp": e["STAMP"],
+    "batch": e["BATCH"],
     "start": int(e["T0"]),
     "end": int(e["T1"]),
     "elapsed_s": int(e["T1"]) - int(e["T0"]),

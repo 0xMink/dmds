@@ -910,6 +910,45 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
+  // ── 22f. contamination through the REAL collector: winDirty
+  //        accumulates per frame while a grab is held, reaches
+  //        govEvaluate at window rollover (int:true in history), and
+  //        clears at the boundary — injection bypasses this path ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(async () => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {};
+      // block the above-baseline promotion so good windows stay
+      // action-free (no trial cooldown noise, no mid-test reinit)
+      E.debugGovInject(null, { allocFail: 128 });
+      // hold a REAL grab → state.grab.active true for the collector
+      window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 720, clientY: 396, button: 0, pointerType: 'mouse' }));
+      await new Promise(r2 => setTimeout(r2, 800));
+      // drive the PRODUCTION govFrame synchronously: warm-up, then enough
+      // frames that at least one fully-populated valid window closes while
+      // the grab is held (the first partial window is invalid by design)
+      let t = 1000;
+      for (let i = 0; i < 35; i++) { t += 0.016; E.debugGovFrame(16, t); }   // warm-up
+      t += 3.1; // past fastUntil → standard 5s windows
+      for (let i = 0; i < 160; i++) { t += 0.08; E.debugGovFrame(16, t); }
+      const dirtyWin = E.debugGovHistory().filter(e => e.event === 'window').pop();
+      const dirtyLen = E.debugGovHistory().length;
+      // release, let excitement decay, then clean windows
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'mouse' }));
+      for (let i = 0; i < 60 && E.status().excite >= 0.1; i++) await new Promise(r2 => setTimeout(r2, 500));
+      const exciteLow = E.status().excite < 0.1;
+      for (let i = 0; i < 160; i++) { t += 0.08; E.debugGovFrame(16, t); }
+      const after = E.debugGovHistory().slice(dirtyLen).filter(e => e.event === 'window');
+      const cleanWin = after.pop();
+      return { dirtyWin, exciteLow, cleanWin };
+    });
+    check('collector:grab-contaminates-window', r.dirtyWin && r.dirtyWin.int === true, JSON.stringify(r.dirtyWin));
+    check('collector:contamination-clears-at-boundary', r.exciteLow && r.cleanWin && r.cleanWin.int !== true, JSON.stringify(r.cleanWin));
+    await page.close();
+  }
+
   // ── 22e. degradation SKIPS a poisoned intermediate size and lands on
   //        the deeper viable one (512 → 256 when 384 is alloc-failed) ──
   {
@@ -1070,6 +1109,31 @@ async function readyPage(browser, query, opts) {
     check('force:perf-rejection-clears-on-revisit', r.marksAfterRevisit.length === 0, JSON.stringify(r.marksAfterRevisit));
     check('force:mid-morph-duress-policy-defined',
       r.settledFormation === 'device', 'formation=' + r.settledFormation);
+    await page.close();
+  }
+
+  // ── 23b. duress side-selection RULE (not one handpicked point):
+  //        mix < 0.5 reseeds at the SOURCE formation; the 0.5 tie goes
+  //        to the destination (23 above). Fling velocities are
+  //        structurally discarded — velT is recreated null-backed
+  //        (zero-initialized per WebGL2 spec) at reinit ──
+  {
+    const page = await readyPage(browser, '?debug=1&gl2n=64&govoff=1');
+    const r = await page.evaluate(async ([BAD]) => {
+      const E = window.DMDS_GL2;
+      E.setFormation = function () {};
+      E.setMorphPair('logo', 'device', 0.25);              // source side
+      E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
+      E.debugGovInject(BAD); E.debugGovInject(BAD);        // request + force
+      let settled = null;
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r2 => setTimeout(r2, 500));
+        const s = E.status();
+        if (s.count === 1024 && s.mix === 1) { settled = s.formation; break; }
+      }
+      return { settled };
+    }, [BAD]);
+    check('force:mix-below-half-reseeds-at-source', r.settled === 'logo', 'formation=' + r.settled);
     await page.close();
   }
 
