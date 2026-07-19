@@ -626,3 +626,8 @@ instruments on their author: m4-results.md was edited mid-run
 (these corrections), so M1 shows tree_stable:false and M2–M4 show
 dirty:true. The taint is a docs file — but the manifest cannot know
 that, which is the point. A clean run of record follows this commit.
+
+**Round-7 run of record** (run_ids 21–24 at 124a02c, author hands off
+the keyboard this time): M1 59 · M2 55 · M3 35 · M4 127 = **276
+checks**, all exit 0, all dirty:false, all tree_stable:true, zero
+untracked files, four verified evidence objects.
