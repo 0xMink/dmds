@@ -10,6 +10,12 @@
 # for the script's lifetime, so it deterministically refuses and can
 # never be claimed by another process mid-test.
 #
+# Every replica starts with a SENTINEL standing attestation, and every
+# refusal asserts it byte-identical afterward with no tmp litter — the
+# production invariant is "a refusal never creates OR REPLACES the
+# existing certificate", and it is enforced per-branch here so future
+# reordering inside the verifier cannot quietly violate it.
+#
 # Constraint: this suite is meaningful only when run from a state that
 # attests cleanly (immediately after a run of record + attest.sh) —
 # every fault is a mutation of a known-good baseline, and the positive
@@ -35,12 +41,16 @@ trap cleanup EXIT
 
 R="$SCRATCH/repo"
 LEDGER_TAIL=4
+SENT_SHA="$(printf 'old-attestation-sentinel\n' | sha256sum | cut -d' ' -f1)"
 
 fresh() {
   rm -rf "$R"
   mkdir -p "$R/tests/evidence" "$R/dist"
   cp tests/attest.sh tests/run.sh tests/run-manifest.jsonl "$R/tests/"
   cp dist/index.html "$R/dist/"
+  # a standing certificate is always on the desk: refusals must leave
+  # it untouched, successful issuance must atomically replace it
+  printf 'old-attestation-sentinel\n' > "$R/tests/attestation.json"
   tail -$LEDGER_TAIL tests/run-manifest.jsonl | python3 -c 'import json,sys
 for l in sys.stdin: print(json.loads(l)["evidence_path"])' | while IFS= read -r p; do
     [ -f "$p" ] || { echo "baseline evidence object missing: $p" >&2; exit 1; }
@@ -57,12 +67,21 @@ run_attest() {  # $1 = URL, or the literal --no-http; sets $out/$rc
   fi
 }
 
+no_tmp_litter() {  # $1 = case label
+  if find "$R/tests" -maxdepth 1 \( -name '.attestation.*.tmp' -o -name 'attestation.json.tmp' \) | grep -q .; then
+    fail "$1: tmp litter left in tests/"
+  fi
+}
+
 refused() {  # $1 = required branch-specific substring, $2 = case label
   [ "$rc" -eq 1 ] || fail "$2: expected exit 1, got $rc — $out"
   printf '%s' "$out" | grep -q "ATTESTATION REFUSED" || fail "$2: refusal banner missing — $out"
   printf '%s' "$out" | grep -qF "$1" || fail "$2: expected '$1' in — $out"
   printf '%s' "$out" | grep -q "Traceback" && fail "$2: refusal leaked a traceback — $out"
-  [ ! -f "$R/tests/attestation.json" ] || fail "$2: refusal still wrote attestation.json"
+  [ -f "$R/tests/attestation.json" ] || fail "$2: refusal DELETED the standing attestation"
+  [ "$(sha256sum "$R/tests/attestation.json" | cut -d' ' -f1)" = "$SENT_SHA" ] \
+    || fail "$2: refusal modified the standing attestation"
+  no_tmp_litter "$2"
 }
 
 mutate_ledger() {  # $1 = python statements over the entry list `ls`
@@ -108,13 +127,15 @@ done
 dead_port="$(cat "$SCRATCH/deadport")"
 
 # 1. positive control: pristine replica + matching serving boundary
-#    attests, and reproduces the committed attestation byte-for-byte
+#    ATOMICALLY REPLACES the sentinel and reproduces the committed
+#    attestation byte-for-byte, with no tmp litter
 fresh
 run_attest "http://127.0.0.1:$port/right.html"
 [ "$rc" -eq 0 ] || fail "positive control: expected exit 0, got $rc — $out"
 printf '%s' "$out" | grep -q '^ATTESTED: ' || fail "positive control: no ATTESTED line — $out"
 diff -q "$R/tests/attestation.json" tests/attestation.json >/dev/null \
   || fail "positive control: replica attestation differs from the committed one"
+no_tmp_litter "positive-control"
 
 # 2. --no-http succeeds as an EXPLICIT disk-only attestation with
 #    http_sha256 recorded as null, and announces itself
@@ -128,9 +149,7 @@ python3 -c 'import json,sys; a=json.load(open(sys.argv[1])); sys.exit(0 if a["ht
 # 3. unreachable serving boundary → refusal (not a warning)
 fresh
 run_attest "http://127.0.0.1:$dead_port/"
-[ "$rc" -eq 1 ] || fail "unreachable: expected exit 1, got $rc — $out"
-printf '%s' "$out" | grep -q 'unreachable' || fail "unreachable: wrong message — $out"
-[ ! -f "$R/tests/attestation.json" ] || fail "unreachable: refusal still wrote attestation.json"
+refused "unreachable" "unreachable"
 
 # 4. serving boundary returns different bytes → refusal
 fresh
@@ -152,64 +171,76 @@ fresh; mutate_ledger 'ls = ls[-3:]'
 run_attest --no-http
 refused "incomplete ledger: 3 entries" "incomplete-ledger"
 
-# 8. extra product run hiding under the candidate batch id (inserted
+# 8. empty (but existing) ledger
+fresh; : > "$R/tests/run-manifest.jsonl"
+run_attest --no-http
+refused "ledger malformed: empty" "ledger-empty"
+
+# 9. extra product run hiding under the candidate batch id (inserted
 #    BEFORE the attested four, so only whole-batch membership can see it)
 fresh; mutate_ledger 'ls.insert(len(ls) - 4, dict(ls[-4]))'
 run_attest --no-http
 refused "additional product runs" "extra-batch-entry"
 
-# 9. cherry-picked runs: entries not sharing one invocation batch
+# 10. cherry-picked runs: entries not sharing one invocation batch
 fresh; mutate_ledger 'ls[-1]["batch"] = "some-other-invocation"'
 run_attest --no-http
 refused "do not share one runner-invocation batch id" "batch-mismatch"
 
-# 10. non-contiguous run_ids
+# 11. non-contiguous run_ids
 fresh; mutate_ledger 'ls[-1]["run_id"] += 1'
 run_attest --no-http
 refused "run_ids not contiguous" "run-id-gap"
 
-# 11. a fixture run posing as a product run
+# 12. a fixture run posing as a product run
 fresh; mutate_ledger 'ls[-1]["kind"] = "fixture"'
 run_attest --no-http
 refused "is not a product run" "kind-not-product"
 
-# 12. wrong ledger schema
+# 13. wrong ledger schema
 fresh; mutate_ledger 'ls[-1]["schema"] = 2'
 run_attest --no-http
 refused "unexpected ledger schema" "schema-wrong"
 
-# 13. a failing run cannot be attested
+# 14. a failing run cannot be attested
 fresh; mutate_ledger 'ls[-1]["exit"] = 1'
 run_attest --no-http
 refused "exit 1" "nonzero-exit"
 
-# 14. a dirty run cannot be attested
+# 15. Python's bool-is-an-int rule: exit:false satisfies BOTH
+#     isinstance(v, int) and v != 0 → the pre-patch verifier ISSUED a
+#     certificate over this ledger. Exact typing must refuse it.
+fresh; mutate_ledger 'ls[-1]["exit"] = False'
+run_attest --no-http
+refused "ledger malformed: exit has wrong type" "ledger-bool-as-int"
+
+# 16. a dirty run cannot be attested
 fresh; mutate_ledger 'ls[-1]["dirty"] = True'
 run_attest --no-http
 refused "dirty" "dirty-run"
 
-# 15. a tree-unstable run cannot be attested
+# 17. a tree-unstable run cannot be attested
 fresh; mutate_ledger 'ls[-1]["tree_stable"] = False'
 run_attest --no-http
 refused "tree unstable" "tree-unstable"
 
-# 16. runs spanning multiple commits
+# 18. runs spanning multiple commits
 fresh; mutate_ledger 'ls[-1]["commit"] = "0" * 40'
 run_attest --no-http
 refused "runs span multiple commits" "commit-span"
 
-# 17. missing evidence object
+# 19. missing evidence object
 fresh; rm "$R/$(last_evidence)"
 run_attest --no-http
 refused "evidence object missing" "evidence-missing"
 
-# 18. corrupt evidence object with an HONEST ledger (byte appended →
+# 20. corrupt evidence object with an HONEST ledger (byte appended →
 #     caught at the object-hash gate, before any decompression)
 fresh; printf 'x' >> "$R/$(last_evidence)"
 run_attest --no-http
 refused "evidence object hash mismatch" "evidence-corrupt"
 
-# 19. malformed evidence BLESSED by a forged ledger: evidence_sha256
+# 21. malformed evidence BLESSED by a forged ledger: evidence_sha256
 #     matches the malformed bytes, so the object-hash gate passes and
 #     the decompressor itself must refuse in-band — a controlled
 #     refusal, never a verifier traceback
@@ -221,59 +252,52 @@ mutate_ledger "ls[-1]['evidence_sha256'] = '$new_sha'"
 run_attest --no-http
 refused "evidence archive is not readable gzip" "malformed-gzip-forged-ledger"
 
-# 20. a lying ledger: evidence object intact but log_sha256 forged —
+# 22. a lying ledger: evidence object intact but log_sha256 forged —
 #     the decompress-back-to-log branch is the only defense
 fresh; mutate_ledger 'ls[-1]["log_sha256"] = "0" * 64'
 run_attest --no-http
 refused "decompresses to a different log" "log-sha-forged"
 
-# 21. rebuilt-after-test dist
+# 23. rebuilt-after-test dist
 fresh; printf ' ' >> "$R/dist/index.html"
 run_attest --no-http
 refused "tested DIFFERENT dist bytes" "dist-rebuilt"
 
-# 22. runner changed since the runs it vouches for
+# 24. runner changed since the runs it vouches for
 fresh; printf '# tampered\n' >> "$R/tests/run.sh"
 run_attest --no-http
 refused "used a different runner" "runner-changed"
 
-# 23. the PRODUCTION invariant: a refusal never creates OR REPLACES a
-#     standing attestation — "present" must never be mistaken for
-#     "fresh" just because a later attempt failed
-fresh
-printf 'old-attestation-sentinel\n' > "$R/tests/attestation.json"
-before="$(sha256sum "$R/tests/attestation.json" | cut -d' ' -f1)"
-mutate_ledger 'ls[-1]["dirty"] = True'
-run_attest --no-http
-[ "$rc" -eq 1 ] || fail "standing-attestation: expected refusal, got $rc — $out"
-printf '%s' "$out" | grep -q "ATTESTATION REFUSED" || fail "standing-attestation: banner missing — $out"
-after="$(sha256sum "$R/tests/attestation.json" | cut -d' ' -f1)"
-[ "$before" = "$after" ] || fail "standing-attestation: refusal modified the standing attestation"
-[ ! -f "$R/tests/attestation.json.tmp" ] || fail "standing-attestation: refusal left a tmp file behind"
-
-# 24. malformed ledger: unparseable JSON line
+# 25. malformed ledger: unparseable JSON line
 fresh; printf 'this is not json\n' >> "$R/tests/run-manifest.jsonl"
 run_attest --no-http
 refused "ledger malformed: JSONDecodeError" "ledger-not-json"
 
-# 25. malformed ledger: valid JSON that is not an object
+# 26. malformed ledger: valid JSON that is not an object
 fresh; printf '[1, 2, 3]\n' >> "$R/tests/run-manifest.jsonl"
 run_attest --no-http
 refused "ledger malformed: non-object entry" "ledger-non-object"
 
-# 26. malformed ledger: required key missing
+# 27. malformed ledger: required key missing
 fresh; mutate_ledger 'del ls[-1]["checks"]'
 run_attest --no-http
 refused "ledger malformed: entry missing checks" "ledger-missing-key"
 
-# 27. malformed ledger: wrong field type
+# 28. malformed ledger: wrong field type
 fresh; mutate_ledger 'ls[-1]["dirty"] = "false"'
 run_attest --no-http
 refused "ledger malformed: dirty has wrong type" "ledger-wrong-type"
 
-# 28. unreadable manifest
+# 29. unreadable manifest
 fresh; rm "$R/tests/run-manifest.jsonl"
 run_attest --no-http
 refused "ledger malformed: FileNotFoundError" "ledger-unreadable"
 
-echo "ATTEST ACCEPTANCE: PASS (28 cases — positive control byte-identical to committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner, standing-attestation preserved across refusal, malformed ledger [not-json/non-object/missing-key/wrong-type/unreadable]; no refusal wrote or replaced an attestation or leaked a traceback)"
+# 30. verifier byte-stability: the certificate must name the bytes
+#     that RAN. Injected via the refusal-only override seam (a forged
+#     value can only cause refusal, never a false attestation).
+fresh
+if out="$(DMDS_ATTEST_BEFORE_OVERRIDE="$(printf '%064d' 0)" "$R/tests/attest.sh" --no-http 2>&1)"; then rc=0; else rc=$?; fi
+refused "verifier changed during attestation" "verifier-unstable"
+
+echo "ATTEST ACCEPTANCE: PASS (30 cases — positive control atomically replaces the sentinel and is byte-identical to the committed attestation, --no-http explicit+null, refusals: unreachable/mismatched HTTP, check inventory, suite composition, incomplete/empty ledger, extra batch entry, cherry-picked batch, run_id gap, kind/schema, nonzero exit, bool-as-int exit, dirty, tree-unstable, commit span, missing/corrupt evidence, forged-ledger malformed gzip, forged log hash, rebuilt dist, changed runner, malformed ledger [not-json/non-object/missing-key/wrong-type/unreadable], verifier-unstable; EVERY refusal asserted banner-carrying, traceback-free, standing-certificate-preserving, and tmp-litter-free)"

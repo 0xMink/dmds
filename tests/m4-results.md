@@ -901,3 +901,56 @@ reviewer, remaining work "concerns making the certificate office
 resilient when someone submits a document written in crayon or simply
 leaves last week's certificate sitting on the desk." Both are now
 tested behaviors.
+
+## Round 14 — the crayon that Python classified as a number (2026-07-19)
+
+Five findings; all five adopted. One of them is the most serious
+defect class this system has ever produced.
+
+**1. bool-is-an-int defeated the shape validator — and produced a
+FALSE ATTESTATION.** isinstance(False, int) is True and False == 0,
+so a ledger with exit:false passed BOTH the shape check and the
+semantic exit predicate. Counterfactual against the pre-patch
+verifier: **exit 0, ATTESTED printed — a certificate issued over
+malformed data.** Every prior defect was a messy or missing refusal;
+this one was a false positive from the instrument whose sole job is
+refusing. Fix: exact typing (type(v) is int) for schema/run_id/exit/
+checks — bool explicitly rejected. Case 15 injects exit:False.
+
+**2. Empty-ledger predicate was implemented but never injected** —
+the "every declared refusal predicate" claim was again slightly too
+broad. Case 8 added (existing-but-empty manifest).
+
+**3. Standing-certificate preservation generalized from one case to
+EVERY refusal.** Chose the reviewer's stronger option: fresh() now
+plants a sentinel standing attestation in every replica, and
+refused() asserts — for all 27 refusal cases — that the sentinel is
+byte-identical afterward with no tmp litter. Future branch
+reordering inside the verifier cannot quietly violate the invariant.
+The claim is now enforced per-branch, not inferred from structure.
+
+**4. Issuance is serialized and race-free.** Exclusive flock on
+tests/attestation.lock + UNIQUE mkstemp tmp in the destination dir
+(a fixed tmp name lets two concurrent verifiers write through each
+other's inode) + fsync of file AND directory, finally-unlinked.
+Honesty note: the concurrent-writer race itself is not
+deterministically injected — the locking is code-reviewed, not
+acceptance-forced; what IS asserted everywhere is no litter and no
+standing-certificate mutation. attestation.lock/.attestation.*.tmp
+gitignored so issuance can never dirty a future product run's
+provenance.
+
+**5. Verifier byte-stability gate.** attest.sh hashes itself FIRST;
+issuance refuses if the bytes changed mid-verification, and
+attest_sha256 records the pre-hash — the certificate names the bytes
+that RAN, the verifier's own tree_stable discipline. Tested via a
+refusal-only override seam (DMDS_ATTEST_BEFORE_OVERRIDE): a forged
+value can only cause refusal, never a false attestation, so the seam
+adds no attack surface. Case 30.
+
+Standing release re-issued: attest_sha256 = eb084396… (verified
+against on-disk script), everything else unchanged — same batch,
+run_ids 33–36, source fb69476, dist = http = 28507038….
+Suite: **ATTEST ACCEPTANCE: PASS (30 cases)** — every refusal
+banner-carrying, traceback-free, standing-certificate-preserving,
+tmp-litter-free.

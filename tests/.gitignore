@@ -2,3 +2,5 @@ node_modules/
 logs/
 evidence/
 runner-artifacts/
+attestation.lock
+.attestation.*.tmp

@@ -29,6 +29,12 @@ cd "$(dirname "$0")/.."
 require_http=1
 [ "${1:-}" = "--no-http" ] && require_http=0
 url="${DMDS_HTTP_URL:-http://127.0.0.1:8080/}"
+# verifier stability: hash THIS script's bytes before doing anything
+# else; issuance later refuses if they changed mid-verification, so
+# attest_sha256 names the bytes that RAN, not whatever was on disk at
+# the end. The override is a refusal-only test seam — a forged value
+# can only cause a refusal, never a false attestation.
+attest_before="${DMDS_ATTEST_BEFORE_OVERRIDE:-$(sha256sum tests/attest.sh | cut -d' ' -f1)}"
 http_sha=""
 if [ "$require_http" -eq 1 ]; then
   curl -fsS --max-time 5 "$url" > "/tmp/dmds-attest-http.$$" \
@@ -38,8 +44,8 @@ if [ "$require_http" -eq 1 ]; then
 else
   echo "NOTE: --no-http — producing a DISK-ONLY attestation (serving boundary not verified)"
 fi
-HTTP_SHA="$http_sha" REQUIRE_HTTP="$require_http" python3 - <<'PY'
-import gzip, hashlib, json, os, sys, zlib
+HTTP_SHA="$http_sha" REQUIRE_HTTP="$require_http" ATTEST_BEFORE="$attest_before" python3 - <<'PY'
+import fcntl, gzip, hashlib, json, os, sys, tempfile, zlib
 def sha_file(p):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -70,11 +76,20 @@ SHAPE = {
     "runner_sha256": str, "log_sha256": str,
     "evidence_path": (str, type(None)), "evidence_sha256": (str, type(None)),
 }
+# exact typing for integer fields: isinstance(False, int) is True in
+# Python, and False == 0 satisfies the exit predicate — so bool must
+# be rejected explicitly or a crayon gets classified as a number
+def well_typed(v, t):
+    if t is int:
+        return type(v) is int
+    if t == (int, type(None)):
+        return v is None or type(v) is int
+    return isinstance(v, t)
 for e in entries:
     for k, t in SHAPE.items():
         if k not in e:
             refuse("ledger malformed: entry missing %s" % k)
-        if not isinstance(e[k], t):
+        if not well_typed(e[k], t):
             refuse("ledger malformed: %s has wrong type" % k)
 dist = sha_file("dist/index.html")
 runner = sha_file("tests/run.sh")
@@ -128,9 +143,13 @@ if os.environ.get("REQUIRE_HTTP") == "1" and http_sha != dist:
 if problems:
     print("ATTESTATION REFUSED: " + "; ".join(problems))
     sys.exit(1)
+# the verifier's tree_stable: refuse if this script's bytes changed
+# between the pre-hash and issuance
+if sha_file("tests/attest.sh") != os.environ["ATTEST_BEFORE"]:
+    refuse("verifier changed during attestation")
 att = {
     "schema": 4,
-    "attest_sha256": sha_file("tests/attest.sh"),
+    "attest_sha256": os.environ["ATTEST_BEFORE"],
     "source_commit": entries[0]["commit"],
     "batch": batch,
     "dist_sha256": dist,
@@ -140,14 +159,28 @@ att = {
     "suites": {e["suite"]: e["checks"] for e in entries},
     "total_checks": sum(e["checks"] for e in entries),
 }
-# atomic issuance: a crash mid-write must never leave a truncated
-# certificate where a valid standing one used to be
-tmp = "tests/attestation.json.tmp"
-with open(tmp, "w", encoding="utf-8") as f:
-    json.dump(att, f, indent=1, sort_keys=True)
-    f.write("\n")
-    f.flush()
-    os.fsync(f.fileno())
-os.replace(tmp, "tests/attestation.json")
+# atomic, serialized issuance: an exclusive lock plus a UNIQUE tmp
+# file (a fixed tmp name lets two concurrent verifiers write through
+# each other's inode), fsync of file AND directory — a crash or a
+# racing verifier must never leave a truncated or post-replacement-
+# mutated certificate where a valid standing one used to be
+with open("tests/attestation.lock", "w") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    fd, tmp = tempfile.mkstemp(prefix=".attestation.", suffix=".tmp", dir="tests")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(att, f, indent=1, sort_keys=True)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, "tests/attestation.json")
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    dfd = os.open("tests", os.O_DIRECTORY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
 print("ATTESTED: " + json.dumps(att, sort_keys=True))
 PY
