@@ -31,7 +31,7 @@ else
   echo "NOTE: --no-http — producing a DISK-ONLY attestation (serving boundary not verified)"
 fi
 HTTP_SHA="$http_sha" REQUIRE_HTTP="$require_http" python3 - <<'PY'
-import gzip, hashlib, json, os, sys
+import gzip, hashlib, json, os, sys, zlib
 def sha_file(p):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -75,9 +75,16 @@ for e in entries:
         if sha_file(ep) != e["evidence_sha256"]:
             problems.append("run %d evidence object hash mismatch" % rid)
         else:
-            raw = gzip.open(ep, "rb").read()
-            if hashlib.sha256(raw).hexdigest() != e["log_sha256"]:
-                problems.append("run %d evidence decompresses to a different log" % rid)
+            # the sha gate above proves the object matches the LEDGER's
+            # claim — a forged ledger can bless malformed bytes, so the
+            # decompressor must refuse in-band, never traceback
+            try:
+                raw = gzip.open(ep, "rb").read()
+            except (OSError, EOFError, zlib.error) as exc:
+                problems.append("run %d evidence archive is not readable gzip: %s" % (rid, type(exc).__name__))
+            else:
+                if hashlib.sha256(raw).hexdigest() != e["log_sha256"]:
+                    problems.append("run %d evidence decompresses to a different log" % rid)
 if len({e["commit"] for e in entries}) != 1:
     problems.append("runs span multiple commits")
 http_sha = os.environ.get("HTTP_SHA") or None

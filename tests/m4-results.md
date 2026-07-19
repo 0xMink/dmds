@@ -801,3 +801,52 @@ attestation claim exists to defend.
 
 First run: **ATTEST ACCEPTANCE: PASS (14 cases)** against the round-10
 release state; dist/attestation hashes verified unchanged after.
+
+## Round 12 — the acceptance suite gets corrected by its own standard (2026-07-19)
+
+Reviewer accepted the round-11 suite ("a proper acceptance suite, not
+a shell script staring confidently at another shell script") and
+raised two wording/robustness defects plus harness polish. All three
+were right; one was a false claim of mine in the round-11 record.
+
+**1. My "cannot raise" claim was WRONG — recorded as such.** I wrote
+that the object-hash gate means gzip.open "only ever runs on
+byte-identical objects and cannot raise." Byte-identical *to what the
+ledger claims* — and a forged evidence_sha256 over malformed bytes
+passes the gate into the decompressor. I built case 20 (forged
+log_sha256) on the premise that the ledger might lie, then proved a
+safety property from the premise that it doesn't. Counterfactual
+against the pre-patch attest.sh confirmed: exit 1 with NO attestation
+written (failed safe), but an uncontrolled BadGzipFile traceback with
+no ATTESTATION REFUSED banner, aborting before other problems were
+collected. Fix: exception boundary (OSError/EOFError/zlib.error) →
+in-band "evidence archive is not readable gzip" refusal; case 19
+injects exactly the forged-ledger malformed-gzip state, and refused()
+now also asserts NO traceback in any refusal output.
+
+**2. "Every refusal branch" was an overclaim at commit time.** Seven
+declared predicates were uninjected: suite composition (name in
+slot), incomplete ledger, kind≠product, schema≠3, exit≠0,
+tree_stable:false, commit span. All seven added (the mutation
+framework makes each ~one line) rather than weakening the claim —
+"every declared refusal predicate" is now literal. 14 → 22 cases.
+
+**3. Harness statefulness.** run_attest toggled errexit ON after its
+first call in a script that started with set -u only — the harness's
+global shell semantics depended on call history, in a suite whose job
+is exposing exactly that kind of statefulness. Now set -euo pipefail
+from line one, if-captured exit codes, cleanup() that kills AND waits
+both helper processes. The unreachable-port TOCTOU race is gone:
+a holder process binds the port WITHOUT listening for the script's
+lifetime — connections deterministically refused, port reserved
+against reuse until cleanup.
+
+attest.sh changed (exception boundary only); the positive control
+proves the patched script reproduces the committed attestation
+byte-for-byte, so the standing release attestation is unaffected and
+dist is untouched. Full suite: **ATTEST ACCEPTANCE: PASS (22 cases)**.
+
+Reviewer's closing position stands: M4 and the 291-check release
+remain closed; this round was evidence-system hardening, "an argument
+over whether the evidence system deserves 'very extensively tested'
+or 'tested against literally every malformed universe.'"
