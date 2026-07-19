@@ -1289,7 +1289,7 @@
     if (window.console) console.warn("[DMDS] governor: tier 1 cannot hold frame rate at the floor -> demoting to tier 2");
     if (state.onDemote) state.onDemote();
   }
-  function govDegradeOnce(viaHold) {
+  function govDegradeOnce(strikeEligible) {
     var g = state.gov;
     // bad evidence cancels a queued PROMOTION — and the SAME window still
     // degrades below. Consuming a performance collapse merely to cancel
@@ -1306,12 +1306,13 @@
       // ~30s forever — the rung axis had no promotion memory, unlike
       // sizes and tier 2). A promotion undone twice within its evidence
       // window locks the lower rung until tab revisit or a size change.
-      // a strike is BOUNDARY-OSCILLATION evidence, so only a sustained-
-      // hold degradation counts: a severe bad window (interaction burst,
-      // browser stall, system load) still degrades immediately but says
-      // nothing about whether the promoted rung itself was too expensive
-      var promo = viaHold ? g.lastRungPromo : null;
-      if (!viaHold) g.lastRungPromo = null; // trial voided, not failed
+      // strike attribution is CONTAMINATION-aware, not severity-gated: a
+      // clean failure at any severity is real evidence the promoted rung
+      // doesn't fit (a rung failing cleanly at 27ms must not void its own
+      // trial forever), while an interaction-contaminated window still
+      // degrades immediately but voids the trial instead of striking
+      var promo = strikeEligible ? g.lastRungPromo : null;
+      if (!strikeEligible) g.lastRungPromo = null; // trial voided, not failed
       if (promo && promo.to === g.rung && state.time - promo.t < 120) {
         var strikes = g.rungStrikes;
         if (!strikes || strikes.to !== promo.to || state.time - strikes.t > 180) strikes = { to: promo.to, n: 0 };
@@ -1391,14 +1392,18 @@
   }
   // ONE evaluation function — the real frame loop and the test injector
   // both call this, so tests exercise production decision logic
-  function govEvaluate(p90, fast) {
+  function govEvaluate(p90, fast, interacted) {
     var g = state.gov;
     if (state.time < g.cool) { govLog("window", { p90: Math.round(p90 * 10) / 10, action: "cooldown" }); return "cooldown"; }
-    govLog("window", { p90: Math.round(p90 * 10) / 10, action: p90 > 25 ? "bad" : p90 < 17.9 ? "good" : "hold" });
+    var we = { p90: Math.round(p90 * 10) / 10, action: p90 > 25 ? "bad" : p90 < 17.9 ? "good" : "hold" };
+    if (interacted) we.int = true; // contamination recorded per window
+    govLog("window", we);
     if (p90 > 25) {
       g.good = 0; g.mid = 0;
-      govDegradeOnce();
-      if (fast && p90 > 40) govDegradeOnce(); // severe startup miss skips a rung
+      // a CLEAN failure counts as a strike at any severity; only an
+      // interaction-contaminated window voids the promotion trial
+      govDegradeOnce(!interacted);
+      if (fast && p90 > 40) govDegradeOnce(false); // severe startup miss skips a rung
       return "degrade";
     }
     if (p90 < 17.9) {
@@ -1412,7 +1417,7 @@
     // letting a machine sit below the floor forever
     g.good = 0;
     g.mid = (g.mid || 0) + 1;
-    if (g.mid >= 2) { g.mid = 0; govDegradeOnce(true); return "degrade-sustained-hold"; }
+    if (g.mid >= 2) { g.mid = 0; govDegradeOnce(!interacted); return "degrade-sustained-hold"; }
     return "hold";
   }
   function govEmergency() {
@@ -1441,6 +1446,10 @@
       return;
     }
     g.frames.push(dtMs);
+    // contamination sampling: a window during which the user held a grab
+    // or the field was excited is interaction evidence, not a clean
+    // performance verdict — strike attribution reads this, severity doesn't
+    if (state.grab.active || state.excite >= 0.1) g.winDirty = true;
     g.recent.push([now, dtMs]);
     while (g.recent.length && g.recent[0][0] < now - 1) g.recent.shift();
     if (g.recent.length >= 4) {
@@ -1448,20 +1457,20 @@
       for (var i = 0; i < g.recent.length; i++) sum += g.recent[i][1];
       if (sum / g.recent.length > 50) {
         if (govEmergency() === "emergency") {
-          g.frames = []; g.winStart = now; g.invalid = false;
+          g.frames = []; g.winStart = now; g.invalid = false; g.winDirty = false;
           return;
         }
       }
     }
     var winLen = now < g.fastUntil ? 1 : 5;
     if (now - g.winStart < winLen) return;
-    var frames = g.frames, wasInvalid = g.invalid;
-    g.frames = []; g.winStart = now; g.invalid = false;
+    var frames = g.frames, wasInvalid = g.invalid, wasDirty = g.winDirty;
+    g.frames = []; g.winStart = now; g.invalid = false; g.winDirty = false;
     // validity: not hidden, not marked (resume/restore/resize/alloc),
     // enough presented frames for the percentile to mean something
     if (wasInvalid || document.hidden || frames.length < winLen * 12) { g.good = 0; return; }
     var sorted = frames.slice().sort(function (a, b) { return a - b; });
-    govEvaluate(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], now < g.fastUntil);
+    govEvaluate(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], now < g.fastUntil, wasDirty);
   }
   function govMaybeResize(now) {
     var g = state.gov;
@@ -1479,7 +1488,12 @@
     }
     // a forced resize may fire mid-interaction — release the grab through
     // the standard path FIRST so pointer capture is dropped exactly once
-    // and no held clump survives into the rebuilt engine
+    // and no held clump survives into the rebuilt engine.
+    // EXPLICIT DURESS POLICY for the rest of the interaction state: a
+    // mid-morph transition reseeds at the CURRENT formation (the side of
+    // the morph mix has passed), fling velocities are discarded with the
+    // old field, and the visible snap is accepted — the field is already
+    // missing its frame budget, so there is no smoothness left to spend
     if (p.forced && state.grab.active && state.releaseGrab) state.releaseGrab();
     g.pendingResize = null;
     executeResize(p.idx);
@@ -1739,10 +1753,12 @@
         if (state.gov) {
           state.gov.invalid = true; // realloc window is invalid
           // a viewport change moves the fill-rate landscape: a rung-cost
-          // judgment made at the old backing size no longer applies
+          // judgment made at the old backing size no longer applies — and
+          // neither does a size performance-rejected under the old area
           state.gov.rungLockAt = 0;
           state.gov.rungStrikes = null;
           state.gov.lastRungPromo = null;
+          state.gov.perfRejected = {};
         }
         resize();
         Object.keys(state.formations).forEach(function (k) {
@@ -1796,6 +1812,9 @@
       }
       function releaseGrab() {
         // unconditional: a grab can never outlive its pointer (spec MUST)
+        // effective releases are counted so tests can prove the standard
+        // path ran (a reinit clearing GPU flags is not release causality)
+        if (state.grab.active) state.grabReleases = (state.grabReleases || 0) + 1;
         state.grab.active = false;
         state.grab.edge = false;
         document.documentElement.classList.remove("engine-grab");
@@ -2154,6 +2173,7 @@
         warmed: g.warmed, cooling: state.time < g.cool, good: g.good, mid: g.mid || 0,
         pending: g.pendingResize ? { idx: g.pendingResize.idx, dir: g.pendingResize.dir, forced: !!g.pendingResize.forced } : null,
         rungLockAt: g.rungLockAt || 0,
+        grabReleases: state.grabReleases || 0,
         post: state.post, demoted: g.demoted,
         txn: g.txn || { phase: "idle" },
         // trialFailed is the merged blocked-size view; the split fields
@@ -2207,7 +2227,7 @@
       if (opts.emergency) return govEmergency();
       var sorted = frameMs.slice().sort(function (a, b) { return a - b; });
       var p90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))];
-      return govEvaluate(p90, opts.fast === true);
+      return govEvaluate(p90, opts.fast === true, opts.interacting === true);
     }
   };
 })();

@@ -30,6 +30,7 @@
 #   74   log write failure (tee)
 #   75   evidence archive failure
 #   76   ledger append failure
+#   77   runner integrity: tree changed during the run (recorded, fatal)
 #   >128 killed by signal
 #
 #   tests/run.sh              run all product suites, stop on first failure
@@ -41,7 +42,7 @@ cd "$(dirname "$0")/.."
 mkdir -p tests/logs tests/failures tests/evidence tests/runner-artifacts
 
 PRODUCT_SUITES=(m1-core m2-grab m3-depth m4-governor)
-FIXTURE_SUITES=(fail-fixture pass-fixture)
+FIXTURE_SUITES=(fail-fixture pass-fixture taint-fixture)
 PROD_LEDGER=tests/run-manifest.jsonl
 ACCEPT_LEDGER=tests/runner-acceptance-manifest.jsonl
 LEDGER_EXCLUDES=(":(exclude)${PROD_LEDGER}" ":(exclude)${ACCEPT_LEDGER}")
@@ -49,15 +50,17 @@ LEDGER_EXCLUDES=(":(exclude)${PROD_LEDGER}" ":(exclude)${ACCEPT_LEDGER}")
 untracked_list() { git ls-files --others --exclude-standard 2>/dev/null || true; }
 
 # working-state fingerprint: tracked diffs + untracked names AND contents
-# + the artifact, runner and suite actually being exercised
+# + the artifact, runner and suite actually being exercised.
+# REQUIRED inputs fail CLOSED — a signature computed from partially-read
+# state would look respectable while attesting an unobserved tree
 tree_sig() {
   local suite="$1"
   {
-    git status --porcelain=v1 -- . "${LEDGER_EXCLUDES[@]}" 2>/dev/null || true
-    git diff --binary -- . "${LEDGER_EXCLUDES[@]}" 2>/dev/null || true
-    git diff --cached --binary -- . "${LEDGER_EXCLUDES[@]}" 2>/dev/null || true
-    while IFS= read -r f; do [ -f "$f" ] && sha256sum "$f" || true; done < <(untracked_list)
-    sha256sum dist/index.html tests/run.sh "tests/${suite}.js" 2>/dev/null || true
+    git status --porcelain=v1 -- . "${LEDGER_EXCLUDES[@]}"
+    git diff --binary -- . "${LEDGER_EXCLUDES[@]}"
+    git diff --cached --binary -- . "${LEDGER_EXCLUDES[@]}"
+    while IFS= read -r f; do if [ -n "$f" ] && [ -f "$f" ]; then sha256sum "$f"; fi; done < <(untracked_list)
+    sha256sum dist/index.html tests/run.sh "tests/${suite}.js"
   } | sha256sum | cut -d' ' -f1
 }
 
@@ -86,9 +89,9 @@ run_suite() {
      && git diff --cached --quiet -- . "${LEDGER_EXCLUDES[@]}" \
      && [ -z "$untracked" ]; then dirty=false; fi
   diff_sha="$({
-    git diff --binary -- . "${LEDGER_EXCLUDES[@]}" 2>/dev/null || true
-    git diff --cached --binary -- . "${LEDGER_EXCLUDES[@]}" 2>/dev/null || true
-    while IFS= read -r f; do [ -n "$f" ] && [ -f "$f" ] && { printf 'UNTRACKED %s\n' "$f"; sha256sum "$f"; } || true; done <<< "$untracked"
+    git diff --binary -- . "${LEDGER_EXCLUDES[@]}"
+    git diff --cached --binary -- . "${LEDGER_EXCLUDES[@]}"
+    while IFS= read -r f; do if [ -n "$f" ] && [ -f "$f" ]; then printf 'UNTRACKED %s\n' "$f"; sha256sum "$f"; fi; done <<< "$untracked"
   } | sha256sum | cut -d' ' -f1)"
   tree_before="$(tree_sig "$suite")"
   t0="$(date -u +%s)"
@@ -180,6 +183,14 @@ with open(e["LEDGER"], "a", encoding="utf-8") as f:
     f.write(json.dumps(entry, separators=(",", ":"), sort_keys=True) + "\n")
 PY
 
+  # tree instability is ENFORCED, not just recorded: result and evidence
+  # are preserved above, the ledger entry names the taint, and the runner
+  # refuses to continue or claim success — automation must reject what a
+  # careful human would reject
+  if [ "$tree_before" != "$tree_after" ]; then
+    echo "RUNNER INTEGRITY: tree changed during ${suite} run (tree_stable:false) — aborting" >&2
+    exit 77
+  fi
   [ "$status" -eq 0 ] || exit "$status"
 }
 

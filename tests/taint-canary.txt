@@ -1,0 +1,2 @@
+Tracked canary for runner tree-stability acceptance. taint-fixture.js
+appends to this file mid-run; runner-acceptance.sh restores it.

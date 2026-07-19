@@ -51,22 +51,35 @@ PATH="$fake:$PATH" tests/run.sh pass-fixture >/dev/null 2>&1
 [ $? -eq 76 ] || fail "python3 fault: expected exit 76 (ledger append failure)"
 rm -rf "$fake"
 
-# 7. ledger separation and integrity
+# 7. ENFORCEMENT: a tree-tainting suite is fatal (77), recorded, banner-
+#    free, and stops the multi-suite chain — detection without policy is
+#    just a diary
+out="$(SUITES="taint-fixture m2-grab" tests/run.sh all 2>&1)"
+rc=$?
+[ "$rc" -eq 77 ] || fail "taint: expected exit 77, got $rc"
+printf '%s' "$out" | grep -q "ALL SUITES PASSED" && fail "taint: success banner printed for an unstable tree"
+m2_logs_after3="$(ls tests/logs/ 2>/dev/null | grep -c '^m2-grab-' || true)"
+[ "$m2_logs_after3" -eq "$m2_logs_before" ] || fail "taint: m2-grab started after an unstable first suite"
+git checkout -- tests/taint-canary.txt
+
+# 8. ledger separation and integrity
 [ "$(lines tests/run-manifest.jsonl)" -eq "$prod_before" ] || fail "fixtures polluted the production ledger"
 acc_after="$(lines tests/runner-acceptance-manifest.jsonl)"
-# fail(1) + harness(1) + multi(1) + pass(1) = 4; faulted runs append nothing
-[ $((acc_after - acc_before)) -eq 4 ] || fail "expected exactly 4 acceptance entries, got $((acc_after - acc_before))"
-tail -4 tests/runner-acceptance-manifest.jsonl | python3 -c '
+# fail(1) + harness(1) + multi(1) + pass(1) + taint(1) = 5; faulted runs append nothing
+[ $((acc_after - acc_before)) -eq 5 ] || fail "expected exactly 5 acceptance entries, got $((acc_after - acc_before))"
+tail -5 tests/runner-acceptance-manifest.jsonl | python3 -c '
 import json, sys
 es = [json.loads(l) for l in sys.stdin]
-assert [e["exit"] for e in es] == [1, 2, 1, 0], [e["exit"] for e in es]
+assert [e["exit"] for e in es] == [1, 2, 1, 0, 0], [e["exit"] for e in es]
 assert all(e["kind"] == "fixture" for e in es), "kind must be fixture"
 assert all(e["schema"] == 3 for e in es), "schema must be 3"
 assert all("tree_stable" in e and "untracked" in e for e in es), "schema-3 fields missing"
+assert es[-1]["tree_stable"] is False, "taint run must record tree_stable:false"
+assert all(e["tree_stable"] for e in es[:-1]), "non-taint fixtures must be tree-stable"
 ' || fail "acceptance ledger entries malformed"
 
-# 8. fixture failures land in runner-artifacts, never the committed fire history
+# 9. fixture failures land in runner-artifacts, never the committed fire history
 ls tests/runner-artifacts/ | grep -q '^fail-fixture-' || fail "fixture failure log not in runner-artifacts"
 ls tests/failures/ 2>/dev/null | grep -q '^fail-fixture-' && fail "fixture failure log leaked into tests/failures"
 
-echo "RUNNER ACCEPTANCE: PASS (exit 1/2/64 propagation, stop-on-first-failure, evidence+ledger fault injection fatal at 75/76, ledger separation, artifact segregation)"
+echo "RUNNER ACCEPTANCE: PASS (exit 1/2/64 propagation, stop-on-first-failure, evidence+ledger faults fatal at 75/76, tree-taint fatal at 77 with no banner, ledger separation, artifact segregation)"
