@@ -1,0 +1,19 @@
+{
+ "dist_sha256": "a8396aa000137d7a3ef76f3cfe2863996e2bf2eff8b9648157d2bf2cc0ddff17",
+ "run_ids": [
+  25,
+  26,
+  27,
+  28
+ ],
+ "runner_sha256": "5665d328b78690d1f1f18a78e6f2c005dfdbe56233ff0d1880d3b1e81e370d09",
+ "schema": 1,
+ "source_commit": "fa66e1486f8dd813d0956cc0e5b63619a824651d",
+ "suites": {
+  "m1-core": 59,
+  "m2-grab": 55,
+  "m3-depth": 35,
+  "m4-governor": 135
+ },
+ "total_checks": 284
+}

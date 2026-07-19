@@ -631,3 +631,52 @@ that, which is the point. A clean run of record follows this commit.
 the keyboard this time): M1 59 · M2 55 · M3 35 · M4 127 = **276
 checks**, all exit 0, all dirty:false, all tree_stable:true, zero
 untracked files, four verified evidence objects.
+
+## Review closure round 8 (2026-07-19) — served bytes = proven bytes
+
+1. **Release sequence corrected** (the review's core finding): dist is
+   no longer rebuilt after testing. New order: commit source → build →
+   commit dist → regression against THOSE bytes → tests/attest.sh
+   binds {source_commit, dist_sha256, runner_sha256, run_ids} and
+   REFUSES if any run was non-zero/dirty/unstable, spanned commits,
+   used a different runner, or — the key one — tested different dist
+   bytes than presently on disk. The attestation commit does not
+   rebuild (a proof must not change the object it proves).
+2. **Tree instability ENFORCED**: exit 77, result+evidence+ledger
+   preserved, no success banner, chain stops. Acceptance-tested with
+   a self-tainting fixture (tracked canary modified mid-run):
+   exit 77, tree_stable:false recorded, m2-grab never started,
+   banner absent.
+3. **tree_sig/diff_sha fail CLOSED**: required git/sha256sum inputs
+   lost their || true guards — a signature over partially-read state
+   no longer possible; only environmental diagnostics tolerate absence.
+4. **Strike attribution is contamination-aware, not severity-gated**
+   (fixing the reverse failure: a rung failing cleanly at 27ms voided
+   its own trial forever → eternal promote/degrade cycle). winDirty
+   sampled per frame (grab active or excite ≥ 0.1); clean failures
+   strike at ANY severity; contaminated windows degrade but void;
+   contamination recorded in history (int:true). Tested in all four
+   quadrants.
+5. **Grab-release causality instrumented**: effective releases counted
+   (only when a grab was active — a reinit clearing GPU flags cannot
+   move the counter). Forced-resize-during-grab now proves: released
+   via the standard path EXACTLY once, post-reinit pointerup counts
+   nothing, a fresh grab works on the rebuilt engine.
+6. **Poisoned-intermediate skip demonstrated at the default ladder**:
+   384 alloc-failed → request targets 256 directly, 384 never
+   requested or committed, 512→256 commit lands. (Two-consecutive-
+   poisoned-then-viable is untestable on the shipped ladder — only
+   two sizes exist below baseline; the skip loop + exhaustion case
+   cover the code paths that exist.)
+7. **Mid-morph duress policy explicit and tested**: forced resize at
+   scrub-parked mix 0.5 reseeds at the current formation side
+   ('device'), completes to mix 1, no limbo. Fling velocities are
+   discarded with the old field (documented at the release site).
+8. **perfRejected clears on viewport change** (same reasoning as the
+   rung lock: a conditional verdict must not outlive its conditions).
+
+Acceptance: 9 sections PASS (adds exit-77 enforcement drill).
+**Run of record: run_ids 25–28 at fa66e14 — M1 59 · M2 55 · M3 35 ·
+M4 135 = 284 checks, all dirty:false + tree_stable:true. Attested:
+dist a8396aa0… (independently re-hashed = served bytes). M4 phase +
+evidence workflow: CLOSED.**
