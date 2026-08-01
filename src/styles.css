@@ -256,12 +256,12 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
    per-frame cost. Inside hover-flood rows the scrim yields to the
    flood so ink-on-signal states stay clean. */
 .hero__tag, .manifesto__text, .manifesto__foot, .section-head,
-.cap__meta, .cap__desc, .cap__tags, .operator__body,
+.cap__meta, .cap__desc, .cap__tags, .operator__body, .transmit,
 .proof__body, .work__detail p, .contact__kicker, .contact__sub {
   position: relative;
 }
 .hero__tag::before, .manifesto__text::before, .manifesto__foot::before, .section-head::before,
-.cap__meta::before, .cap__desc::before, .cap__tags::before, .operator__body::before,
+.cap__meta::before, .cap__desc::before, .cap__tags::before, .operator__body::before, .transmit::before,
 .proof__body::before, .work__detail p::before, .contact__kicker::before, .contact__sub::before {
   content: ""; position: absolute; inset: -1.4rem -2rem; z-index: -1;
   background: rgba(11, 11, 12, 0.82);
@@ -443,19 +443,35 @@ html.engine-grab, html.engine-grab * {
   .proof__body { grid-column: 2; }
 }
 
+/* the page's ONE loud signal moment: a full-bleed band of solid
+   --signal in the scroll path. Everything else on the page stays ink,
+   which is exactly why this lands — ink type on the band is 5.84:1,
+   AA at every size it uses. Kept to a single band (operator stats stay
+   dark) so it reads as a statement, not a theme. */
 .proof__stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
-  background: var(--line); border: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--signal);
   margin-top: 5rem;
+  margin-left: calc(-1 * var(--pad)); margin-right: calc(-1 * var(--pad));
+  padding: 3.4rem var(--pad);
 }
+.proof__stats ::selection { background: var(--ink); color: var(--signal); }
 .stat {
   position: relative; background: var(--ink); padding: 2rem 1.4rem;
   display: flex; flex-direction: column; gap: 0.6rem;
 }
+.proof__stats .stat { background: none; padding: 0.2rem 1.4rem; }
+.proof__stats .stat + .stat { border-left: 1px solid rgba(11, 11, 12, 0.3); }
 .stat__num { font-size: clamp(2.2rem, 4.5vw, 3.6rem); color: var(--bone); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .stat__plus { position: absolute; top: 1.6rem; right: 1.2rem; color: var(--signal); font-size: 1.3rem; }
 .stat__label { color: var(--bone-dim); font-size: 0.625rem; }
-@media (max-width: 860px) { .proof__stats { grid-template-columns: repeat(2, 1fr); } }
+.proof__stats .stat__num { color: var(--ink); }
+.proof__stats .stat__plus { color: var(--ink); top: 0; right: 1rem; }
+.proof__stats .stat__label { color: rgba(11, 11, 12, 0.85); } /* 5.07:1 on signal */
+@media (max-width: 860px) {
+  .proof__stats { grid-template-columns: repeat(2, 1fr); row-gap: 2rem; }
+  .proof__stats .stat:nth-child(3) { border-left: 0; }
+}
 
 /* ═══ Operator ═══ */
 .operator { padding-top: 9rem; padding-bottom: 9rem; border-top: 1px solid var(--line); }
@@ -598,18 +614,23 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 @media (max-width: 560px) { .transmit__grid { grid-template-columns: 1fr; } }
 .transmit__field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
 .transmit__field .mono { color: var(--signal); font-size: 0.625rem; }
+/* hairline grammar: fields are underlines, not boxes — the form
+   reads as an instrument panel, not a CMS default. The scrim behind
+   .transmit guarantees the dark ground the hairlines sit on. */
 .transmit__field input, .transmit__field textarea {
-  background: var(--ink-2); border: 1px solid var(--line-strong); color: var(--bone);
+  background: transparent; border: 0;
+  border-bottom: 1px solid var(--line-strong); color: var(--bone);
   font-family: var(--font-body); font-size: 0.95rem;
-  padding: 0.9rem 1rem; border-radius: 0;
-  transition: border-color 0.25s;
+  padding: 0.65rem 0.1rem; border-radius: 0;
+  transition: border-color 0.25s, box-shadow 0.25s;
   width: 100%; resize: vertical;
 }
 .transmit__field input::placeholder, .transmit__field textarea::placeholder { color: var(--bone-dim); }
 .transmit__field input:focus, .transmit__field textarea:focus {
   outline: none; border-color: var(--signal);
+  box-shadow: 0 1px 0 var(--signal); /* underline reads 2px without layout shift */
 }
-.transmit__field input:user-invalid { border-color: #d4452c; }
+.transmit__field input:user-invalid { border-color: #d4452c; box-shadow: 0 1px 0 #d4452c; }
 .transmit__chips { border: none; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .transmit__chips legend { color: var(--signal); font-size: 0.625rem; margin-bottom: 0.7rem; }
 .transmit__chips label { cursor: pointer; }
@@ -618,11 +639,22 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
   display: inline-block; border: 1px solid var(--line-strong); padding: 0.5rem 0.9rem;
   color: var(--bone-dim); transition: all 0.25s;
 }
-.transmit__chips input:checked + span { border-color: var(--signal); color: var(--signal); background: rgba(255, 74, 0, 0.08); }
+.transmit__chips input:checked + span { border-color: var(--signal); color: var(--ink); background: var(--signal); }
 .transmit__chips input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
 .transmit__hp { position: absolute; left: -5000px; width: 1px; height: 1px; opacity: 0; }
 .transmit__micro { color: var(--bone-dim); text-align: center; }
 .transmit__micro a { color: var(--bone-dim); }
+/* one visible line of microcopy; the rest folds behind a disclosure —
+   fine print should be findable, not a disclaimers pile */
+.transmit__fine { text-align: center; color: var(--bone-dim); }
+.transmit__fine summary {
+  cursor: pointer; list-style: none; display: inline-block;
+  color: var(--bone-dim); transition: color 0.25s;
+}
+.transmit__fine summary::-webkit-details-marker { display: none; }
+.transmit__fine summary:hover, .transmit__fine[open] summary { color: var(--signal); }
+.transmit__fine summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.transmit__fine p { margin-top: 0.9rem; line-height: 1.9; }
 .transmit__done {
   border: 1px solid var(--signal); color: var(--signal);
   padding: 1.6rem 2rem; margin-top: 1rem;
@@ -638,8 +670,8 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 .contact__cta {
   display: inline-flex; align-items: center; gap: 1.1rem;
   background: transparent; color: inherit; cursor: pointer;
-  border: 1px solid var(--bone-dim); border-radius: 100px;
-  padding: 1.3rem 2.6rem; margin-top: 1rem;
+  border: 1px solid var(--bone-dim); border-radius: 0;
+  padding: 1.2rem 2.6rem; margin-top: 1rem;
   font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.16em;
   text-decoration: none; text-transform: uppercase;
   position: relative; overflow: hidden;
@@ -649,7 +681,6 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 .contact__cta::before {
   content: ""; position: absolute; inset: 0; background: var(--signal);
   transform: translateY(101%); transition: transform 0.4s var(--ease-inout);
-  border-radius: 100px;
 }
 .contact__cta:hover::before { transform: translateY(0); }
 .contact__cta > * { position: relative; z-index: 1; }
