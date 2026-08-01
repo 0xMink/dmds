@@ -12,6 +12,10 @@
   --signal: #ff4a00;
   --signal-hot: #ff6b2b;
   --line: rgba(237, 234, 227, 0.13);
+  /* interactive-control boundaries: WCAG 1.4.11 needs 3:1 against the
+     page — 0.4 alpha lands at 3.33:1 on ink. --line stays for purely
+     decorative rules */
+  --line-strong: rgba(237, 234, 227, 0.4);
   --font-display: "Clash Display", "Arial Narrow", sans-serif;
   --font-body: "General Sans", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -242,6 +246,34 @@ html.js .reveal-lines.is-in .line { clip-path: inset(-10% 0 -10% 0); transform: 
 html.js .reveal-lines.is-in .line:nth-child(2) { transition-delay: 0.09s; }
 html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
+/* ═══ Legibility scrim ═══
+   Copy never fights the particle field. Text zones carry a feathered
+   ink backing — a blurred solid, so it hugs each block's shape at any
+   width or alignment — because dense particle regions stack additively
+   to white and no amount of engine dimming guarantees dark behind
+   text. The field stays vivid in open space; behind copy it reads as
+   atmosphere, not competition. Static layers: composited once, no
+   per-frame cost. Inside hover-flood rows the scrim yields to the
+   flood so ink-on-signal states stay clean. */
+.hero__tag, .manifesto__text, .manifesto__foot, .section-head,
+.cap__meta, .cap__desc, .cap__tags, .operator__body,
+.proof__body, .work__detail p, .contact__kicker, .contact__sub {
+  position: relative;
+}
+.hero__tag::before, .manifesto__text::before, .manifesto__foot::before, .section-head::before,
+.cap__meta::before, .cap__desc::before, .cap__tags::before, .operator__body::before,
+.proof__body::before, .work__detail p::before, .contact__kicker::before, .contact__sub::before {
+  content: ""; position: absolute; inset: -1.4rem -2rem; z-index: -1;
+  background: rgba(11, 11, 12, 0.82);
+  filter: blur(26px);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.proof__row:hover .proof__body::before, .proof__row:focus-within .proof__body::before,
+.work__row:hover .work__detail p::before, .work__row:focus-within .work__detail p::before {
+  opacity: 0;
+}
+
 /* ═══ Hero ═══ */
 .hero { height: 100vh; height: 100svh; }
 .hero__corners i {
@@ -405,7 +437,7 @@ html.engine-grab, html.engine-grab * {
 .proof__body { color: var(--bone-dim); max-width: 46rem; }
 .proof__plain { display: block; margin-top: 0.7rem; color: var(--bone-dim); font-size: 0.625rem; }
 .proof__row:hover > *, .proof__row:hover .proof__body, .proof__row:hover .proof__idx { color: var(--ink); }
-.proof__row:hover .proof__plain { color: rgba(11, 11, 12, 0.72); }
+.proof__row:hover .proof__plain { color: rgba(11, 11, 12, 0.85); } /* 5.07:1 on the flood; 0.72 was 4.12 */
 @media (max-width: 860px) {
   .proof__row { grid-template-columns: 3.4rem 1fr; }
   .proof__body { grid-column: 2; }
@@ -567,7 +599,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 .transmit__field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
 .transmit__field .mono { color: var(--signal); font-size: 0.625rem; }
 .transmit__field input, .transmit__field textarea {
-  background: var(--ink-2); border: 1px solid var(--line); color: var(--bone);
+  background: var(--ink-2); border: 1px solid var(--line-strong); color: var(--bone);
   font-family: var(--font-body); font-size: 0.95rem;
   padding: 0.9rem 1rem; border-radius: 0;
   transition: border-color 0.25s;
@@ -583,7 +615,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 .transmit__chips label { cursor: pointer; }
 .transmit__chips input { position: absolute; opacity: 0; pointer-events: none; }
 .transmit__chips span {
-  display: inline-block; border: 1px solid var(--line); padding: 0.5rem 0.9rem;
+  display: inline-block; border: 1px solid var(--line-strong); padding: 0.5rem 0.9rem;
   color: var(--bone-dim); transition: all 0.25s;
 }
 .transmit__chips input:checked + span { border-color: var(--signal); color: var(--signal); background: rgba(255, 74, 0, 0.08); }

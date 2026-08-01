@@ -406,6 +406,9 @@
     })();
   }
   $$(".scramble").forEach(function (el) {
+    // the accessible name must never scramble: SRs announce at focus
+    // time, mid-animation — pin the real name before any frame runs
+    if (!el.hasAttribute("aria-label")) el.setAttribute("aria-label", el.textContent.trim());
     el.addEventListener("mouseenter", function () { scramble(el); });
     el.addEventListener("focus", function () { scramble(el); });
   });
