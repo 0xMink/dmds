@@ -51,6 +51,10 @@
     line.innerHTML = "<span>" + label + " " + dots + "</span><span>" + value + "</span>";
     logEl.appendChild(line);
     statusEl.textContent = (opts.status || label).toUpperCase();
+    // durable mirror: the loader removes itself from the DOM after the
+    // reveal, but boot evidence must outlive the splash — telemetry and
+    // tests read this buffer instead of racing the removal
+    (window.DMDS_BOOTLOG = window.DMDS_BOOTLOG || []).push(label + " :: " + value);
   }
 
   var loaderT0 = performance.now();

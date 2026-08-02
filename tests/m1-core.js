@@ -92,10 +92,14 @@ const LIFECYCLE_INSTRUMENTS = () => {
     const r = await page.evaluate(() => ({
       status: window.DMDS_GL2.status(),
       health: window.DMDS_GL2.debugGLHealth(),
-      log: Array.from(document.querySelectorAll('.loader__log-line')).map(l => l.textContent),
+      // DMDS_BOOTLOG is the durable mirror — the loader element removes
+      // itself ~1.1s after the reveal, so reading its DOM here races the
+      // removal (latent since the first commit; surfaced when scrim
+      // compositing shifted SwiftShader frame pacing)
+      log: (window.DMDS_BOOTLOG || []).slice(),
     }));
     check('prod:count-262144', r.status.count === 262144, JSON.stringify(r.status));
-    check('prod:seed-line', r.log.some(l => /SEED particles.*262,144/.test(l)));
+    check('prod:seed-line', r.log.some(l => /SEED particles.*262,144/.test(l)), JSON.stringify(r.log));
     check('prod:running', r.status.running === true && r.status.tier === 'gl2');
     check('prod:no-gl-error', r.health.error === 0, 'glError=' + r.health.error);
     check('prod:fbos-complete', r.health.fbo.every(s => s === 0x8CD5), JSON.stringify(r.health.fbo));
