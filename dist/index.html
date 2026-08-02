@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-DUqZ4P0GSbSQdtNxYqga67vitIk1+ZGrL+0iZhxko58='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-SUdih4zEuGiyDgwUDvvpUgavfDut+zRvJKWp67Ii6Gk=' 'sha256-2dsjK58zcrFJsHoFBKvr/bs5W9Tg5Dwuq0eb9/qiso4=' 'sha256-9I3vYJYu0mR9Cg7cyB3hsv/DakwcmWuFE/QU3KmL+RQ='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-DUqZ4P0GSbSQdtNxYqga67vitIk1+ZGrL+0iZhxko58='; script-src 'sha256-AJXiwkC6XZY6MD/1Lzy/RTj3IMTiSjV9ivXhFdczBvs=' 'sha256-SUdih4zEuGiyDgwUDvvpUgavfDut+zRvJKWp67Ii6Gk=' 'sha256-2dsjK58zcrFJsHoFBKvr/bs5W9Tg5Dwuq0eb9/qiso4=' 'sha256-IsSf1wdou3NplFAzzXgk6vK+S0D0PCGTMjIBvmKF5fM='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS® — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -743,7 +743,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="fcff870 2026-08-01T19:26:31Z">
+<meta name="dmds-build" content="2ca4191-dirty 2026-08-02T05:02:39Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -4610,6 +4610,10 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     line.innerHTML = "<span>" + label + " " + dots + "</span><span>" + value + "</span>";
     logEl.appendChild(line);
     statusEl.textContent = (opts.status || label).toUpperCase();
+    // durable mirror: the loader removes itself from the DOM after the
+    // reveal, but boot evidence must outlive the splash — telemetry and
+    // tests read this buffer instead of racing the removal
+    (window.DMDS_BOOTLOG = window.DMDS_BOOTLOG || []).push(label + " :: " + value);
   }
 
   var loaderT0 = performance.now();
@@ -5406,4 +5410,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build fcff870 2026-08-01T19:26:31Z -->
+<!-- dmds build 2ca4191-dirty 2026-08-02T05:02:39Z -->
