@@ -1,0 +1,72 @@
+== env preamble ==
+Sat Aug  1 19:34:35 UTC 2026
+ 19:34:36 up 14 days, 23:06,  5 users,  load average: 5.67, 5.40, 4.29
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi        15Gi       320Mi          0B       408Mi       728Mi
+Swap:         8.0Gi       6.7Gi       1.3Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  1 7004412 328376      0 417920    0    2    30    58    0    1  1  0 99  0  0
+ 0  1 7003132 322256      0 417920 1372    0  1376   140 3221 21070  6  0 94  0  0
+ 0  1 7002108 311808      0 417920 1220    0  1220    64 3243 18527  7  0 93  0  0
+93017 S     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+commit: 413081f5c65cd30fdc02eb6feb506b2d6863d222 dirty: false
+== suite: m2-grab ==
+  ok   grab:captures-particles count=224
+  ok   grab:depth-stored-on-captured 
+  ok   grab:free-keep-sentinel 
+  ok   grab:membership-constant-still 
+  ok   grab:membership-constant-dragging 
+  ok   grab:clump-follows-pointer dx=4.50
+  FAIL grab:clump-keeps-shape drift=1.665 clumpR=3.75
+  ok   grab:release-same-step-clears-all 
+  ok   grab:release-restores-sentinel 
+  ok   grab:fling-finite-bounded maxV=28.5
+  ok   grab:fling-matches-drag-direction meanVX=20.18
+  ok   grab:no-page-errors 
+  ok   grab:cancel-releases {"before":984,"after":0}
+  ok   grab:blur-releases {"before":1171,"after":0}
+  ok   grab:nan-while-held-recovers-and-clears {"finite":true,"cleared":true}
+  ok   num:damping-time-based-not-per-frame c@1/144=5.333 c@1/30=5.330
+  ok   num:drag-coefficient-near-nominal maxOff=2.55%
+  ok   conv:dt=1/144:grabbed n=967
+  ok   conv:dt=1/144:excursion-inside-bound maxR=12.3 oob=60.9
+  ok   conv:dt=1/144:99pct-within-0.01-by-3s 4096/4096
+  ok   conv:dt=1/144:100pct-within-0.03-by-4s 4096/4096
+  ok   conv:dt=1/144:zero-grab-flags flags=0
+  ok   conv:dt=1/144:zero-nonfinite 
+  ok   conv:dt=1/60:grabbed n=971
+  ok   conv:dt=1/60:excursion-inside-bound maxR=12.1 oob=60.9
+  ok   conv:dt=1/60:99pct-within-0.01-by-3s 4096/4096
+  ok   conv:dt=1/60:100pct-within-0.03-by-4s 4096/4096
+  ok   conv:dt=1/60:zero-grab-flags flags=0
+  ok   conv:dt=1/60:zero-nonfinite 
+  ok   conv:dt=1/30:grabbed n=948
+  ok   conv:dt=1/30:excursion-inside-bound maxR=11.9 oob=60.9
+  ok   conv:dt=1/30:99pct-within-0.01-by-3s 4096/4096
+  ok   conv:dt=1/30:100pct-within-0.03-by-4s 4096/4096
+  ok   conv:dt=1/30:zero-grab-flags flags=0
+  ok   conv:dt=1/30:zero-nonfinite 
+  ok   grab:lostpointercapture-releases {"lpcBefore":1002,"lpcAfter":0,"hidBefore":1041,"hidAfter":0}
+  ok   grab:hidden-tab-releases {"lpcBefore":1002,"lpcAfter":0,"hidBefore":1041,"hidAfter":0}
+  ok   grab:context-loss-releases {"before":1002,"grabActive":false,"flags":0}
+  ok   grab:destroy-resets-grab {"before":964,"grabActive":false,"flags":0}
+  ok   grab:text-press-never-grabs {"textGrab":0,"classDuringText":false,"fieldGrab":973,"classDuringGrab":true,"classAfterRelease":false}
+  ok   grab:field-press-grabs 
+  ok   grab:selection-suppressed-during-grab-only {"textGrab":0,"classDuringText":false,"fieldGrab":973,"classDuringGrab":true,"classAfterRelease":false}
+  ok   geom:16x9:roundtrip maxErr=1.3712082204129628e-12
+  ok   geom:ultrawide:roundtrip maxErr=1.4938297634290472e-12
+  ok   geom:portrait:roundtrip maxErr=2.1833734939911268e-12
+  ok   prodconv:256sq:captured-via-reduction captured=4824
+  ok   prodconv:256sq:99pct-by-3s out=1/65536
+  ok   prodconv:256sq:100pct-by-4s finalOut=0 bad=0
+  ok   prodconv:256sq:maxdist-sane maxDist=0
+  ok   prodconv:256sq:no-errors 
+  ok   prodconv:512sq:captured-via-reduction captured=19597
+  ok   prodconv:512sq:99pct-by-3s out=0/262144
+  ok   prodconv:512sq:100pct-by-4s finalOut=0 bad=0
+  ok   prodconv:512sq:maxdist-sane maxDist=0
+  ok   prodconv:512sq:no-errors 
+M2 GRAB: FAIL
+exit=1
