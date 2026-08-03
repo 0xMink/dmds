@@ -109,7 +109,7 @@ try:
             text = re.sub(r"(?:^|(?<=\s))//.*$", "", text, flags=re.M)
         return text
 
-    for fname, kind in (("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js")):
+    for fname, kind in (("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js"), ("term.js", "js")):
         body = strip_comments(read(os.path.join(SRC, fname)), kind)
         for ch in sorted({c for c in body if ord(c) > 127}):
             if ch not in covered and ch not in SYSTEM_FALLBACK_OK:

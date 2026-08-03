@@ -41,7 +41,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p tests/logs tests/failures tests/evidence tests/runner-artifacts
 
-PRODUCT_SUITES=(m1-core m2-grab m3-depth m4-governor)
+PRODUCT_SUITES=(m1-core m2-grab m3-depth m4-governor m5-terminal)
 FIXTURE_SUITES=(fail-fixture pass-fixture taint-fixture)
 PROD_LEDGER=tests/run-manifest.jsonl
 ACCEPT_LEDGER=tests/runner-acceptance-manifest.jsonl

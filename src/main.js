@@ -161,6 +161,14 @@
       if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
         hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
       }
+      // terminal context: accessors, not snapshots — GL is reassigned on
+      // governor demotion and status must describe the live engine
+      if (window.DMDS_TERM) {
+        window.DMDS_TERM.setContext({
+          gl: function () { return glOK ? GL : null; },
+          fps: function () { return GL && GL.fps ? GL.fps() : 0; }
+        });
+      }
     })
     .catch(function () {
       $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */

@@ -204,6 +204,40 @@ html.loaded .nav { opacity: 1; transform: none; }
 }
 .nav__snd:hover { color: var(--bone); }
 .nav__snd.on { color: var(--signal); }
+.nav__trm[aria-expanded="true"] { color: var(--signal); }
+
+/* ═══ DMDS/OS terminal — bottom sheet over the live page ═══ */
+.term {
+  width: 100%; max-width: 100%;
+  margin: auto 0 0; border: 0;
+  border-top: 1px solid var(--line-strong);
+  background: rgba(19, 19, 21, 0.96);
+  color: var(--bone);
+  padding: 1.2rem var(--pad) 1.4rem;
+  height: min(42vh, 30rem);
+}
+.term[open] { display: flex; flex-direction: column; }
+/* the page stays visible — the terminal operates it, so it is the display */
+.term::backdrop { background: transparent; }
+.term__out {
+  flex: 1; overflow-y: auto;
+  font-size: 0.6875rem; line-height: 1.8; letter-spacing: 0.08em;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.term__out .t-cmd { color: var(--bone-dim); }
+.term__out .t-dim { color: var(--bone-dim); }
+.term__out .t-err { color: #d4452c; }
+.term__line { display: flex; gap: 0.6rem; align-items: baseline; margin-top: 0.8rem; }
+.term__prompt { color: var(--signal); }
+.term__in {
+  flex: 1; background: transparent; border: 0;
+  color: var(--bone); font: inherit; letter-spacing: inherit;
+  text-transform: none; caret-color: var(--signal);
+}
+.term__in:focus-visible { outline: none; box-shadow: 0 1px 0 var(--signal); }
+@media (forced-colors: active) {
+  .term { border-top: 1px solid CanvasText; }
+}
 /* past the hero, the nav gets a solid bar so it never fights body text */
 .nav--scrolled {
   mix-blend-mode: normal;

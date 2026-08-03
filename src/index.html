@@ -54,6 +54,7 @@
     <span class="nav__clock" id="clock">00:00:00 ET</span>
   </div>
   <nav class="nav__links mono" aria-label="Primary">
+    <button class="nav__snd nav__trm" id="term-toggle" aria-expanded="false" aria-controls="term" data-cursor hidden>TRM</button>
     <button class="nav__snd" id="snd-toggle" aria-pressed="false" data-cursor>SND&nbsp;·&nbsp;OFF</button>
     <a href="#work" class="scramble" data-cursor>WORK</a>
     <a href="#capabilities" class="scramble" data-cursor>CAPABILITIES</a>
@@ -425,9 +426,18 @@
 </main>
 </div>
 
+<dialog id="term" class="term mono" aria-label="DMDS/OS terminal">
+  <div class="term__out" id="term-out" role="log"></div>
+  <form class="term__line" id="term-form">
+    <span class="term__prompt" aria-hidden="true">dmds://$</span>
+    <input class="term__in" id="term-in" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal command">
+  </form>
+</dialog>
+
 <script src="claims.js"></script>
 <script src="gl2.js"></script>
 <script src="gl.js"></script>
+<script src="term.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
