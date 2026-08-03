@@ -1005,3 +1005,42 @@ Standing release re-issued: attest_sha256 = 6344d979… (verified
 against on-disk script), all else unchanged — same batch, run_ids
 33–36, source fb69476, dist = http = 28507038….
 Suite: **ATTEST ACCEPTANCE: PASS (35 cases)**.
+## Round 16 — a one-line comment gets the full treatment (2026-08-03)
+
+The runner's header comment claimed "this repo has no remote" — true
+when written, false since the repo went public. The conclusion it
+supported (evidence archives do not survive machine loss) is still
+true, for a different reason: tests/evidence/ is gitignored and never
+pushed. Fixed the stated reason (0f64fd4). One changed byte in a
+comment, but attest.sh binds every attested run to the CURRENT runner
+bytes (refusal: "run N used a different runner"), so a comment edit
+retires the standing batch's re-attestability and the acceptance
+harness's positive control with it. Per discipline, the change gets a
+full round rather than riding along with a docs commit:
+
+1. **Fixture acceptance against the edited runner** (runner
+   2231cb82…): pass-fixture → exit 0, ledgered to the acceptance
+   manifest (run_id 20, dirty:false); fail-fixture → exit 1, no
+   success banner, log archived to runner-artifacts (run_id 21);
+   taint-fixture → suite itself exits 0 but the runner refuses with
+   exit 77, tree_stable:false recorded, no banner (run_id 22) — a
+   passing suite that taints the tree is still rejected, which is the
+   enforcement's whole point. Canary restored from index afterward.
+2. **Full regression, new batch** at 0f64fd4: run_ids 55–58 —
+   M1 59 · M2 55 · M3 35 · M4 142 = 291 checks, all exit 0,
+   dirty:false, tree_stable:true. dist bytes UNCHANGED (e0e29754…) —
+   the round proves runner parity, not product change.
+3. **Attestation re-issued** over the new batch: same dist_sha256 =
+   http_sha256, new runner_sha256 (2231cb82…), attest.sh untouched
+   (attest_sha256 still 6344d979…).
+4. **attest-acceptance 35/35** against the new certificate — positive
+   control reproduces it byte-for-byte; all refusal predicates still
+   fire, including "used a different runner" (now exercised against a
+   tampered copy of the NEW runner).
+
+Observed, deliberately not fixed this round: run.sh's success banner
+names tests/run-manifest.jsonl even for fixture runs that ledger to
+the acceptance manifest — cosmetic, but it is a runner-bytes change
+and will ride the next substantive runner round, not this one.
+
+**Run of record: run_ids 55–58 at 0f64fd4 — 291 checks, attest-acceptance 35/35, attestation 29974fc.**
