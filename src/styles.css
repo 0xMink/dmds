@@ -271,6 +271,14 @@ html.loaded .nav { opacity: 1; transform: none; }
   .nav__links { gap: 0.15rem; }
   .nav__links a { font-size: 0.625rem; letter-spacing: 0.08em; padding: 0.9rem 0.4rem; }
   .nav__snd { display: none; }
+  /* the terminal keeps its door on phones: TRM stays (SND hides first).
+     Same tap-target rule as the jump links — padding makes the target */
+  .nav__trm { display: inline-block; font-size: 0.625rem; padding: 0.9rem 0.4rem; }
+}
+/* iOS zooms the page when a focused input's font-size is under 16px —
+   on coarse pointers the terminal input meets that floor */
+@media (pointer: coarse) {
+  .term__in { font-size: 1rem; }
 }
 
 /* ═══ Sections shared ═══ */

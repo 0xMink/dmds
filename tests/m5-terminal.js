@@ -98,7 +98,12 @@ async function readyPage(browser, query, opts) {
     });
     const helpText = ex.help.join('\n');
     check('exec:help-lists-all', ['help', 'status', 'boot', 'build', 'clear', 'exit'].every(c => helpText.includes(c)), helpText);
-    check('exec:help-aligned', ex.help[1].indexOf('list commands') === ex.help[2].indexOf('engine'), JSON.stringify([ex.help[1], ex.help[2]]));
+    // every command row's description column starts at the same index
+    const descCols = ex.help.slice(1, 7).map(l => {
+      const m = l.match(/^ {2}(\S+)( +)/);
+      return m ? 2 + m[1].length + m[2].length : -1;
+    });
+    check('exec:help-aligned-all-rows', descCols.every(c => c > 0 && c === descCols[0]), JSON.stringify(descCols));
     check('exec:status-tier-truthful', ex.engineTier === 'gl2' ? ex.status[0].includes('TIER 1') : ex.status[0].includes('TIER 2') || ex.status[0].includes('STATIC'), ex.status[0]);
     check('exec:status-count-matches-engine', ex.engineCount === null || ex.status.join(' ').includes(ex.engineCount.toLocaleString('en-US')), ex.status[1]);
     check('exec:boot-equals-buffer', JSON.stringify(ex.boot) === JSON.stringify(ex.bootlog.length ? ex.bootlog : ['boot log empty']), JSON.stringify(ex.boot));
@@ -268,6 +273,33 @@ async function readyPage(browser, query, opts) {
     check('integration:real-static-status', r.status.length === 1 && /STATIC · CONTENT NOMINAL/.test(r.status[0]), JSON.stringify(r.status));
     check('integration:real-static-boot-honest', r.boot.some(l => /FALLBACK static field/.test(l)), JSON.stringify(r.boot));
     check('integration:terminal-survives-no-gl', r.toggleUsable && page.errs.length === 0, page.errs.join(' | '));
+    // the one-shot bridge must be consumed on EVERY boot outcome —
+    // static fallback included, or the "no mutation channel" claim lies
+    check('integration:static-bridge-consumed', await page.evaluate(() => typeof window.DMDS_TERM._connect === 'undefined'));
+    await page.close();
+  }
+
+  // ── 5b. REAL tier-2 integration: WebGL2 unavailable, WebGL1 boots ──
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.errs = [];
+    page.on('pageerror', e => page.errs.push(String(e)));
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) {
+        return t === 'webgl2' ? null : orig.call(this, t, o);
+      };
+    });
+    await page.goto(DIST);
+    await page.waitForFunction(() => document.documentElement.classList.contains('loaded'), { timeout: 120000 });
+    await page.waitForFunction(() => window.DMDS_GL && window.DMDS_GL.isReady && window.DMDS_GL.isReady(), { timeout: 60000 });
+    const t2 = await page.evaluate(() => ({
+      status: window.DMDS_TERM.exec('status'),
+      bridge: typeof window.DMDS_TERM._connect,
+    }));
+    check('integration:real-tier2-status', /TIER 2 · WEBGL1/.test(t2.status[0]) && /RUNNING/.test(t2.status[0]), JSON.stringify(t2.status));
+    check('integration:real-tier2-count-live', t2.status.join(' ').includes('42,000'), t2.status[1]);
+    check('integration:tier2-bridge-consumed', t2.bridge === 'undefined', t2.bridge);
     await page.close();
   }
 
@@ -296,46 +328,75 @@ async function readyPage(browser, query, opts) {
     const page = await readyPage(browser, '', { forcedColors: 'active' });
     await page.keyboard.press('`');
     await poll(page, () => document.getElementById('term').open === true);
+    // produce an error line so error text is also under test
+    await page.type('#term-in', 'nope');
+    await page.keyboard.press('Enter');
+    await poll(page, () => document.querySelector('#term-out .t-err') !== null);
     const fc = await page.evaluate(() => {
-      const dlg = getComputedStyle(document.getElementById('term'));
+      const dlgEl = document.getElementById('term');
+      const dlg = getComputedStyle(dlgEl);
       const input = document.getElementById('term-in');
       input.focus();
       const ics = getComputedStyle(input);
+      const vis = sel => {
+        const el = document.querySelector(sel);
+        const cs = getComputedStyle(el);
+        return cs.color !== dlg.backgroundColor && cs.display !== 'none' && cs.visibility !== 'hidden';
+      };
       return {
         borderTop: dlg.borderTopWidth + ' ' + dlg.borderTopStyle,
         outlineStyle: ics.outlineStyle,
         outlineWidth: ics.outlineWidth,
+        closeVisible: vis('#term-close'),
+        promptVisible: vis('.term__prompt'),
+        errVisible: vis('#term-out .t-err'),
+        outVisible: vis('#term-out'),
       };
     });
     check('fc:panel-boundary', fc.borderTop === '1px solid', fc.borderTop);
     check('fc:focus-visible-indicator', fc.outlineStyle !== 'none' && parseFloat(fc.outlineWidth) >= 1, JSON.stringify(fc));
+    check('fc:close-button-visible', fc.closeVisible);
+    check('fc:prompt-visible', fc.promptVisible);
+    check('fc:error-text-visible', fc.errVisible);
+    check('fc:output-visible', fc.outVisible);
     await page.close();
   }
 
-  // ── 8. mobile viewports: panel fits, no overflow, toggle hidden ≤560 ──
+  // ── 8. mobile viewports: the terminal has a DOOR on phones — the TRM
+  //       launcher stays visible ≤560 (soft keyboards have no backtick),
+  //       opens by real touch tap, panel fits, no overflow.
+  //       NOTE: env(safe-area-inset-*) is 0 in headless emulation — the
+  //       padding check verifies base padding only; device-inset behavior
+  //       is a real-phone item.
   for (const vp of [{ width: 320, height: 568 }, { width: 375, height: 667 }, { width: 667, height: 375 }]) {
-    const page = await readyPage(browser, '', { viewport: vp });
-    const m = await page.evaluate(() => {
+    const page = await readyPage(browser, '', { viewport: vp, hasTouch: true });
+    const tag = vp.width + 'x' + vp.height;
+    const pre = await page.evaluate(() => {
       const toggle = document.getElementById('term-toggle');
-      window.DMDS_TERM.open();
+      const r = toggle.getBoundingClientRect();
+      return { display: getComputedStyle(toggle).display, h: r.height, w: r.width };
+    });
+    check('mobile:' + tag + ':launcher-visible', pre.display !== 'none', pre.display);
+    if (vp.width <= 560) check('mobile:' + tag + ':launcher-tap-target', pre.h >= 40, 'h=' + pre.h);
+    await page.tap('#term-toggle');
+    await poll(page, () => document.getElementById('term').open === true);
+    check('mobile:' + tag + ':tap-opens', true);
+    const m = await page.evaluate(() => {
       const dlg = document.getElementById('term');
       const cs = getComputedStyle(dlg);
       return {
-        toggleDisplay: getComputedStyle(toggle).display,
-        open: dlg.open,
         panelW: dlg.getBoundingClientRect().width,
         innerW: window.innerWidth,
         scrollW: document.documentElement.scrollWidth,
         padBottom: parseFloat(cs.paddingBottom),
         inputVisible: document.getElementById('term-in').getBoundingClientRect().bottom <= window.innerHeight,
+        inputFont: parseFloat(getComputedStyle(document.getElementById('term-in')).fontSize),
       };
     });
-    const tag = vp.width + 'x' + vp.height;
-    if (vp.width <= 560) check('mobile:' + tag + ':toggle-hidden', m.toggleDisplay === 'none', m.toggleDisplay);
-    else check('mobile:' + tag + ':toggle-visible', m.toggleDisplay !== 'none', m.toggleDisplay);
-    check('mobile:' + tag + ':opens-full-width', m.open && Math.abs(m.panelW - m.innerW) <= 1, 'panel=' + m.panelW + ' inner=' + m.innerW);
+    check('mobile:' + tag + ':opens-full-width', Math.abs(m.panelW - m.innerW) <= 1, 'panel=' + m.panelW + ' inner=' + m.innerW);
     check('mobile:' + tag + ':no-horizontal-overflow', m.scrollW <= m.innerW + 1, 'scrollW=' + m.scrollW);
-    check('mobile:' + tag + ':input-on-screen', m.inputVisible && m.padBottom >= 22, 'padBottom=' + m.padBottom);
+    check('mobile:' + tag + ':input-on-screen-base-pad', m.inputVisible && m.padBottom >= 22, 'padBottom=' + m.padBottom);
+    check('mobile:' + tag + ':input-no-ios-zoom', m.inputFont >= 16, 'font=' + m.inputFont);
     await page.close();
   }
 

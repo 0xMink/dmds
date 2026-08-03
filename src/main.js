@@ -161,20 +161,24 @@
       if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
         hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
       }
+    })
+    .catch(function () {
+      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
+      bootLog("COMPILE render engine", "FAIL");
+      bootLog("FALLBACK static field", "ACTIVE");
+    })
+    .then(function () {
       // terminal context: accessors, not snapshots — GL is reassigned on
-      // governor demotion and status must describe the live engine.
-      // _connect is a one-shot bridge (consumed on first use).
+      // governor demotion and status must describe the live engine. This
+      // runs after BOTH outcomes (the catch above returns), so the
+      // one-shot _connect bridge is consumed on every boot path — tier 1,
+      // tier 2, and static — never left dangling on the public API.
       if (window.DMDS_TERM && window.DMDS_TERM._connect) {
         window.DMDS_TERM._connect({
           gl: function () { return glOK ? GL : null; },
           fps: function () { return GL && GL.fps ? GL.fps() : 0; }
         });
       }
-    })
-    .catch(function () {
-      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
-      bootLog("COMPILE render engine", "FAIL");
-      bootLog("FALLBACK static field", "ACTIVE");
     });
 
   // a consistency check — the DOM against the embedded registry — not a

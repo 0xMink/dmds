@@ -47,7 +47,12 @@ OS *voice* without the OS *simulation*.
 ## Entry points
 
 - **Nav toggle `TRM`** next to `SND` (real `<button>`, `aria-expanded`,
-  `aria-controls="term"`; hidden ≤560px like SND).
+  `aria-controls="term"`). **Portrait phones keep it** (SND hides
+  ≤560px; TRM does not — a soft keyboard has no backtick, so the
+  launcher is the only door on phones and a hidden launcher would make
+  the mobile terminal a room without one). Same ≥40px tap-target rule
+  as the nav jump links; the input meets iOS's 16px no-zoom floor on
+  coarse pointers.
 - **Backtick `` ` ``** opens/closes globally (not just on the hero).
   Guards identical to the type-mode capture contract: never when focus
   is in `input, textarea, select, button, a, [contenteditable]`, never
@@ -248,9 +253,13 @@ Slice-1 checks:
 - Byte/CSP: build passes check.py (hashes, glyphs, budgets) with the
   new inline block.
 
-Manual: real screen reader open/announce/close; mobile behavior (TRM
-hidden ≤560px, backtick N/A on soft keyboards — terminal is a
-fine-pointer/keyboard surface by design, like the cursor).
+Manual (open items): real screen reader open/announce/close; real
+phone — virtual-keyboard resize behavior, focus zoom, home-indicator
+spacing with the keyboard open, iOS Safari `<dialog>` behavior.
+Headless viewport tests verify layout and reachability, not device
+behavior; the safe-area CSS is present but `env()` insets are zero in
+emulation, so device-inset behavior is unverified until the real-phone
+check.
 
 ## Out of scope (YAGNI'd)
 
