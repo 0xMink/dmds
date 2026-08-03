@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-y1s5stT84krpxN8JzHb3hAfW4CDbnPdr8+Yg98+vTp4='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-6m89SVLhFEbnNoi/IGJ60RlmkRrmfBPhpVEeFylATgg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-Z6ol4wrxZTUTWtpf/8yKQ2UJP6p1PimnM6mUH18xpbU='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-6m89SVLhFEbnNoi/IGJ60RlmkRrmfBPhpVEeFylATgg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS™ — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -298,8 +298,9 @@ html.loaded .nav { opacity: 1; transform: none; }
   .nav__links a { font-size: 0.625rem; letter-spacing: 0.08em; padding: 0.9rem 0.4rem; }
   .nav__snd { display: none; }
   /* the terminal keeps its door on phones: TRM stays (SND hides first).
-     Same tap-target rule as the jump links — padding makes the target */
-  .nav__trm { display: inline-block; font-size: 0.625rem; padding: 0.9rem 0.4rem; }
+     Same tap-target rule as the jump links — padding makes the target,
+     in BOTH dimensions (0.4rem side padding measured only 35.8px wide) */
+  .nav__trm { display: inline-block; font-size: 0.625rem; padding: 0.9rem 0.6rem; }
 }
 /* iOS zooms the page when a focused input's font-size is under 16px —
    on coarse pointers the terminal input meets that floor */
@@ -800,7 +801,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="b23fd48 2026-08-03T13:47:08Z">
+<meta name="dmds-build" content="45c98a8 2026-08-03T14:13:51Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -5703,4 +5704,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build b23fd48 2026-08-03T13:47:08Z -->
+<!-- dmds build 45c98a8 2026-08-03T14:13:51Z -->
