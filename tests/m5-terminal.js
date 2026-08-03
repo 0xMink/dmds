@@ -1,7 +1,8 @@
 /* M5 verification — DMDS/OS terminal, slice 1: shell lifecycle,
-   keyboard precedence router (all six paths), a11y contract, command
-   truthfulness (help/status/boot/build/clear/exit), unavailable
-   states, no-JS absence.
+   keyboard precedence router, a11y contract, command truthfulness
+   (help/status/boot/build/clear/exit), context-level unavailable
+   states (?debug=1 seam), REAL no-WebGL integration, reduced motion,
+   forced colors, mobile viewports, no-JS absence.
    Run: node tests/m5-terminal.js  (headless SwiftShader) */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
@@ -50,12 +51,14 @@ async function readyPage(browser, query, opts) {
     args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
   });
 
-  // ── 1. API surface + markup contract ──
+  // ── 1. production page: API surface + markup contract ──
   {
     const page = await readyPage(browser);
     const api = await page.evaluate(() => ({
       type: typeof window.DMDS_TERM,
-      fns: window.DMDS_TERM ? ['open', 'close', 'exec', 'setContext'].map(f => typeof window.DMDS_TERM[f]) : [],
+      fns: window.DMDS_TERM ? ['open', 'close', 'exec'].map(f => typeof window.DMDS_TERM[f]) : [],
+      bridgeConsumed: typeof window.DMDS_TERM._connect,
+      noDebugSeam: typeof window.DMDS_TERM.debugSetContext,
       toggleHidden: document.getElementById('term-toggle').hidden,
       ariaExpanded: document.getElementById('term-toggle').getAttribute('aria-expanded'),
       ariaControls: document.getElementById('term-toggle').getAttribute('aria-controls'),
@@ -66,6 +69,8 @@ async function readyPage(browser, query, opts) {
     }));
     check('api:object', api.type === 'object');
     check('api:functions', api.fns.every(t => t === 'function'), api.fns.join(','));
+    check('api:bridge-consumed', api.bridgeConsumed === 'undefined', '_connect=' + api.bridgeConsumed);
+    check('api:no-mutation-channel-in-prod', api.noDebugSeam === 'undefined', 'debugSetContext=' + api.noDebugSeam);
     check('markup:toggle-revealed', api.toggleHidden === false, 'hidden=' + api.toggleHidden);
     check('markup:aria-expanded-false', api.ariaExpanded === 'false');
     check('markup:aria-controls', api.ariaControls === 'term');
@@ -74,7 +79,7 @@ async function readyPage(browser, query, opts) {
     check('markup:input-labelled', !!api.inputLabel);
     check('markup:closed-at-boot', api.open === false);
 
-    // ── 2. exec truthfulness (pure surface, no DOM needed) ──
+    // ── 2. exec truthfulness (against the REAL wired context) ──
     const ex = await page.evaluate(() => {
       const help = window.DMDS_TERM.exec('help');
       const status = window.DMDS_TERM.exec('status');
@@ -93,6 +98,7 @@ async function readyPage(browser, query, opts) {
     });
     const helpText = ex.help.join('\n');
     check('exec:help-lists-all', ['help', 'status', 'boot', 'build', 'clear', 'exit'].every(c => helpText.includes(c)), helpText);
+    check('exec:help-aligned', ex.help[1].indexOf('list commands') === ex.help[2].indexOf('engine'), JSON.stringify([ex.help[1], ex.help[2]]));
     check('exec:status-tier-truthful', ex.engineTier === 'gl2' ? ex.status[0].includes('TIER 1') : ex.status[0].includes('TIER 2') || ex.status[0].includes('STATIC'), ex.status[0]);
     check('exec:status-count-matches-engine', ex.engineCount === null || ex.status.join(' ').includes(ex.engineCount.toLocaleString('en-US')), ex.status[1]);
     check('exec:boot-equals-buffer', JSON.stringify(ex.boot) === JSON.stringify(ex.bootlog.length ? ex.bootlog : ['boot log empty']), JSON.stringify(ex.boot));
@@ -102,27 +108,8 @@ async function readyPage(browser, query, opts) {
     check('exec:unknown-honest', ex.bad.length === 1 && /^unknown command: warpdrive/.test(ex.bad[0]), JSON.stringify(ex.bad));
     check('exec:empty-line-silent', Array.isArray(ex.empty) && ex.empty.length === 0);
 
-    // ── 3. unavailable states: the real static-tier path via the real setter ──
-    const staticOut = await page.evaluate(() => {
-      window.DMDS_TERM.setContext({ gl: null, fps: null });
-      const s = window.DMDS_TERM.exec('status');
-      return s;
-    });
-    check('exec:static-tier-honest', staticOut.length === 1 && /STATIC · CONTENT NOMINAL/.test(staticOut[0]), JSON.stringify(staticOut));
-    const tier2Out = await page.evaluate(() => {
-      // real tier-2 handle: gl.js is loaded (fallback module) — its status()
-      // is the same object the footer would read after a demotion
-      window.DMDS_TERM.setContext({ gl: function () { return window.DMDS_GL; } });
-      return window.DMDS_TERM.exec('status');
-    });
-    check('exec:tier2-honest', /TIER 2/.test(tier2Out[0]) && tier2Out.join(' ').includes('OF 42,000'), JSON.stringify(tier2Out));
-    await page.evaluate(() => {
-      // restore the live tier-1 accessor for the remaining checks
-      window.DMDS_TERM.setContext({ gl: function () { return window.DMDS_GL2; } });
-    });
-
-    // ── 4. keyboard precedence router: all six paths ──
-    // path 5: bare backtick over the page opens
+    // ── 3. keyboard precedence router ──
+    // open path: bare backtick over the page
     await page.keyboard.press('`');
     await poll(page, () => document.getElementById('term').open === true);
     check('kbd:backtick-opens', true);
@@ -131,7 +118,7 @@ async function readyPage(browser, query, opts) {
     await poll(page, () => document.getElementById('term-toggle').getAttribute('aria-expanded') === 'true');
     check('a11y:aria-expanded-syncs-open', true);
 
-    // path 3 (terminal's own input is a form control): backtick types literally
+    // guard 3 via the terminal's own input: backtick types literally
     await page.keyboard.press('`');
     const literal = await page.evaluate(() => ({
       v: document.getElementById('term-in').value,
@@ -151,43 +138,56 @@ async function readyPage(browser, query, opts) {
     const echoed = await page.evaluate(() => document.getElementById('term-out').textContent.includes('dmds://$ status'));
     check('shell:command-echoed', echoed);
 
-    // history: ArrowUp restores the last command
     await page.keyboard.press('ArrowUp');
     check('shell:history-up', await page.evaluate(() => document.getElementById('term-in').value === 'status'));
     await page.evaluate(() => { document.getElementById('term-in').value = ''; });
 
-    // tab completion
     await page.type('#term-in', 'bu');
     await page.keyboard.press('Tab');
     check('shell:tab-completes', await page.evaluate(() => document.getElementById('term-in').value === 'build'));
     await page.evaluate(() => { document.getElementById('term-in').value = ''; });
 
-    // clear empties the scrollback
     await page.type('#term-in', 'clear');
     await page.keyboard.press('Enter');
     await poll(page, () => document.getElementById('term-out').textContent === '');
     check('shell:clear-empties', true);
 
-    // exit closes via the command path
+    // in-dialog CLOSE button — the reachable pointer path while modal
+    // (showModal makes the page inert, so the nav toggle is a launcher)
+    await page.click('#term-close');
+    await poll(page, () => document.getElementById('term').open === false);
+    check('shell:close-button-closes', true);
+    await poll(page, () => document.getElementById('term-toggle').getAttribute('aria-expanded') === 'false');
+    check('a11y:aria-expanded-syncs-close', true);
+
+    // exit command closes
+    await page.evaluate(() => window.DMDS_TERM.open());
+    await poll(page, () => document.getElementById('term').open === true);
     await page.type('#term-in', 'exit');
     await page.keyboard.press('Enter');
     await poll(page, () => document.getElementById('term').open === false);
     check('shell:exit-closes', true);
-    await poll(page, () => document.getElementById('term-toggle').getAttribute('aria-expanded') === 'false');
-    check('a11y:aria-expanded-syncs-close', true);
 
-    // Escape closes + focus returns to the opener (toggle-button open path)
+    // Escape closes + focus returns to the opener (toggle-launch path)
     await page.evaluate(() => { document.getElementById('term-toggle').focus(); });
     await page.click('#term-toggle');
     await poll(page, () => document.getElementById('term').open === true);
-    check('shell:toggle-opens', true);
+    check('shell:toggle-launches', true);
     await page.keyboard.press('Escape');
     await poll(page, () => document.getElementById('term').open === false);
     check('kbd:escape-closes', true);
     await poll(page, () => document.activeElement === document.getElementById('term-toggle'));
     check('a11y:focus-restored-to-opener', true);
 
-    // path 1/2/3/4 guards: none of these may open the terminal
+    // guard 1 — IME composition. NOTE: synthetic dispatch (KeyboardEventInit
+    // isComposing) exercises the router's guard branch; it is not a real IME
+    // session (headless has no input method) — labeled accordingly.
+    await page.evaluate(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '`', isComposing: true, bubbles: true, cancelable: true }));
+    });
+    check('kbd:guard-ime-synthetic', await page.evaluate(() => document.getElementById('term').open === false));
+
+    // guard 3 — form field focused: backtick stays literal, no open
     await page.evaluate(() => { document.querySelector('#transmit input[name="name"]').focus(); });
     await page.keyboard.press('`');
     let g = await page.evaluate(() => {
@@ -200,17 +200,20 @@ async function readyPage(browser, query, opts) {
       el.value = ''; el.blur();
     });
 
+    // guard 2 — modifier held
     await page.keyboard.down('Control');
     await page.keyboard.press('`');
     await page.keyboard.up('Control');
     check('kbd:guard-modifier', await page.evaluate(() => document.getElementById('term').open === false));
 
+    // guard 3 — link focused
     await page.evaluate(() => { document.querySelector('.nav__links a').focus(); });
     await page.keyboard.press('`');
     check('kbd:guard-link-focus', await page.evaluate(() => document.getElementById('term').open === false));
     await page.evaluate(() => document.activeElement.blur());
 
-    await page.keyboard.press('a'); // path 4: non-backtick keys never touch the router
+    // guard 4 — non-backtick keys never touch the router
+    await page.keyboard.press('a');
     check('kbd:guard-other-keys', await page.evaluate(() => document.getElementById('term').open === false));
 
     // scrollback survives close/reopen (clear is the only eraser)
@@ -223,18 +226,120 @@ async function readyPage(browser, query, opts) {
     await page.close();
   }
 
-  // ── 5. reduced motion: terminal fully functional ──
+  // ── 4. context-level unavailable states (?debug=1 seam — these verify
+  //       output for supplied contexts, not engine-selection integration;
+  //       section 5 covers the real path) ──
+  {
+    const page = await readyPage(browser, '?debug=1');
+    const seam = await page.evaluate(() => typeof window.DMDS_TERM.debugSetContext);
+    check('context:debug-seam-present', seam === 'function', seam);
+    const staticOut = await page.evaluate(() => {
+      window.DMDS_TERM.debugSetContext({ gl: null, fps: null });
+      return window.DMDS_TERM.exec('status');
+    });
+    check('context:static-honest', staticOut.length === 1 && /STATIC · CONTENT NOMINAL/.test(staticOut[0]), JSON.stringify(staticOut));
+    const tier2Out = await page.evaluate(() => {
+      // real tier-2 module handle — same status() the footer reads post-demotion
+      window.DMDS_TERM.debugSetContext({ gl: function () { return window.DMDS_GL; } });
+      return window.DMDS_TERM.exec('status');
+    });
+    check('context:tier2-honest', /TIER 2/.test(tier2Out[0]) && tier2Out.join(' ').includes('OF 42,000'), JSON.stringify(tier2Out));
+    await page.close();
+  }
+
+  // ── 5. REAL static-tier integration: WebGL genuinely unavailable ──
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.errs = [];
+    page.on('pageerror', e => page.errs.push(String(e)));
+    await page.addInitScript(() => {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (t, o) {
+        return (t === 'webgl2' || t === 'webgl') ? null : orig.call(this, t, o);
+      };
+    });
+    await page.goto(DIST);
+    await page.waitForFunction(() => document.documentElement.classList.contains('loaded'), { timeout: 120000 });
+    const r = await page.evaluate(() => ({
+      status: window.DMDS_TERM.exec('status'),
+      boot: window.DMDS_TERM.exec('boot'),
+      toggleUsable: !document.getElementById('term-toggle').hidden,
+    }));
+    check('integration:real-static-status', r.status.length === 1 && /STATIC · CONTENT NOMINAL/.test(r.status[0]), JSON.stringify(r.status));
+    check('integration:real-static-boot-honest', r.boot.some(l => /FALLBACK static field/.test(l)), JSON.stringify(r.boot));
+    check('integration:terminal-survives-no-gl', r.toggleUsable && page.errs.length === 0, page.errs.join(' | '));
+    await page.close();
+  }
+
+  // ── 6. reduced motion: functional AND actually unanimated ──
   {
     const page = await readyPage(browser, '', { reducedMotion: 'reduce' });
     await page.keyboard.press('`');
     await poll(page, () => document.getElementById('term').open === true);
-    const lines = await page.evaluate(() => window.DMDS_TERM.exec('status'));
-    check('rm:opens-and-reads', lines.length > 0, JSON.stringify(lines[0]));
+    const rm = await page.evaluate(() => {
+      const cs = getComputedStyle(document.getElementById('term'));
+      return {
+        lines: window.DMDS_TERM.exec('status').length,
+        transition: cs.transitionDuration,
+        animation: cs.animationName,
+      };
+    });
+    check('rm:opens-and-reads', rm.lines > 0);
+    check('rm:no-transition', rm.transition === '0s', rm.transition);
+    check('rm:no-animation', rm.animation === 'none', rm.animation);
     check('rm:no-exceptions', page.errs.length === 0, page.errs.join(' | '));
     await page.close();
   }
 
-  // ── 6. no-JS: no dead control, no dialog, content unaffected ──
+  // ── 7. forced colors: panel boundary + focus indicator stay visible ──
+  {
+    const page = await readyPage(browser, '', { forcedColors: 'active' });
+    await page.keyboard.press('`');
+    await poll(page, () => document.getElementById('term').open === true);
+    const fc = await page.evaluate(() => {
+      const dlg = getComputedStyle(document.getElementById('term'));
+      const input = document.getElementById('term-in');
+      input.focus();
+      const ics = getComputedStyle(input);
+      return {
+        borderTop: dlg.borderTopWidth + ' ' + dlg.borderTopStyle,
+        outlineStyle: ics.outlineStyle,
+        outlineWidth: ics.outlineWidth,
+      };
+    });
+    check('fc:panel-boundary', fc.borderTop === '1px solid', fc.borderTop);
+    check('fc:focus-visible-indicator', fc.outlineStyle !== 'none' && parseFloat(fc.outlineWidth) >= 1, JSON.stringify(fc));
+    await page.close();
+  }
+
+  // ── 8. mobile viewports: panel fits, no overflow, toggle hidden ≤560 ──
+  for (const vp of [{ width: 320, height: 568 }, { width: 375, height: 667 }, { width: 667, height: 375 }]) {
+    const page = await readyPage(browser, '', { viewport: vp });
+    const m = await page.evaluate(() => {
+      const toggle = document.getElementById('term-toggle');
+      window.DMDS_TERM.open();
+      const dlg = document.getElementById('term');
+      const cs = getComputedStyle(dlg);
+      return {
+        toggleDisplay: getComputedStyle(toggle).display,
+        open: dlg.open,
+        panelW: dlg.getBoundingClientRect().width,
+        innerW: window.innerWidth,
+        scrollW: document.documentElement.scrollWidth,
+        padBottom: parseFloat(cs.paddingBottom),
+        inputVisible: document.getElementById('term-in').getBoundingClientRect().bottom <= window.innerHeight,
+      };
+    });
+    const tag = vp.width + 'x' + vp.height;
+    if (vp.width <= 560) check('mobile:' + tag + ':toggle-hidden', m.toggleDisplay === 'none', m.toggleDisplay);
+    else check('mobile:' + tag + ':toggle-visible', m.toggleDisplay !== 'none', m.toggleDisplay);
+    check('mobile:' + tag + ':opens-full-width', m.open && Math.abs(m.panelW - m.innerW) <= 1, 'panel=' + m.panelW + ' inner=' + m.innerW);
+    check('mobile:' + tag + ':no-horizontal-overflow', m.scrollW <= m.innerW + 1, 'scrollW=' + m.scrollW);
+    check('mobile:' + tag + ':input-on-screen', m.inputVisible && m.padBottom >= 22, 'padBottom=' + m.padBottom);
+    await page.close();
+  }
+
+  // ── 9. no-JS: no dead control, no dialog, content unaffected ──
   {
     const ctx2 = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });
     const page = await ctx2.newPage();

@@ -162,9 +162,10 @@
         hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
       }
       // terminal context: accessors, not snapshots — GL is reassigned on
-      // governor demotion and status must describe the live engine
-      if (window.DMDS_TERM) {
-        window.DMDS_TERM.setContext({
+      // governor demotion and status must describe the live engine.
+      // _connect is a one-shot bridge (consumed on first use).
+      if (window.DMDS_TERM && window.DMDS_TERM._connect) {
+        window.DMDS_TERM._connect({
           gl: function () { return glOK ? GL : null; },
           fps: function () { return GL && GL.fps ? GL.fps() : 0; }
         });

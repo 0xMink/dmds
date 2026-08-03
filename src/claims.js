@@ -34,12 +34,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
     },
     "platforms-production": {
-      "page": "3", "dom": true,
-      "text": "3 PLATFORMS IN PRODUCTION",
-      "definition": "Zoo Code, insurewithmink.com, and the Comfort Airz platform — live or in active production use.",
-      "source": "Live URLs / client engagement",
-      "verify": "Zoo Code and insurewithmink.com are publicly reachable; Comfort Airz by reference.",
-      "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "public"
+      "page": "2", "dom": true,
+      "text": "2 PLATFORMS IN PRODUCTION",
+      "definition": "Zoo Code and insurewithmink.com — live or in active production use. Comfort Airz is deliberately excluded: engineering/prototype work, not a completed production delivery (its dossier carries implementation metrics only). Restore to 3 only with owner verification of production use.",
+      "source": "Live URLs",
+      "verify": "Zoo Code and insurewithmink.com are publicly reachable.",
+      "verified": "2026-08-03", "review_by": "2026-11-01", "visibility": "public"
     },
     "templates-used": {
       "page": "0", "dom": true,

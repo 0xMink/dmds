@@ -12,6 +12,8 @@
   var input = document.getElementById("term-in");
   var form = document.getElementById("term-form");
   var toggle = document.getElementById("term-toggle");
+  var closeBtn = document.getElementById("term-close");
+  var DEBUG = /[?&]debug=1/.test(location.search);
   // native <dialog> is the accessibility foundation (top layer, focus
   // trap, Escape). No dialog support → the terminal honestly doesn't
   // exist: the toggle stays hidden and no key is ever intercepted.
@@ -24,9 +26,12 @@
 
   function cmdHelp() {
     var lines = ["DMDS/OS commands — every line below reads live state:"];
-    for (var name in COMMANDS) {
+    var width = 0, name;
+    for (name in COMMANDS) { width = Math.max(width, COMMANDS[name].usage.length); }
+    var pad = new Array(width + 3).join(" ");
+    for (name in COMMANDS) {
       var c = COMMANDS[name];
-      lines.push("  " + (c.usage + "          ").slice(0, 10) + c.desc);
+      lines.push("  " + (c.usage + pad).slice(0, width + 2) + c.desc);
     }
     lines.push("  ESC closes · UP/DOWN history · TAB completes");
     return lines;
@@ -172,18 +177,31 @@
 
   if (toggle) {
     toggle.removeAttribute("hidden"); // no-JS / no-dialog never shows a dead control
+    // showModal() makes the page inert while open, so this control is a
+    // LAUNCHER in practice — the reachable close paths are the in-dialog
+    // CLOSE button, Escape, and 'exit'. aria-expanded still reports state.
     toggle.addEventListener("click", function () {
-      if (dlg.open) dlg.close(); else open();
+      if (!dlg.open) open();
     });
+  }
+  if (closeBtn) closeBtn.addEventListener("click", function () { dlg.close(); });
+
+  function setContext(c) {
+    if (c && "gl" in c) ctx.gl = c.gl;
+    if (c && "fps" in c) ctx.fps = c.fps;
   }
 
   window.DMDS_TERM = {
     open: open,
     close: function () { if (dlg.open) dlg.close(); },
     exec: exec,
-    setContext: function (c) {
-      if (c && "gl" in c) ctx.gl = c.gl;
-      if (c && "fps" in c) ctx.fps = c.fps;
+    // one-shot bridge for main.js — consumed on first use so the public
+    // API does not advertise a mutation channel for the state source
+    _connect: function (c) {
+      setContext(c);
+      delete window.DMDS_TERM._connect;
     }
   };
+  // test seam, same doctrine as the engine's: only honored under ?debug=1
+  if (DEBUG) window.DMDS_TERM.debugSetContext = setContext;
 })();
