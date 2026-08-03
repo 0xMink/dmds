@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-UAkrxwcCRS36qqkiufd9h/Rqeo56PiPUK6s2e+Y/vTE='; script-src 'sha256-TUSKbIsZGtCuq/+/uF4SjfA1OMxeBT4jrlgr1EZmJqs=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-AUZRb3ztu7nRqR1JdbLjjYmlaGbLvuRaoy2MUv9BIgU='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-5Qrol1E4UT+SzrH6KzMImOA8Y1onqIwB3iPKfSMSIDI='; script-src 'sha256-TUSKbIsZGtCuq/+/uF4SjfA1OMxeBT4jrlgr1EZmJqs=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-teKXLcRSYEcZ9HIFeiF1KPyyJUwqVuL2YVAqGVBIekA=' 'sha256-yYj9NEHlkrfO8wTy1stTrVyaWe/8X3eQBs20Z39/IvU='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS™ — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -230,6 +230,40 @@ html.loaded .nav { opacity: 1; transform: none; }
 }
 .nav__snd:hover { color: var(--bone); }
 .nav__snd.on { color: var(--signal); }
+.nav__trm[aria-expanded="true"] { color: var(--signal); }
+
+/* ═══ DMDS/OS terminal — bottom sheet over the live page ═══ */
+.term {
+  width: 100%; max-width: 100%;
+  margin: auto 0 0; border: 0;
+  border-top: 1px solid var(--line-strong);
+  background: rgba(19, 19, 21, 0.96);
+  color: var(--bone);
+  padding: 1.2rem var(--pad) 1.4rem;
+  height: min(42vh, 30rem);
+}
+.term[open] { display: flex; flex-direction: column; }
+/* the page stays visible — the terminal operates it, so it is the display */
+.term::backdrop { background: transparent; }
+.term__out {
+  flex: 1; overflow-y: auto;
+  font-size: 0.6875rem; line-height: 1.8; letter-spacing: 0.08em;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.term__out .t-cmd { color: var(--bone-dim); }
+.term__out .t-dim { color: var(--bone-dim); }
+.term__out .t-err { color: #d4452c; }
+.term__line { display: flex; gap: 0.6rem; align-items: baseline; margin-top: 0.8rem; }
+.term__prompt { color: var(--signal); }
+.term__in {
+  flex: 1; background: transparent; border: 0;
+  color: var(--bone); font: inherit; letter-spacing: inherit;
+  text-transform: none; caret-color: var(--signal);
+}
+.term__in:focus-visible { outline: none; box-shadow: 0 1px 0 var(--signal); }
+@media (forced-colors: active) {
+  .term { border-top: 1px solid CanvasText; }
+}
 /* past the hero, the nav gets a solid bar so it never fights body text */
 .nav--scrolled {
   mix-blend-mode: normal;
@@ -743,7 +777,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="3c54260 2026-08-03T12:12:13Z">
+<meta name="dmds-build" content="8af6ebb 2026-08-03T13:02:47Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -782,6 +816,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
     <span class="nav__clock" id="clock">00:00:00 ET</span>
   </div>
   <nav class="nav__links mono" aria-label="Primary">
+    <button class="nav__snd nav__trm" id="term-toggle" aria-expanded="false" aria-controls="term" data-cursor hidden>TRM</button>
     <button class="nav__snd" id="snd-toggle" aria-pressed="false" data-cursor>SND&nbsp;·&nbsp;OFF</button>
     <a href="#work" class="scramble" data-cursor>WORK</a>
     <a href="#capabilities" class="scramble" data-cursor>CAPABILITIES</a>
@@ -1152,6 +1187,14 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 
 </main>
 </div>
+
+<dialog id="term" class="term mono" aria-label="DMDS/OS terminal">
+  <div class="term__out" id="term-out" role="log"></div>
+  <form class="term__line" id="term-form">
+    <span class="term__prompt" aria-hidden="true">dmds://$</span>
+    <input class="term__in" id="term-in" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal command">
+  </form>
+</dialog>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
@@ -4558,6 +4601,198 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 <script>
 /* ═══════════════════════════════════════════════════════════════
+   DMDS™ — DMDS/OS terminal (phase 2, slice 1)
+   Spec: docs/superpowers/specs/2026-08-03-dmds-os-terminal-design.md
+   The site's console: every command reads live state or
+   build-embedded data labeled as such. Nothing simulated.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var dlg = document.getElementById("term");
+  var out = document.getElementById("term-out");
+  var input = document.getElementById("term-in");
+  var form = document.getElementById("term-form");
+  var toggle = document.getElementById("term-toggle");
+  // native <dialog> is the accessibility foundation (top layer, focus
+  // trap, Escape). No dialog support → the terminal honestly doesn't
+  // exist: the toggle stays hidden and no key is ever intercepted.
+  if (!dlg || !out || !input || !form || typeof dlg.showModal !== "function") return;
+
+  var ctx = { gl: null, fps: null }; // injected by main.js after engine boot
+  var hist = [], histIdx = 0, opener = null;
+
+  /* ═══ commands — pure: parse, read real state, return lines ═══ */
+
+  function cmdHelp() {
+    var lines = ["DMDS/OS commands — every line below reads live state:"];
+    for (var name in COMMANDS) {
+      var c = COMMANDS[name];
+      lines.push("  " + (c.usage + "          ").slice(0, 10) + c.desc);
+    }
+    lines.push("  ESC closes · UP/DOWN history · TAB completes");
+    return lines;
+  }
+
+  function cmdStatus() {
+    // ctx.gl may be an accessor: the live engine can change tier after
+    // boot (governor demotion), and status must describe what is
+    // actually rendering NOW, not what booted
+    var engine = typeof ctx.gl === "function" ? ctx.gl() : ctx.gl;
+    if (!engine) {
+      return ["RENDER: STATIC · CONTENT NOMINAL — no engine active"];
+    }
+    var s = engine.status();
+    var lines = [];
+    if (s.tier === "gl2") {
+      lines.push("TIER 1 · WEBGL2 GPGPU SIM · " + (s.running ? "RUNNING" : "STOPPED") + (s.sleeping ? " (REDUCED-MOTION SLEEP)" : ""));
+      lines.push("PARTICLES " + s.count.toLocaleString("en-US") + " · BASELINE " + s.baseline.toLocaleString("en-US") + " · CEILING " + s.ceiling.toLocaleString("en-US"));
+      lines.push("POST-FX " + (s.post ? "ON" : "OFF") + " · " + (s.degraded ? "DEGRADED (governor acted — that is it working)" : "FULL QUALITY"));
+      lines.push("FORMATION " + s.formation + " · MIX " + s.mix.toFixed(2) + " · EXCITE " + s.excite.toFixed(2));
+    } else {
+      lines.push("TIER 2 · WEBGL1 BUFFER ENGINE · " + (s.running ? "RUNNING" : "STOPPED"));
+      lines.push("PARTICLES " + s.count.toLocaleString("en-US") + " OF " + s.max.toLocaleString("en-US") + " · POST-FX " + (s.post ? "ON" : "OFF"));
+      lines.push("(two-axis governor history is a tier-1 instrument; tier 2 keeps a simpler halve/restore budget)");
+    }
+    if (typeof ctx.fps === "function") {
+      var f = ctx.fps();
+      if (f) lines.push("FPS " + f + " (measured)");
+    }
+    return lines;
+  }
+
+  function cmdBoot() {
+    var log = window.DMDS_BOOTLOG;
+    if (!log || !log.length) return ["boot log empty"];
+    return log.slice();
+  }
+
+  function cmdBuild() {
+    var meta = document.querySelector('meta[name="dmds-build"]');
+    var lines = [meta ? "BUILD " + meta.content + " (commit · UTC build time, stamped at build)" : "error: provenance stamp missing"];
+    lines.push("SOURCE github.com/0xMink/dmds · attestation: tests/attestation.json");
+    lines.push("VERIFY: sha256 of this page's served bytes == dist_sha256 in the attestation");
+    return lines;
+  }
+
+  var COMMANDS = {
+    help:   { usage: "help",   desc: "list commands", run: cmdHelp },
+    status: { usage: "status", desc: "engine + render state, live", run: cmdStatus },
+    boot:   { usage: "boot",   desc: "replay the boot log (real events)", run: cmdBoot },
+    build:  { usage: "build",  desc: "artifact provenance + how to verify it", run: cmdBuild },
+    clear:  { usage: "clear",  desc: "clear scrollback", run: function () { return []; } },
+    exit:   { usage: "exit",   desc: "close the terminal", run: function () { return []; } }
+  };
+
+  function exec(line) {
+    var argv = String(line).trim().split(/\s+/);
+    var name = (argv[0] || "").toLowerCase();
+    if (!name) return [];
+    var c = COMMANDS[name];
+    if (!c) return ["unknown command: " + name + " — 'help' lists what exists"];
+    return c.run(argv.slice(1));
+  }
+
+  /* ═══ shell ═══ */
+
+  function print(text, cls) {
+    var div = document.createElement("div");
+    if (cls) div.className = cls;
+    div.textContent = text;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function banner() {
+    print("DMDS/OS · site console — every command reads live state");
+    print("'help' lists commands · ESC closes", "t-dim");
+  }
+
+  function open() {
+    if (dlg.open) return;
+    opener = document.activeElement;
+    dlg.showModal();
+    if (toggle) toggle.setAttribute("aria-expanded", "true");
+    if (!out.childNodes.length) banner();
+    input.focus();
+  }
+
+  dlg.addEventListener("close", function () {
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (opener && opener.focus) { try { opener.focus(); } catch (e) {} }
+    opener = null;
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var line = input.value;
+    input.value = "";
+    if (!line.trim()) return;
+    hist.push(line);
+    histIdx = hist.length;
+    print("dmds://$ " + line, "t-cmd");
+    var name = line.trim().split(/\s+/)[0].toLowerCase();
+    if (name === "clear") { out.textContent = ""; return; }
+    exec(line).forEach(function (l) {
+      print(l, /^(unknown|unavailable|error)/.test(l) ? "t-err" : "");
+    });
+    if (name === "exit") dlg.close();
+  });
+
+  // ↑↓ history, TAB command completion — in-memory only (dies with the page)
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowUp") {
+      if (histIdx > 0) { histIdx--; input.value = hist[histIdx]; }
+      e.preventDefault();
+    } else if (e.key === "ArrowDown") {
+      if (histIdx < hist.length - 1) { histIdx++; input.value = hist[histIdx]; }
+      else { histIdx = hist.length; input.value = ""; }
+      e.preventDefault();
+    } else if (e.key === "Tab") {
+      var pre = input.value.trim().toLowerCase();
+      if (pre && pre.indexOf(" ") === -1) {
+        for (var name in COMMANDS) {
+          if (name.indexOf(pre) === 0) { input.value = name; break; }
+        }
+      }
+      e.preventDefault();
+    }
+  });
+
+  /* ═══ keyboard precedence router (spec: six paths, each tested) ═══
+     Backtick opens. Close is Escape (native) or 'exit' — the terminal's
+     own input is a form control, so rule 3 makes backtick literal there. */
+  document.addEventListener("keydown", function (e) {
+    if (e.isComposing) return;                                      // 1 IME
+    if (e.ctrlKey || e.altKey || e.metaKey) return;                 // 2 modifiers
+    var t = e.target;
+    if (t && t.closest && t.closest("input, textarea, select, button, a, [contenteditable]")) return; // 3 controls
+    if (e.key !== "`") return;                                      // 4 one key only
+    e.preventDefault();
+    open();                                                          // 5
+  });
+
+  if (toggle) {
+    toggle.removeAttribute("hidden"); // no-JS / no-dialog never shows a dead control
+    toggle.addEventListener("click", function () {
+      if (dlg.open) dlg.close(); else open();
+    });
+  }
+
+  window.DMDS_TERM = {
+    open: open,
+    close: function () { if (dlg.open) dlg.close(); },
+    exec: exec,
+    setContext: function (c) {
+      if (c && "gl" in c) ctx.gl = c.gl;
+      if (c && "fps" in c) ctx.fps = c.fps;
+    }
+  };
+})();
+
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
    DMDS™ — interaction layer
    Loader · virtual scroll · cursor · scramble · reveals · HUD
    ═══════════════════════════════════════════════════════════════ */
@@ -4719,6 +4954,14 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       var hint = $("#engine-hint");
       if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
         hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
+      }
+      // terminal context: accessors, not snapshots — GL is reassigned on
+      // governor demotion and status must describe the live engine
+      if (window.DMDS_TERM) {
+        window.DMDS_TERM.setContext({
+          gl: function () { return glOK ? GL : null; },
+          fps: function () { return GL && GL.fps ? GL.fps() : 0; }
+        });
       }
     })
     .catch(function () {
@@ -5410,4 +5653,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 3c54260 2026-08-03T12:12:13Z -->
+<!-- dmds build 8af6ebb 2026-08-03T13:02:47Z -->
