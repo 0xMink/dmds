@@ -2,12 +2,19 @@
 
 | | |
 |---|---|
-| **Version** | 2.1 (design system) |
-| **Date** | 2026-07-17 |
+| **Version** | 2.2 (design system) |
+| **Date** | 2026-08-02 |
 | **Owner** | Dennis Mink (@0xMink) |
 | **Scope** | The DMDS studio site (`src/` → `build.sh` → one self-contained `dist/index.html`) |
-| **Describes** | Site implementation v6 — "version" elsewhere in this doc means the site version |
-| **Enforcement** | `scripts/check.py`, run by every build — claims, glyphs, CSP, provenance, size budgets |
+| **Describes** | Site implementation v7 — "version" elsewhere in this doc means the site version |
+| **Enforcement** | `scripts/check.py` on every build (claims, glyphs, CSP, provenance, budgets) + the evidence suites in `tests/` (291 automated checks) + `tests/attest.sh` (release attestation) |
+
+**v2.2 covers what v2.1 predated**: the tier-1 GPGPU engine and its
+two-axis governor (M1–M4), the accessibility hardening round
+(`--line-strong`, the legibility scrim, scramble labels, per-section
+dim reductions), M5 (the signal band, the form grammar), boot-log
+durability, and the promotion of the test matrix from a manual
+checklist to an automated evidence-and-attestation system.
 
 **Conformance labels.** **MUST** = invariant; the build or a review should
 fail without it. **SHOULD** = expected unless a reason is recorded here.
@@ -60,12 +67,21 @@ How the rule above is implemented:
   consistency check (see below), `BOOT … READY` by load completion.
   Engine failure logs `FAIL` + `FALLBACK static field — ACTIVE`. A stall
   logs `TIMEOUT — CONTINUING`.
+- **Boot log durability**: every log line is also mirrored into
+  `window.DMDS_BOOTLOG` (append-only string array). The loader element
+  removes itself ~1.1s after finishing, so the DOM copy of the log is
+  ephemeral by design; the buffer is the durable record that tests and
+  telemetry read. **NOTE** — this closed a first-commit-vintage race:
+  whether a DOM read at engine-ready+2.5s beat `loader.remove()`
+  depended on frame pacing, and a rendering-cost change flipped it.
+  **MUST**: anything that needs boot-log contents after boot reads the
+  buffer, not the loader's DOM.
 - **Clock**: `Intl` supplies the zone label, so it reads `EST` or `EDT`
   correctly across daylight-saving transitions. **MUST** never hardcode a
   zone abbreviation.
 - **Footer status**: reads the renderer's actual state —
   `ALL SYSTEMS NOMINAL` (full budget) / `RENDER DEGRADED · CORE NOMINAL`
-  (governor has cut the particle budget) / `STATIC RENDER · CONTENT
+  (governor has reduced quality or budget) / `STATIC RENDER · CONTENT
   NOMINAL` (no WebGL, and the no-JS default in markup).
 - **FPS readout**: measured. **Console banner**: prints the actually
   seeded particle count after init.
@@ -109,26 +125,61 @@ it), `verified` date, `review_by` date, `visibility`.
 
 ## Color
 
-| Token         | Value                   | Usage                                  |
-| ------------- | ----------------------- | -------------------------------------- |
-| `--ink`       | `#0b0b0c`               | Page ground                            |
-| `--ink-2`     | `#131315`               | Loader panels, inputs, raised surfaces |
-| `--bone`      | `#edeae3`               | Primary text (≈16.4:1 on ink)          |
-| `--bone-dim`  | `rgba(237,234,227,.52)` | Secondary text (≈4.9:1 — AA at 11px+)  |
-| `--bone-faint`| `rgba(237,234,227,.28)` | **Decorative/`aria-hidden` only** (≈2.2:1) |
-| `--signal`    | `#ff4a00`               | THE accent — test-equipment orange     |
-| `--signal-hot`| `#ff6b2b`               | Reserved hot variant                   |
-| `--line`      | `rgba(237,234,227,.13)` | Hairlines (decorative)                 |
+| Token          | Value                   | Usage                                  |
+| -------------- | ----------------------- | -------------------------------------- |
+| `--ink`        | `#0b0b0c`               | Page ground; text on signal (5.84:1)   |
+| `--ink-2`      | `#131315`               | Loader panels, raised surfaces         |
+| `--bone`       | `#edeae3`               | Primary text (≈16.4:1 on ink)          |
+| `--bone-dim`   | `rgba(237,234,227,.52)` | Secondary text (≈4.9:1 — AA at 11px+)  |
+| `--bone-faint` | `rgba(237,234,227,.28)` | **Decorative/`aria-hidden` only** (≈2.2:1) |
+| `--signal`     | `#ff4a00`               | THE accent — test-equipment orange     |
+| `--signal-hot` | `#ff6b2b`               | Reserved hot variant                   |
+| `--line`       | `rgba(237,234,227,.13)` | Hairlines — **decorative only**        |
+| `--line-strong`| `rgba(237,234,227,.4)`  | Interactive boundaries (≈3.33:1 — WCAG 1.4.11) |
 
 - **MUST**: meaningful text uses `--bone` or `--bone-dim`, never
   `--bone-faint` (it fails WCAG contrast; it exists for annotations that
   are also `aria-hidden` — coordinates, loader log, placeholders).
-- **MUST**: `--line` never serves as the *sole* boundary of an
-  interactive control — controls get text, fills, or focus rings too.
+- **MUST**: the boundary of an interactive control (input underlines,
+  chip borders) uses `--line-strong` or stronger — ≥3:1 against the
+  ground per WCAG 1.4.11. `--line` is for decorative hairlines only and
+  never serves as the *sole* affordance of a control.
 - One accent, spent deliberately: cursor, indices, hover floods, terminal
   punctuation (`.sig` — the period as a shipped deliverable), ~12% of
-  particles (`step(0.88, mix)` in the fragment shader). Single-theme by
-  design. Selection inverts: signal ground, ink text.
+  particles. Single-theme by design. Selection inverts: signal ground,
+  ink text.
+- **The signal band** (v7): the proof-of-work stats strip is the page's
+  **one** full-bleed solid-`--signal` surface — ink type on orange
+  ground (5.84:1), hairline ink separators (`rgba(11,11,12,.3)`),
+  selection inverted locally (ink ground, signal text). **MUST**: it
+  stays singular. A second solid orange band would demote the accent to
+  a theme; new emphasis spends the existing grammar (floods, indices)
+  instead.
+
+## Legibility over the field
+
+Particles composite **additively** — dense regions of the field stack
+toward white, so no per-section `data-dim` value can *guarantee* dark
+ground behind text. Dimming shapes the field's average; it cannot bound
+its maximum.
+
+- Long-form text blocks that sit over the live canvas (manifesto,
+  section heads, capability copy, operator body, proof rows, work
+  details, contact copy, the transmit form) carry a **feathered ink
+  scrim**: a `::before` layer behind the text (`inset: -1.4rem -2rem`,
+  `rgba(11,11,12,.82)`, `blur(26px)`, `z-index: -1`) — a soft pool of
+  ink, not a visible card.
+- Rows with signal hover-floods set their scrim to `opacity: 0` while
+  flooded — the flood is itself an opaque ground, and ink-under-orange
+  would ring the edges.
+- **MUST**: body text rendered over the live field sits on a scrim or an
+  opaque surface. Per-section `data-dim` is an aesthetic control, not
+  the contrast mechanism.
+- **NOTE**: this rule was added after a human review caught dense
+  particle formations washing out hero-adjacent text — automated
+  contrast tooling samples static ground colors and cannot see an
+  animated additive field. Contrast over the canvas is a design
+  invariant, not an audit output.
 
 ## Type
 
@@ -156,18 +207,23 @@ assumed from inlining.
 
 - **Spacing**: `--pad: clamp(1.25rem, 4vw, 4rem)` is the horizontal
   module; vertical rhythm uses rem multiples (section padding 8–10rem,
-  intra-component 0.4–2.4rem).
+  intra-component 0.4–2.4rem). Full-bleed elements (the signal band)
+  escape the module with `margin: 0 calc(-1 * var(--pad))` and restore
+  it as internal padding.
 - **Easing**: `--ease-out: cubic-bezier(.19,1,.22,1)` (reveals, cursor),
   `--ease-inout: cubic-bezier(.77,0,.175,1)` (panel wipes, floods).
   Durations: micro 0.25–0.35s · reveals 1–1.1s · floods 0.4–0.5s ·
   morphs 0.9–1.5s (2.2s first assembly).
 - **Breakpoints** (max-width): **900** nav meta hides · **860** stat/dossier
-  grids 4→2, proof grid collapses · **720** HUD/coords/engine-hint hide,
-  cap layout unmirrors, work grid 3-col · **560** nav compacts (see
-  Responsive), transmit grid 1-col.
+  grids 4→2 (the signal band goes 2×2 with corrected separators), proof
+  grid collapses · **720** HUD/coords/engine-hint hide, cap layout
+  unmirrors, work grid 3-col · **560** nav compacts (see Responsive),
+  transmit grid 1-col.
 - **Z-index layers**: 0 canvas · 10 content · 90 grain · 100 HUD ·
   200 nav · 250 cursor · 300 skip-link · 400 loader. **MUST**: new layers
-  slot into this scale, no arbitrary values.
+  slot into this scale, no arbitrary values. (Scrims live at `z-index:
+  -1` *within* their text block's stacking context — below the text,
+  above the canvas.)
 - **Content widths**: manifesto 20ch · descriptions 30–46rem ·
   form `min(40rem, 100%)`.
 
@@ -191,27 +247,56 @@ assumed from inlining.
 | 001 | Hero / boot | `logo` | 1.0 |
 | 002 | Manifesto | `ambient` | 0.7 |
 | 003 | Capabilities ×4 | `grid` → `device` → `neural` → `curve` | 1.0 |
-| 004 | Proof of Work | `ambient` | 0.38 |
-| 005 | Operator | `text:0xMINK` | 0.8 |
-| 006 | Work / dossiers | `ambient` | 0.32 |
-| 007 | Contact / transmit | `logo` | 0.55 |
+| 004 | Proof of Work (+ signal band) | `ambient` | 0.28 |
+| 005 | Operator | `text:0xMINK` | 0.45 |
+| 006 | Work / dossiers | `ambient` | 0.25 |
+| 007 | Contact / transmit | `logo` | 0.3 |
 
 `data-formation` / `data-dim` drive the engine; per-section dim keeps
-text legible over the field. **NOTE**: `0xMINK` is a handle, not a hex
+the field's *average* legible over text (the scrim, above, bounds the
+worst case). The reading-heavy sections (004–007) were dimmed further
+in the accessibility round. **NOTE**: `0xMINK` is a handle, not a hex
 literal. On desktop, non-text formations shift ±0.42 × half-width so
 they sit beside the copy.
 
 ## The engine as instrument
 
-42,000 particles (16,000 mobile / Save-Data), one `GL_POINTS` draw call,
-GPU vertex-shader morphing between position buffers with per-particle
-stagger. Three ways visitors operate it: **typing** on the hero (live
-typesetting through the same canvas-sampling pipeline as the wordmark,
-12-char buffer), **scrolling** (morphs scrubbed by scroll position via
-`setMorphPair`, forward and backward), **hovering work rows** (the field
-spells the project). Vertex shader: three-sine idle drift, curl advection
-peaking mid-morph (`mix·(1−mix)·4`) so transitions swirl, world-space
-mouse repulsion.
+Two tiers, feature-detected at boot (`gl2 → gl1 → static`):
+
+**Tier 1 (`src/gl2.js`) — WebGL2 GPGPU physical simulation.** Particle
+positions and velocities live in RGBA32F textures; a fragment pass
+integrates real forces every frame — one MRT sim pass, one `GL_POINTS`
+render draw. Sim sizes come from a ladder (`count = N²`): desktop
+baseline **512² = 262,144** particles (floor 256², promotion ceiling
+1024²); mobile / Save-Data pinned to [256², 384²]. The physics is
+specified, not vibed (spec: `docs/superpowers/specs/2026-07-17-gpgpu-
+physical-engine-design.md`): formation springs with per-particle
+stagger, time-based exponential drag (`v·exp(−K_DRAG·dt)` — frame-rate
+independent), force and velocity caps, dt clamp, and a settle deadband
+that snaps converged particles. One GLSL stagger/hash definition is
+injected into every shader that blends targets, so the per-particle
+factor can never silently diverge between passes.
+
+Visitors can **grab** the field (capture radius 160 CSS px — sized to
+exceed the ~130px hover-repulsion crater, or a press would grab the
+middle of its own evacuated hole), tear a clump off a formation, and
+**fling** it (release velocity clamped to 0.8·V_max, per-axis seed
+jitter). A depth channel (`position.w`) drives camera parallax
+(amplitudes fixed by the spec's unit audit). **Typing** on the hero
+typesets live through the same canvas-sampling pipeline as the wordmark
+(glyph particles capped at 120,000; the remainder becomes dust).
+
+**Tier 2 (`src/gl.js`) — WebGL1 buffer engine.** 42,000 particles
+(16,000 mobile / Save-Data), GPU vertex-shader morphing between position
+buffers with per-particle stagger, three-sine idle drift, curl advection
+peaking mid-morph, world-space mouse repulsion. This was the site's
+original engine; it remains the fallback when WebGL2 / float-texture
+support is absent or tier 1 fails init or demotes.
+
+Three ways visitors operate the field in either tier: **typing** on the
+hero (12-char buffer), **scrolling** (morphs scrubbed by scroll position
+via `setMorphPair`, forward and backward), **hovering work rows** (the
+field spells the project).
 
 ### Engine state machine
 
@@ -243,28 +328,40 @@ Ambient capture is deliberately narrow. **MUST** hold all of:
 ## Rendering
 
 Desktop post pipeline (hand-rolled, ping-pong FBOs): persistence trails
-(frame-rate-independent decay `exp(−9·dt)`) → quarter-res two-pass bloom
-→ composite with radial chromatic aberration, vignette, hash dither.
-**NOTE**: "one draw call" refers to the particle field; the post pipeline
-adds four fullscreen-quad passes, which are the dominant fill-rate cost —
-the claim registry says so explicitly.
+(frame-rate-independent decay) → reduced-res two-pass bloom → composite
+with radial chromatic aberration, vignette, hash dither.
+**NOTE**: "one draw call" refers to the particle field; the post
+pipeline adds fullscreen-quad passes, which are the dominant fill-rate
+cost — the claim registry says so explicitly.
 
 Degradation ladder — **MUST** preserve content at every rung:
 
-1. Full: particles + post pipeline (desktop).
-2. Direct: particles, no post (mobile, Save-Data, or any FBO/shader failure).
+1. Tier 1: GPGPU simulation + post pipeline (desktop WebGL2).
+2. Tier 2: buffer engine (WebGL1, or any tier-1 init failure/demotion);
+   post pipeline where supported, direct rendering on mobile/Save-Data.
 3. Static: no WebGL → CSS gradient atmosphere; all content readable.
 4. No JS: dossiers render expanded, stats show real values, reveals
    don't hide anything (`html.js`-gated).
 
-**Quality governor**: halves the particle budget when FPS < 40, restores
-(doubling) only after two consecutive fast windows — drop fast, recover
-slow, no oscillation. Floor: COUNT/4. Hidden tabs pause the loop, so no
-polluted samples. `setBudget()` pins and locks the budget.
-**WebGL context loss**: `webglcontextlost` pauses; `webglcontextrestored`
-rebuilds every GPU resource from CPU-side state and resumes; a failed
-restore falls to the static rung. **MUST**: context loss never blanks
-content.
+**Quality governor (tier 1) — two axes.** Axis 1: post/fill quality,
+rungs 0–5 (bloom drops to eighth-res, then the backing store caps at
+1.0 device px, then post turns off). Axis 2: sim size along the ladder,
+where a resize is a **managed reinit deferred until idle** — never
+mid-frame (a demotion inside the frame callback destroys the engine
+under its own feet; found the hard way). Escalation order under
+sustained low FPS: quality down → sim size down → post off → **tier-2
+demotion** (one-way per page load). Improvement reverses the path;
+promotion above baseline is desktop-only and gated on sustained
+headroom, and a size that ever failed allocation is blocked from
+promotion. Every decision is appended to a sequenced governor history
+(`seq` disambiguates order where timestamps can't). Hidden tabs pause
+the loop, so no polluted samples; reduced-motion runs a power stop.
+**Tier 2 keeps its own simpler governor**: halve budget below 40 FPS,
+restore only after two consecutive fast windows, floor COUNT/4.
+**WebGL context loss** (both tiers): `webglcontextlost` pauses;
+`webglcontextrestored` rebuilds every GPU resource from CPU-side state
+and resumes; a failed restore falls down the ladder. **MUST**: context
+loss never blanks content.
 
 ## Sound
 
@@ -303,8 +400,12 @@ scrolling and find-in-page; this section exists so that never returns.
   low frame rates can't stretch it.
 - **Reveals**: clip-path line reveals + translate/fade, one-shot
   IntersectionObserver. **Manifesto**: per-word illumination by scroll.
-- **Scramble**: glyph decode on nav hover/focus. **Hover floods**:
-  proof/work rows flood signal, content inverts to ink. **Magnetic CTA**:
+- **Scramble**: glyph decode on nav hover/focus. **MUST**: scrambled
+  elements carry an `aria-label` with their true text, set *before*
+  listeners bind — screen readers announce at focus time, mid-animation,
+  and must never read garbage glyphs.
+- **Hover floods**: proof/work rows flood signal, content inverts to ink
+  (plain-English lines darken to ≥5:1 on the flood). **Magnetic CTA**:
   0.32× pointer follow. **Cursor**: dot + lagging ring with labels
   (VIEW / TRANSMIT), `pointer: fine` only. **Tab title**: blur swaps to
   `[ SIGNAL LOST ] — DMDS®`.
@@ -317,10 +418,18 @@ scrolling and find-in-page; this section exists so that never returns.
 | Nav link | `--bone-dim` | `--bone` + scramble | ring + scramble | — | — |
 | Work row (button-in-h3) | hairline row | flood, ink text, name slides, detail unfolds | `:focus-within` = hover + ring | `.open`: flood suppressed, arrow 45°, dossier region shown | no-JS: dossier expanded |
 | Proof row | hairline row | flood, ink text | `:focus-within` flood | — | — |
-| Chip (native radio) | hairline border | — | ring on span | signal border/text/tint | — |
-| Input | `--ink-2`, hairline | — | signal border | `:user-invalid` red border | — |
-| CTA | outlined pill | flood fills, arrow nudges | ring | TRANSMITTING… label | fallback → recovery row |
+| Chip (native radio) | `--line-strong` hairline border | — | ring on span | checked: **solid signal fill, ink text** | — |
+| Input / textarea | transparent ground, `--line-strong` bottom hairline | — | signal underline (border + 1px shadow = 2px rule) | `:user-invalid`: `#d4452c` underline | — |
+| CTA | outlined **rectangle** (no radius — the page has no rounded corners) | flood fills, arrow nudges | ring | TRANSMITTING… label | fallback → recovery row |
+| Fine-print disclosure (native `details`) | mono summary, `--bone-dim`, `+` affix | `--bone` | ring on summary | `[open]`: summary signal, content revealed | no-JS: browser-native disclosure still works |
 | SND toggle | `--bone-dim` OFF | `--bone` | ring | signal ON | hidden ≤560px |
+
+**Form grammar (v7).** Fields are hairline underlines on the scrim
+ground — no boxes, no fills; the underline is the affordance
+(`--line-strong`, so it meets 1.4.11), and focus answers in signal. The
+checked chip is the one solid-signal control state on the page, echoing
+the band. The CTA is rectangular: the pill radius was retired because
+nothing else on the page curves.
 
 ## Conversion layer
 
@@ -332,11 +441,19 @@ scrolling and find-in-page; this section exists so that never returns.
   reveals a copy-to-clipboard recovery row. **NOTE**: mailto is a
   *recovery path*, not guaranteed delivery — the site never claims
   otherwise.
+- **Microcopy**: exactly **one visible line** under the CTA; everything
+  else (privacy statement, draft-persistence disclosure, the direct
+  email line) lives behind a native `<details>` disclosure
+  (`[ PRIVACY & DIRECT LINE + ]`). **MUST**: the disclosure stays native
+  `details/summary` — keyboard and no-JS behavior for free. **NOTE**:
+  three stacked fine-print paragraphs read as a disclaimers pile and
+  undercut the conversion moment; one line + a disclosure keeps the
+  promises *available* without printing them all.
 - **Draft privacy**: drafts are timestamped and expire after 7 days
   (expired drafts are deleted on load, not restored); storage failures
   are swallowed (no draft on browsers that throw); nothing beyond the
-  four field values is stored. **MUST**: the form's microcopy discloses
-  that unsent text is kept on the device.
+  four field values is stored. **MUST**: the form's microcopy (behind
+  the disclosure) discloses that unsent text is kept on the device.
 - **Abuse controls, client side**: honeypot + minimum-fill-time gate,
   where fill time is measured from first interaction. **MUST**: timing
   is a *risk signal, not proof* — a too-fast submit (autofill, paste,
@@ -348,8 +465,9 @@ scrolling and find-in-page; this section exists so that never returns.
 - **Privacy**: stated on the form — one inbox, no third-party analytics,
   no tracking, no list. **MUST** stay true as long as it's printed.
 - **Mid-page shortcut CTA** after Capabilities; **plain-English
-  translations** in the Proof table; nav becomes a solid blurred bar past
-  the hero.
+  translations** in the Proof table; the **signal band** carries the
+  four headline stats (registry-wired) as the section's exclamation
+  point; nav becomes a solid blurred bar past the hero.
 
 ## Evidence dossiers
 
@@ -365,20 +483,20 @@ semantics stay native (real button, real region) — no `tabindex` +
 
 ## Performance budgets
 
-Enforced by `check.py` on every build; measured values as of v6:
+Enforced by `check.py` on every build; measured values as of v7:
 
 | Metric | Budget | Measured |
 |---|---|---|
-| dist raw | ≤ 512 KB | ~321 KB (v6 + tier-1 GPGPU engine + governor) |
-| dist gzip | ≤ 280 KB | ~130 KB |
+| dist raw | ≤ 512 KB | ~334 KB (v7: both engine tiers + governor + instrumentation) |
+| dist gzip | ≤ 280 KB | ~136 KB |
 | Requests on load | 0 | 0 — verified by artifact inspection + browser network test; with no endpoint configured, `connect-src 'none'` also makes requests *impossible* (CSP constrains destinations, it can't count requests) |
 | Loader cap | ≤ 2.6 s | hard timeout |
 
-**SHOULD** (test matrix, measured in DevTools/PageSpeed until automated):
-LCP < 2.5s on mid-tier mobile · CLS < 0.02 · main-thread JS parse+exec
-< 150ms desktop · steady-state ≥ 55fps desktop / ≥ 40fps mobile (below
-which the governor is *expected* to act — that's it working, and the
-footer says so).
+**SHOULD** (measured in DevTools/PageSpeed; not yet in the automated
+suites): LCP < 2.5s on mid-tier mobile · CLS < 0.02 · main-thread JS
+parse+exec < 150ms desktop · steady-state ≥ 55fps desktop / ≥ 40fps
+mobile (below which the governor is *expected* to act — that's it
+working, and the footer says so).
 
 ## Security & provenance
 
@@ -400,10 +518,9 @@ footer says so).
   (`<meta name="dmds-build">` + trailing comment); a non-clean tree is
   stamped `-dirty` so a commit hash never misrepresents the source.
   **NOTE — what this proves**: CSP hash re-derivation detects post-build
-  content drift; it is *consistency*, not proof of origin. **MUST**:
-  release only artifacts emitted by `build.sh` — process discipline (and
-  CI attestation, if the site ever gets CI), not something the artifact
-  can prove about itself.
+  content drift; it is *consistency*, not proof of origin. Proof that
+  the *served* artifact is the *tested* artifact is the attestation
+  system's job (below).
 - **External links**: `rel="noopener"` on every `target="_blank"`.
 - **Reproducibility**: the artifact is deterministic given the source
   tree, the resolved commit, the build timestamp (`SOURCE_DATE_EPOCH`
@@ -414,10 +531,99 @@ footer says so).
   is current before launch; if not registered, switch to ™ (launch
   checklist, README).
 
+### Debug & telemetry surface
+
+The shipped artifact contains the engine's test instrumentation, gated
+behind query parameters: `?debug=1` enables the debug API (state
+readbacks, fault injection, staged init failures, governor injection —
+every debug function **throws** without the flag) and `?telemetry=1`
+enables read-only observability getters with zero behavior change (used
+for hardware retests, so the measured run IS the production experience).
+
+**Decision (v2.2): no stripped production build.** Considered and
+rejected, deliberately:
+
+- The 291-check evidence suite and the attestation both bind to the
+  exact dist bytes. A stripped variant forks "tested artifact" from
+  "shipped artifact" — the attestation's core claim (*public bytes =
+  attested bytes = tested bytes*) would silently weaken to "a sibling of
+  the tested artifact".
+- The gates are real: without the params, debug paths are unreachable
+  (functions throw; injection branches never run) — there is no default
+  behavior difference to remove.
+- The debug surface exposes nothing sensitive: it reads and perturbs the
+  visitor's own local simulation.
+- Size is inside budget with margin (~334 of 512 KB).
+
+**MUST**: debug/test hooks are honored only under an explicit query
+flag, default-off, with zero behavior change when absent. **MUST**: the
+attested artifact and the served artifact are the same bytes — any
+future "production variant" proposal must answer for the fork above.
+
+## Verification & evidence
+
+What v2.1 listed as a manual pre-release checklist is now an automated
+regime with three layers. (Manual checks that remain are listed at the
+end.)
+
+**1. Build verification** (`scripts/check.py`, run by every
+`./build.sh`): claims↔page consistency, `review_by` freshness, stat
+text↔`data-count` agreement, glyph coverage against the embedded woff2
+cmaps, CSP hash re-derivation, provenance stamp, size budgets.
+
+**2. Regression evidence** (`tests/run.sh` + four suites, headless
+Chromium/SwiftShader against the built artifact):
+
+| Suite | Checks | Covers |
+|---|---|---|
+| `m1-core` | 59 | boot, production shape, morph, numerical recovery, lifecycle, full fallback matrix |
+| `m2-grab` | 55 | grab/tear/fling state machine + numerical invariants |
+| `m3-depth` | 35 | camera parallax, reduced-motion camera, dust rules |
+| `m4-governor` | 142 | two-axis governor, resize-as-reinit, demotion, reduced-motion power stop, status honesty |
+
+`run.sh` is an *evidence runner*, not just a test runner: every run
+appends a ledger entry (`tests/run-manifest.jsonl` — suite, check
+counts, exit, git state) and archives the full gzipped log under
+`tests/evidence/`, hash-linked from the ledger. `dirty` includes
+untracked files; a tree that changes mid-run is refused (`tree_stable`).
+Product failures are archived to `tests/failures/` — committed fire
+history, because failures that led to fixes are evidence too.
+
+**3. Release attestation** (`tests/attest.sh`): verifies that one
+contiguous, same-batch, all-passing ledger group with the expected
+suite/check inventory exists, that its evidence archives re-hash and
+decompress correctly, and that `dist/index.html`'s bytes hash equal to
+what an actual HTTP fetch of the served file returns — then issues
+`tests/attestation.json` binding batch → runs → dist bytes → HTTP
+boundary, atomically (lock, unique temp, fsync, rename) with all
+attested inputs re-validated under the lock. The verifier is itself
+verified: `tests/attest-acceptance.sh` fault-injects every declared
+refusal predicate (35 cases) against a scratch replica, with a positive
+control that reproduces the committed attestation byte-for-byte.
+
+**MUST (release sequence)**: commit source → `./build.sh` → commit
+`dist/` → full regression via `run.sh` (all four suites, one batch, on
+the release-candidate commit, clean tree) → `attest.sh` → commit the
+attestation *without rebuilding* → push. GitHub Pages deploys `dist/`
+**verbatim** (no build step in the workflow — a CI build would break
+the byte-equality claim), and the final step is fetching the public URL
+past CDN cache and confirming its hash equals `dist_sha256` in the
+attestation. **MUST**: if a suite's check count changes, the expected
+inventory in `attest.sh` is updated *deliberately, in the same commit* —
+that constant is the tripwire that catches silently vanishing checks.
+
+**Manual checks that remain** (not yet automated): boot-log lines
+correspond to real events under CPU throttle · type mode with a real
+screen reader · form endpoint success/failure paths against a live
+endpoint · reduced motion, forced colors, 200%/400% zoom by eye ·
+real-hardware frame pacing (SwiftShader is a software rasterizer; it
+proves logic, not feel) · axe-core + keyboard-walk + 320px-reflow audit
+re-run after visual changes (tooling in scratch; 0 violations as of v7).
+
 ## Responsive & zoom
 
-- Relative units (rem/clamp/vw) throughout; content reflows to 390px
-  wide with zero horizontal overflow (tested).
+- Relative units (rem/clamp/vw) throughout; content reflows to 320px
+  wide with zero horizontal overflow (tested — WCAG 1.4.10).
 - **MUST**: ≤560px keeps every nav jump link with ≥40px tap targets
   (padding, not font size, makes the target; measured 44px). The SND
   toggle and nav meta hide first; links never shrink below 0.625rem.
@@ -429,16 +635,24 @@ footer says so).
 
 - Semantic sections, skip link, visible focus rings, `aria-hidden` on all
   decorative layers, visually-hidden h1.
+- **Contrast**: audited against WCAG 2.1 AA — alpha-composited pairs
+  computed, axe-core clean (0 violations), non-text contrast (1.4.11)
+  met via `--line-strong`, and text-over-canvas bounded by the scrim
+  (see *Legibility over the field* — the one class of contrast failure
+  automated tools cannot see).
 - **Disclosures**: native buttons wrapped in headings, `aria-expanded` +
   `aria-controls`, labelled regions. Focus stays on the button on
-  toggle (APG accordion behavior).
+  toggle (APG accordion behavior). The form's fine print uses native
+  `details/summary`.
 - **Form**: native inputs and radios (visually-hidden `<input>` +
   styled span, `fieldset`/`legend`), native validation +
   `:user-invalid`, `role="status"` success/recovery messages.
+- **Scramble targets** carry `aria-label` with the true text (set
+  before listeners bind) so mid-animation announcement is never garbage.
 - **Type mode**: announced via `role="status"` live region on entry and
   exit; never captures from interactive elements (contract above).
 - **Reduced motion**: honored end-to-end (scroll, reveals, particles,
-  loader, counters, grain).
+  loader, counters, grain; tier-1 engine runs a power stop).
 - **Forced colors**: atmosphere layers removed, native cursor restored,
   flood pseudo-elements hidden so no state becomes invisible, manifesto
   fully lit, system colors respected.
@@ -449,25 +663,13 @@ footer says so).
 ## Browser & feature matrix
 
 Baseline: evergreen Chromium/Firefox/Safari (last 2 major). Every
-capability is feature-detected, never UA-sniffed: WebGL1 (→ static
-rung), `document.fonts` (→ resolve immediately), AudioContext (→ SND
-hidden no-op), clipboard API (→ execCommand → manual copy), localStorage
-(try/caught), `navigator.connection.saveData`, `pointer: fine`,
+capability is feature-detected, never UA-sniffed: WebGL2 + float
+textures (→ tier 2), WebGL1 (→ static rung), `document.fonts` (→
+resolve immediately), AudioContext (→ SND hidden no-op), clipboard API
+(→ execCommand → manual copy), localStorage (try/caught),
+`navigator.connection.saveData`, `pointer: fine`,
 `prefers-reduced-motion`, `forced-colors`. IE/legacy: not supported; the
 no-JS reading path is the floor.
-
-## Test matrix
-
-Before release (manual until automated): boot log lines correspond to
-real events (throttle CPU to see reordering) · claims PASS in console ·
-loader skips via click/Escape and never exceeds 2.6s+wipe · type mode:
-activate, announce, Escape, idle-exit, blocked while a control has
-focus · dossiers via mouse, Enter, and screen reader (button + region
-semantics) · scroll acceptance list (Motion & scroll) · form: endpoint
-success, endpoint failure → mailto + copy recovery + draft restore ·
-reduced motion · forced colors · 200%/400% zoom · 390px viewport ·
-no-JS render · WebGL blocked → static rung · `check.py` negative tests
-(mutate a claim, a date, the dist — each must fail).
 
 ## Voice / copy rules
 
