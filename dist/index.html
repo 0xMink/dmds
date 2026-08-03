@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-FR37l+0oubb3H8oezQ/dveyd53hs/Jw5AXVhsz/JdrU='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-SPfu/Cy8GoTnIUAGGhimTjjGuXydUGt4pVnfMF6TMCg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-y1s5stT84krpxN8JzHb3hAfW4CDbnPdr8+Yg98+vTp4='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-6m89SVLhFEbnNoi/IGJ60RlmkRrmfBPhpVEeFylATgg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS™ — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -297,6 +297,14 @@ html.loaded .nav { opacity: 1; transform: none; }
   .nav__links { gap: 0.15rem; }
   .nav__links a { font-size: 0.625rem; letter-spacing: 0.08em; padding: 0.9rem 0.4rem; }
   .nav__snd { display: none; }
+  /* the terminal keeps its door on phones: TRM stays (SND hides first).
+     Same tap-target rule as the jump links — padding makes the target */
+  .nav__trm { display: inline-block; font-size: 0.625rem; padding: 0.9rem 0.4rem; }
+}
+/* iOS zooms the page when a focused input's font-size is under 16px —
+   on coarse pointers the terminal input meets that floor */
+@media (pointer: coarse) {
+  .term__in { font-size: 1rem; }
 }
 
 /* ═══ Sections shared ═══ */
@@ -792,7 +800,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="89d62fc 2026-08-03T13:32:18Z">
+<meta name="dmds-build" content="b23fd48 2026-08-03T13:47:08Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -4992,20 +5000,24 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       if (hint && !TOUCH && GL && GL.status().tier === "gl2") {
         hint.innerHTML = "[ <b>FIELD IS PHYSICAL</b> ]&nbsp;&nbsp;GRAB THE WORDMARK — TEAR IT. IT RECOVERS. TYPE ANYTHING.";
       }
+    })
+    .catch(function () {
+      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
+      bootLog("COMPILE render engine", "FAIL");
+      bootLog("FALLBACK static field", "ACTIVE");
+    })
+    .then(function () {
       // terminal context: accessors, not snapshots — GL is reassigned on
-      // governor demotion and status must describe the live engine.
-      // _connect is a one-shot bridge (consumed on first use).
+      // governor demotion and status must describe the live engine. This
+      // runs after BOTH outcomes (the catch above returns), so the
+      // one-shot _connect bridge is consumed on every boot path — tier 1,
+      // tier 2, and static — never left dangling on the public API.
       if (window.DMDS_TERM && window.DMDS_TERM._connect) {
         window.DMDS_TERM._connect({
           gl: function () { return glOK ? GL : null; },
           fps: function () { return GL && GL.fps ? GL.fps() : 0; }
         });
       }
-    })
-    .catch(function () {
-      $("#gl").style.opacity = "0.5"; /* CSS gradient fallback remains */
-      bootLog("COMPILE render engine", "FAIL");
-      bootLog("FALLBACK static field", "ACTIVE");
     });
 
   // a consistency check — the DOM against the embedded registry — not a
@@ -5691,4 +5703,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 89d62fc 2026-08-03T13:32:18Z -->
+<!-- dmds build b23fd48 2026-08-03T13:47:08Z -->
