@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   DMDS® — particle engine
+   DMDS™ — particle engine
    Hand-rolled WebGL1. One draw call. Six formations, GPU-morphed.
    No three.js — every byte here is ours.
    ═══════════════════════════════════════════════════════════════ */

@@ -1,4 +1,4 @@
-# DMDS® — studio site
+# DMDS™ — studio site
 
 Single-page studio site for DMDS (websites · apps · AI · marketing).
 Fully self-contained: **zero external requests** — fonts, styles, and
@@ -165,20 +165,23 @@ curl -s https://0xmink.github.io/dmds/ | sha256sum
   contrast an automated audit can't measure, treated as a design
   invariant.
 
-## Before launch (remaining)
+## Launch checklist
 
-- [ ] Swap the contact email in `src/index.html` **and** `src/main.js`
-      (currently `dennis@shorevapesli.com`) for the studio address you
-      want public
-- [ ] Confirm the work-list blurbs (Zoo Code / Insure With Mink / Comfort
-      Airz) say only what you want public; add quantified outcome
-      numbers to the claim registry when verified
-- [ ] Trademark: the site uses ® — confirm the DMDS registration is
-      current; if it isn't registered, change ® to ™ site-wide
+- [x] Trademark: switched ® → ™ site-wide (2026-08-03) — no DMDS
+      registration found; ™ is lawful without one. Revisit if a
+      registration issues
+- [x] `og:image` / `og:url` / `twitter:card` set to the deployed Pages
+      URLs (2026-08-03). If a custom domain lands, update all three and
+      rebuild
+- [x] Contact email: keeping `dennis@shorevapesli.com` (already public
+      on the live site; no studio address exists yet). Swap in
+      `src/index.html` **and** `src/main.js` when one does
+- [ ] Add quantified outcome numbers for the three dossiers (Zoo Code /
+      Insure With Mink / Comfort Airz) to the claim registry once
+      verified — the signal band's claim slots are wired for them
 - [ ] If you wire a lead API: set `data-endpoint` on `#transmit` and
       rebuild (server-side validation, rate limiting, and origin checks
       are the endpoint's job — the client honeypot is not an
       abuse-control system)
-- [ ] Set the absolute `og:image` URL for rich link cards
 - [ ] Custom domain (optional) — if you ever add analytics, update the
       form's "no third-party analytics" promise first or don't add them

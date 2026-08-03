@@ -1,4 +1,4 @@
-# DMDS® Design System
+# DMDS™ Design System
 
 | | |
 |---|---|
@@ -408,7 +408,7 @@ scrolling and find-in-page; this section exists so that never returns.
   (plain-English lines darken to ≥5:1 on the flood). **Magnetic CTA**:
   0.32× pointer follow. **Cursor**: dot + lagging ring with labels
   (VIEW / TRANSMIT), `pointer: fine` only. **Tab title**: blur swaps to
-  `[ SIGNAL LOST ] — DMDS®`.
+  `[ SIGNAL LOST ] — DMDS™`.
 - Reduced motion collapses all of the above to near-static.
 
 ## Component states
@@ -527,9 +527,13 @@ working, and the footer says so).
   overrides wall-clock time for pinned builds), and the build-tool
   versions — not "given the tree" alone, because the timestamp is an
   input by design.
-- **NOTE — trademark**: the site uses ®. Confirm the DMDS registration
-  is current before launch; if not registered, switch to ™ (launch
-  checklist, README).
+- **NOTE — trademark (resolved 2026-08-03)**: the site uses ™, not ® —
+  no DMDS registration was found, and ® without registration is a
+  misrepresentation this site's truth doctrine can't carry. ™ asserts
+  common-law claim and is always lawful. If a registration issues,
+  switch site-wide and re-subset or allowlist accordingly (™ currently
+  renders via the system-fallback allowlist; the embedded subsets carry
+  ® but not ™ and the font sources are not in the repo).
 
 ### Debug & telemetry surface
 

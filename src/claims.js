@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   DMDS® — claim registry
+   DMDS™ — claim registry
    Single source of truth for every quantitative claim on the page.
    The build fails if the page disagrees with this file or if a
    claim is past its review date (scripts/check.py). The loader's

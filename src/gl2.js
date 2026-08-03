@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   DMDS® — particle engine, tier 1 (WebGL2 GPGPU physical sim)
+   DMDS™ — particle engine, tier 1 (WebGL2 GPGPU physical sim)
    Positions and velocities live in RGBA32F textures; a fragment
    pass integrates real forces every frame. One MRT sim pass, one
    render draw. Spec: docs/superpowers/specs/2026-07-17-gpgpu-

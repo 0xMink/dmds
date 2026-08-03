@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DMDS® build verification — the enforcement half of DESIGN.md.
+"""DMDS™ build verification — the enforcement half of DESIGN.md.
 
 Fails the build when:
   1. a data-claim value on the page disagrees with the claim registry
@@ -36,10 +36,13 @@ WARN_RAW = 352 * 1024     # loud warning near current size — growth must be
 WARN_GZIP = 160 * 1024    # explained, not silently absorbed by the ceiling
 
 # Glyphs intentionally rendered by system fallback fonts (not in the
-# embedded subsets): UI arrows and the scramble-effect block glyphs.
+# embedded subsets): UI arrows, the scramble-effect block glyphs, and
+# ™ (the subsets contain ® but not ™, the font sources are not in the
+# repo to re-subset, and a fallback-rendered small superscript legal
+# mark beats shipping an ® the mark doesn't legally carry).
 # Present in every mainstream OS font stack; worst case they degrade
 # to a different arrow/block shape, never to meaning loss.
-SYSTEM_FALLBACK_OK = set("↗↘→↔█▓▒░")
+SYSTEM_FALLBACK_OK = set("↗↘→↔█▓▒░™")
 
 errors = []
 warnings = []

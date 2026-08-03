@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   DMDS® — interaction layer
+   DMDS™ — interaction layer
    Loader · virtual scroll · cursor · scramble · reveals · HUD
    ═══════════════════════════════════════════════════════════════ */
 (function () {
@@ -780,7 +780,7 @@
 
   /* ═══ Tab title: signal integrity ═══ */
   var baseTitle = document.title;
-  window.addEventListener("blur", function () { document.title = "[ SIGNAL LOST ] — DMDS®"; });
+  window.addEventListener("blur", function () { document.title = "[ SIGNAL LOST ] — DMDS™"; });
   window.addEventListener("focus", function () { document.title = baseTitle; });
 
   /* ═══ Clocks + FPS ═══
@@ -838,7 +838,7 @@
     var s0 = glOK ? GL.status() : null;
     var count = s0 ? (s0.count || s0.max).toLocaleString("en-US") + " particles · 1 draw call" : "static render";
     console.log(
-      "%c DMDS® %c ENGINEERED, NOT DECORATED. \n" +
+      "%c DMDS™ %c ENGINEERED, NOT DECORATED. \n" +
       "%c " + count + " · 0 external requests on load.\n" +
       " We audit our console too. → dennis@shorevapesli.com",
       "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
