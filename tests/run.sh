@@ -3,7 +3,7 @@
 #
 # Every run keeps its complete log in tests/logs/ (gitignored), archives
 # passing logs content-addressed into tests/evidence/ (gitignored;
-# survives log cleanup — NOT machine loss: this repo has no remote),
+# survives log cleanup — NOT machine loss: evidence is never pushed),
 # archives product failure logs to committed tests/failures/ and fixture
 # failure logs to gitignored tests/runner-artifacts/ (a fire drill does
 # not belong in the building's fire history), and appends one JSON line
