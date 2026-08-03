@@ -53,7 +53,11 @@ OS *voice* without the OS *simulation*.
   the mobile terminal a room without one). Same ≥40px tap-target rule
   as the nav jump links; the input meets iOS's 16px no-zoom floor on
   coarse pointers.
-- **Backtick `` ` ``** opens/closes globally (not just on the hero).
+- **Backtick `` ` ``** opens, globally (not just on the hero).
+  Closing is Escape, the in-dialog CLOSE control, or `exit` — never
+  backtick, because the terminal's own input is a form control and the
+  router's guard 3 makes backtick literal there (see Keyboard
+  precedence).
   Guards identical to the type-mode capture contract: never when focus
   is in `input, textarea, select, button, a, [contenteditable]`, never
   with Ctrl/Alt/Meta, never during IME composition. `` ` `` is excluded
@@ -144,9 +148,10 @@ type-mode charset, so type-mode never consumes it; (b) while the
 terminal is open, `showModal()` makes the rest of the page inert and
 focus lives in the terminal's input, so type-mode's own focus guard
 blocks it; (c) the router acts on exactly one key, so it can never
-shadow type-mode's charset. **Close is Escape (native dialog) or
-`exit`** — backtick-to-close is deliberately absent because the
-terminal's input is a form control and rule 3 wins. Each of these six
+shadow type-mode's charset. **Close is Escape (native dialog), the
+in-dialog CLOSE control, or `exit`** — backtick-to-close is
+deliberately absent because the terminal's input is a form control and
+rule 3 wins. Each of these six
 paths (5 guards + open) is a required m5 test case.
 
 ## State restoration rule

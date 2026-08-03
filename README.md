@@ -44,6 +44,9 @@ tests/
   m3-depth.js        35 checks — parallax, reduced-motion camera, dust
   m4-governor.js    142 checks — two-axis governor, resize-as-reinit,
                      demotion, power stop, status honesty
+  m5-terminal.js     86 checks — DMDS/OS terminal: shell, keyboard
+                     precedence, a11y, command truthfulness, real
+                     fallback integration, mobile reachability
   run.sh             evidence runner — appends a ledger entry and archives
                      the gzipped log for every run (see below)
   attest.sh          release attestation — binds a passing batch to exact
@@ -86,7 +89,7 @@ rebuild from `src/` instead.
 ## Tests & evidence
 
 ```bash
-tests/run.sh               # all four product suites (291 checks), one batch
+tests/run.sh               # all five product suites (377 checks), one batch
 tests/run.sh m1-core       # one suite
 tests/run.sh m2-grab 5     # one suite N times (flake hunting)
 ```

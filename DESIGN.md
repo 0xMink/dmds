@@ -7,7 +7,7 @@
 | **Owner** | Dennis Mink (@0xMink) |
 | **Scope** | The DMDS studio site (`src/` → `build.sh` → one self-contained `dist/index.html`) |
 | **Describes** | Site implementation v7 — "version" elsewhere in this doc means the site version |
-| **Enforcement** | `scripts/check.py` on every build (claims, glyphs, CSP, provenance, budgets) + the evidence suites in `tests/` (291 automated checks) + `tests/attest.sh` (release attestation) |
+| **Enforcement** | `scripts/check.py` on every build (claims, glyphs, CSP, provenance, budgets) + the evidence suites in `tests/` (377 automated checks) + `tests/attest.sh` (release attestation) |
 
 **v2.2 covers what v2.1 predated**: the tier-1 GPGPU engine and its
 two-axis governor (M1–M4), the accessibility hardening round
@@ -549,7 +549,7 @@ for hardware retests, so the measured run IS the production experience).
 **Decision (v2.2): no stripped production build.** Considered and
 rejected, deliberately:
 
-- The 291-check evidence suite and the attestation both bind to the
+- The 377-check evidence suite and the attestation both bind to the
   exact dist bytes. A stripped variant forks "tested artifact" from
   "shipped artifact" — the attestation's core claim (*public bytes =
   attested bytes = tested bytes*) would silently weaken to "a sibling of
@@ -577,7 +577,7 @@ end.)
 text↔`data-count` agreement, glyph coverage against the embedded woff2
 cmaps, CSP hash re-derivation, provenance stamp, size budgets.
 
-**2. Regression evidence** (`tests/run.sh` + four suites, headless
+**2. Regression evidence** (`tests/run.sh` + five suites, headless
 Chromium/SwiftShader against the built artifact):
 
 | Suite | Checks | Covers |
@@ -586,6 +586,7 @@ Chromium/SwiftShader against the built artifact):
 | `m2-grab` | 55 | grab/tear/fling state machine + numerical invariants |
 | `m3-depth` | 35 | camera parallax, reduced-motion camera, dust rules |
 | `m4-governor` | 142 | two-axis governor, resize-as-reinit, demotion, reduced-motion power stop, status honesty |
+| `m5-terminal` | 86 | DMDS/OS terminal: shell lifecycle, keyboard precedence, a11y contract, command truthfulness, real fallback-tier integration, forced colors, mobile reachability, no-JS |
 
 `run.sh` is an *evidence runner*, not just a test runner: every run
 appends a ledger entry (`tests/run-manifest.jsonl` — suite, check
@@ -608,7 +609,7 @@ refusal predicate (35 cases) against a scratch replica, with a positive
 control that reproduces the committed attestation byte-for-byte.
 
 **MUST (release sequence)**: commit source → `./build.sh` → commit
-`dist/` → full regression via `run.sh` (all four suites, one batch, on
+`dist/` → full regression via `run.sh` (all five suites, one batch, on
 the release-candidate commit, clean tree) → `attest.sh` → commit the
 attestation *without rebuilding* → push. GitHub Pages deploys `dist/`
 **verbatim** (no build step in the workflow — a CI build would break

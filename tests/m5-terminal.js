@@ -377,7 +377,7 @@ async function readyPage(browser, query, opts) {
       return { display: getComputedStyle(toggle).display, h: r.height, w: r.width };
     });
     check('mobile:' + tag + ':launcher-visible', pre.display !== 'none', pre.display);
-    if (vp.width <= 560) check('mobile:' + tag + ':launcher-tap-target', pre.h >= 40, 'h=' + pre.h);
+    if (vp.width <= 560) check('mobile:' + tag + ':launcher-tap-target', pre.h >= 40 && pre.w >= 40, 'h=' + pre.h.toFixed(1) + ' w=' + pre.w.toFixed(1));
     await page.tap('#term-toggle');
     await poll(page, () => document.getElementById('term').open === true);
     check('mobile:' + tag + ':tap-opens', true);
