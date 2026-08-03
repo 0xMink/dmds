@@ -1044,3 +1044,35 @@ the acceptance manifest — cosmetic, but it is a runner-bytes change
 and will ride the next substantive runner round, not this one.
 
 **Run of record: run_ids 55–58 at 0f64fd4 — 291 checks, attest-acceptance 35/35, attestation 29974fc.**
+
+## Round 17 — the terminal ships, and every layer of the machinery got tested by growth (2026-08-03)
+
+Phase 2 slice 1 (DMDS/OS terminal) released through three review-driven
+revisions in one day — full chronicle in tests/m5-results.md. The
+release also exercised the evidence machinery's growth path end to end:
+
+1. **Suite growth**: PRODUCT_SUITES and EXPECTED grew to five suites /
+   377 checks (m5-terminal: 86), updated in the same commits as the
+   suite changes. Runner-bytes change → fixture drills 3/3 at the
+   five-suite runner (90012d92); verifier-bytes change → attest_sha256
+   rotated (82578c48).
+2. **The acceptance harness had its own four-suite assumption**:
+   LEDGER_TAIL=4 under-staged the scratch replica's evidence the day a
+   fifth suite existed — the positive control refused with "run 71
+   evidence object missing" on first post-attestation run. Batch size
+   is now DERIVED from attest.sh's EXPECTED (with a sanity gate), so
+   suite growth can never silently under-stage again; the
+   extra-batch-entry case's insertion offset derives likewise. 35/35
+   after the fix, positive control byte-identical to the committed
+   certificate.
+3. **Three regressions were deliberately killed mid-run** as review
+   rounds superseded the bytes under test; their partial batches are
+   committed ledger history, clearly superseded by the run of record.
+4. **Provenance discipline caught its author twice**: a smoke dist
+   swept into a source commit via git add -A (both unpushed commits
+   rewritten), and two RC builds stamped -dirty from uncommitted
+   ledger growth (ledgers committed first, rebuilt clean).
+
+**Run of record: run_ids 71–75 at 3afdbe4 — M1 59 · M2 55 · M3 35 ·
+M4 142 · M5 86 = 377 checks, one batch, all clean; attestation
+dist=http=c0b08b9b at 20d5ee3; acceptance 35/35.**

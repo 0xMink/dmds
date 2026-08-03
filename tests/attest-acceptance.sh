@@ -40,7 +40,17 @@ cleanup() {
 trap cleanup EXIT
 
 R="$SCRATCH/repo"
-LEDGER_TAIL=4
+# batch size is DERIVED from the verifier's own EXPECTED inventory, so
+# suite growth can never silently under-stage the scratch replica (the
+# hardcoded 4 here failed the positive control the day m5 landed)
+LEDGER_TAIL="$(python3 - <<'PY'
+import re
+src = open("tests/attest.sh").read()
+m = re.search(r"EXPECTED = (\[.*?\])", src)
+print(len(eval(m.group(1))))
+PY
+)"
+case "$LEDGER_TAIL" in [1-9]|[1-9][0-9]) ;; *) echo "could not derive batch size from attest.sh EXPECTED" >&2; exit 1 ;; esac
 SENT_SHA="$(printf 'old-attestation-sentinel\n' | sha256sum | cut -d' ' -f1)"
 
 fresh() {
@@ -177,8 +187,8 @@ run_attest --no-http
 refused "ledger malformed: empty" "ledger-empty"
 
 # 9. extra product run hiding under the candidate batch id (inserted
-#    BEFORE the attested four, so only whole-batch membership can see it)
-fresh; mutate_ledger 'ls.insert(len(ls) - 4, dict(ls[-4]))'
+#    BEFORE the attested batch, so only whole-batch membership can see it)
+fresh; mutate_ledger "ls.insert(len(ls) - $LEDGER_TAIL, dict(ls[-$LEDGER_TAIL]))"
 run_attest --no-http
 refused "additional product runs" "extra-batch-entry"
 
