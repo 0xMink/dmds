@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Date** | 2026-08-03 |
-| **Status** | Draft — awaiting owner review |
+| **Date** | 2026-08-03 (rev 2 — external review incorporated: keyboard precedence model, state-restoration rule, unavailable-state outputs, a11y test enumeration, commercial hierarchy, no-game-abstractions; implementation begins with slice 1) |
+| **Status** | Accepted |
 | **Phase** | 2 of the staged-fusion roadmap (1: GPGPU engine ✓ · 2: terminal · 3: hidden game) |
 | **Owner** | Dennis Mink (@0xMink) |
 | **Governing docs** | DESIGN.md v2.2 (all MUSTs apply); this spec adds terminal-specific contracts |
@@ -121,6 +121,80 @@ opening a terminal is a stronger explicit act than adding a query param.
 that doesn't exist yet would be the site's first lie. Phase 3 adds its
 entry when there is something real behind it.
 
+## Keyboard precedence (deterministic, not aspirational)
+
+One document-level `keydown` router in term.js, guard order fixed and
+each path tested:
+
+1. `isComposing` → native (IME never intercepted).
+2. Ctrl/Alt/Meta held → native.
+3. Event target inside `input, textarea, select, button, a,
+   [contenteditable]` → native. This includes the terminal's own input:
+   backtick while typing in the terminal inserts a literal backtick.
+4. Key is not `` ` `` → native.
+5. Otherwise: open the terminal, `preventDefault`.
+
+Why this cannot collide with hero type-mode: (a) `` ` `` is not in the
+type-mode charset, so type-mode never consumes it; (b) while the
+terminal is open, `showModal()` makes the rest of the page inert and
+focus lives in the terminal's input, so type-mode's own focus guard
+blocks it; (c) the router acts on exactly one key, so it can never
+shadow type-mode's charset. **Close is Escape (native dialog) or
+`exit`** — backtick-to-close is deliberately absent because the
+terminal's input is a form control and rule 3 wins. Each of these six
+paths (5 guards + open) is a required m5 test case.
+
+## State restoration rule
+
+Terminal commands that mutate the visible site are the same class as
+direct manual interaction, and the same rules govern them:
+
+- `formation` / `type` enter the engine's existing manual states;
+  closing the terminal does **not** revert them — the visitor did it
+  deliberately — and the existing non-interactive exits (90px scroll
+  reclaim, idle timeout) restore scrub exactly as for hover/typing.
+- `snd` flips the real toggle; the nav button's `aria-pressed` is the
+  single source of truth and stays in sync. No revert on close.
+- `goto` scrolls; scroll position is ordinary page state.
+- The terminal itself restores **focus** to whatever held it before
+  opening (stored at open, restored on `close` event).
+
+One sentence of doctrine: **closing the terminal closes the terminal
+— it never undoes what the visitor asked for, and nothing the
+terminal can do outlives the page's existing reclaim rules.**
+
+## Truthful unavailable states
+
+Every command that reads a subsystem must answer honestly when that
+subsystem is absent — refusals are output, never silence or throw:
+
+- Static tier (no WebGL): `status` → `RENDER: STATIC · CONTENT NOMINAL
+  — no engine active`; `formation`/`type` → `unavailable: no engine
+  (static render)`; `gov` → `no governor: no engine`.
+- Tier 2: `status` reports tier 2 truthfully; `gov` prints tier-2
+  budget state and says the two-axis history belongs to tier 1.
+- Empty boot log (terminal opened before boot finished, or buffer
+  missing): `boot` → `boot log empty` — never a fabricated line.
+- Sound unsupported (no AudioContext): `snd` → `unavailable: no audio
+  support`, matching the hidden nav toggle.
+
+## Commercial hierarchy
+
+The terminal is secondary to the site's job. **MUST**: no content is
+exclusive to the terminal (already a contract above); the contact path
+never routes through it; `TRM` sits in the nav at the same visual
+weight as `SND` — never styled to compete with CONTACT/TRANSMIT; no
+puzzle gates anything a prospective client needs. The `contact`
+command exists precisely so the terminal's most engaged users are one
+word from the form.
+
+## No premature game architecture
+
+The command table is a flat object. No plugin system, no command
+registration API, no event bus, no state machine beyond the dialog's
+open/closed — Phase 3 gets abstractions when Phase 3 exists and shows
+what it needs. Build the terminal as a terminal.
+
 ## Contracts (MUSTs, additive to DESIGN.md)
 
 1. Every output line is read from live state or from build-embedded
@@ -143,8 +217,21 @@ entry when there is something real behind it.
 
 ## Testing
 
-New suite `tests/m5-terminal.js` (evidence runner + attestation
-EXPECTED inventory updated deliberately, same commit):
+New suite `tests/m5-terminal.js`, **sized to the shipped slice and
+grown with it** — no checks for unbuilt commands, but nothing ships to
+the public site untested: each slice lands with its tests in the same
+release, and the runner/attestation inventory (PRODUCT_SUITES,
+EXPECTED) is updated deliberately in the same commit.
+
+A11y lifecycle checks (explicit, per review): initial focus lands in
+the command input on open; focus returns to the pre-open element on
+close; the output region is `role="log"` (`aria-live` implicit) so
+command results are announced; the dialog has an accessible name; the
+nav toggle's `aria-expanded` tracks open state; Escape closes; reduced
+motion adds no animation to open/close; forced colors keeps the panel,
+text, and focus visible.
+
+Slice-1 checks:
 
 - `exec` unit surface: every command against known page state — status
   fields match `GL.status()`, `claims verify` matches the loader check,
@@ -173,7 +260,14 @@ lie), Phase 3 content.
 
 ## Rollout
 
-spec review → implementation plan (writing-plans) → build on a branch
-of the normal release discipline: source commit → dist → full
-regression (now 5 suites) → attestation with updated EXPECTED →
-push → public-bytes verify.
+Sliced, each slice a full release (source → dist → 5-suite regression
+→ attestation with updated EXPECTED → push → public-bytes verify):
+
+1. **Slice 1 — the shell**: dialog + nav toggle, keyboard router,
+   focus lifecycle, parser/dispatch, `help` / `status` / `boot` /
+   `build` / `clear` / `exit`, truthful unavailable states, m5 suite
+   covering all of it.
+2. **Slice 2 — operating the page**: `gov`, `claims` / `claims
+   verify`, `formation`, `type`, `goto`, `dossier`, `snd`, `whoami`,
+   `contact`; m5 grows accordingly.
+3. Phase 3 entry lands only with Phase 3.

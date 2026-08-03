@@ -527,13 +527,15 @@ working, and the footer says so).
   overrides wall-clock time for pinned builds), and the build-tool
   versions — not "given the tree" alone, because the timestamp is an
   input by design.
-- **NOTE — trademark (resolved 2026-08-03)**: the site uses ™, not ® —
-  no DMDS registration was found, and ® without registration is a
-  misrepresentation this site's truth doctrine can't carry. ™ asserts
-  common-law claim and is always lawful. If a registration issues,
-  switch site-wide and re-subset or allowlist accordingly (™ currently
-  renders via the system-fallback allowlist; the embedded subsets carry
-  ® but not ™ and the font sources are not in the repo).
+- **NOTE — trademark (2026-08-03)**: the site uses ™, not ®. Basis,
+  stated no wider than the evidence: a USPTO search identified no
+  federal DMDS registration, and displaying ® asserts one — so ® had
+  to go. ™ does not assert registration. This was **not** a
+  clearance determination: no comprehensive search was performed, and
+  ™ provides no protection if the mark conflicts with prior rights.
+  If a registration ever issues, switch site-wide (™ currently renders
+  via the system-fallback allowlist; the embedded subsets carry ® but
+  not ™ and the font sources are not in the repo).
 
 ### Debug & telemetry surface
 

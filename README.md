@@ -165,23 +165,51 @@ curl -s https://0xmink.github.io/dmds/ | sha256sum
   contrast an automated audit can't measure, treated as a design
   invariant.
 
-## Launch checklist
+## Post-launch completion
 
-- [x] Trademark: switched ® → ™ site-wide (2026-08-03) — no DMDS
-      registration found; ™ is lawful without one. Revisit if a
-      registration issues
-- [x] `og:image` / `og:url` / `twitter:card` set to the deployed Pages
-      URLs (2026-08-03). If a custom domain lands, update all three and
-      rebuild
-- [x] Contact email: keeping `dennis@shorevapesli.com` (already public
-      on the live site; no studio address exists yet). Swap in
-      `src/index.html` **and** `src/main.js` when one does
-- [ ] Add quantified outcome numbers for the three dossiers (Zoo Code /
-      Insure With Mink / Comfort Airz) to the claim registry once
-      verified — the signal band's claim slots are wired for them
-- [ ] If you wire a lead API: set `data-endpoint` on `#transmit` and
-      rebuild (server-side validation, rate limiting, and origin checks
-      are the endpoint's job — the client honeypot is not an
-      abuse-control system)
-- [ ] Custom domain (optional) — if you ever add analytics, update the
-      form's "no third-party analytics" promise first or don't add them
+The site is live; "launch checklist" would be a fiction. What remains,
+by category:
+
+**Done**
+- [x] Trademark (2026-08-03): switched ® → ™ site-wide. Scope of the
+      finding, stated precisely: one USPTO search identified no federal
+      DMDS registration, so the site must not display ® (which asserts
+      one). ™ does not assert registration. This was **not** a
+      trademark-clearance determination — no comprehensive search was
+      performed, and ™ is no shield if the mark conflicts with
+      someone's prior rights.
+- [x] OG card (2026-08-03): `og:image` / `og:url` / `twitter:card`
+      point at the deployed Pages URLs. A custom domain means updating
+      all three and rebuilding.
+
+**Open — launch-quality, blocked on owner action**
+- [ ] Studio email: `dennis@shorevapesli.com` on a DMDS site reads as
+      provisional and cross-brands an unrelated business. Fix = a DMDS
+      domain (or any forwarding alias) → then swap in `src/index.html`
+      **and** `src/main.js` and rebuild. Kept live only because no
+      alternative exists yet — this is an active issue, not a resolved
+      one.
+
+**Open — blocked on owner-supplied facts**
+- [ ] Verified outcome numbers for **Zoo Code and Insure With Mink
+      only**. Comfort Airz stays framed as engineering/prototype work
+      with implementation metrics (commits, models, specs — as its
+      dossier already does); it must not acquire business-outcome
+      claims (revenue, conversion, users, delivery) unless
+      independently verified.
+- [ ] Confirm or correct `platforms-production` ("3 PLATFORMS IN
+      PRODUCTION" — its definition counts Comfort Airz as "live or in
+      active production use", owner-verified 2026-07-08). If Comfort
+      Airz is not in production use, the claim must drop to 2 or be
+      redefined before its 2026-10-08 review date.
+
+**Deferred (needs infrastructure that doesn't exist yet)**
+- [ ] Lead API: set `data-endpoint` on `#transmit` and rebuild
+      (server-side validation, rate limiting, and origin checks are
+      the endpoint's job — the client honeypot is not an abuse-control
+      system)
+
+**Optional**
+- [ ] Custom domain — if analytics ever accompany it, update the
+      form's "no third-party analytics" promise first or don't add
+      them
