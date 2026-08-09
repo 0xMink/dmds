@@ -407,7 +407,34 @@ html.engine-grab, html.engine-grab * {
 }
 .manifesto__text .w { opacity: 0.14; transition: opacity 0.3s linear; }
 .manifesto__text .w.lit { opacity: 1; }
+.manifesto__fit { margin-top: 3rem; color: var(--bone-dim); max-width: 58ch; }
 .manifesto__foot { margin-top: 4rem; color: var(--signal); }
+
+/* ═══ Evidence strip — dossier headline numbers surfaced right after
+   the thesis so proof precedes the capability taxonomy; cells anchor
+   to the full dossiers in SEC.05 ═══ */
+.estrip { padding: 0 var(--pad); border-top: 1px solid var(--line); }
+.estrip__tag { color: var(--signal); padding: 2rem 0 1.4rem; }
+.estrip__grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line);
+  margin-bottom: 2.6rem;
+}
+.estrip__item {
+  background: var(--ink-2); padding: 1.4rem 1.2rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+  text-decoration: none;
+}
+.estrip__meta { color: var(--bone-dim); font-size: 0.625rem; }
+.estrip__name {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(1.15rem, 2.2vw, 1.6rem); color: var(--bone);
+  transition: color 0.3s;
+}
+.estrip__stat { color: var(--bone-dim); font-size: 0.625rem; }
+.estrip__stat b { color: var(--bone); font-weight: 700; font-variant-numeric: tabular-nums; }
+.estrip__item:hover .estrip__name, .estrip__item:focus-visible .estrip__name { color: var(--signal); }
+@media (max-width: 860px) { .estrip__grid { grid-template-columns: 1fr; } }
 
 /* ═══ Capabilities ═══ */
 .cap {

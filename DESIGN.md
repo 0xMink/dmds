@@ -464,6 +464,12 @@ nothing else on the page curves.
   origin checks — the client is not the abuse-control system.
 - **Privacy**: stated on the form — one inbox, no third-party analytics,
   no tracking, no list. **MUST** stay true as long as it's printed.
+- **Buyer-fit line** in the manifesto (mono, plain-English: who DMDS
+  is built for) and an **evidence strip** directly after it — the three
+  dossier headline numbers as registry-wired reuses in the dossier
+  stat-grid grammar, each cell anchoring to SEC.05, so proof precedes
+  the capability taxonomy. **MUST**: strip stats are `data-claim`
+  reuses of existing registry entries, never new or restated numbers.
 - **Mid-page shortcut CTA** after Capabilities; **plain-English
   translations** in the Proof table and every work dossier; the
   **signal band** carries the
