@@ -1,0 +1,161 @@
+== env preamble ==
+Sun Aug  9 16:48:11 UTC 2026
+ 16:48:11 up 1 day, 15:34,  2 users,  load average: 10.76, 12.99, 10.07
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi        10Gi       301Mi       311Mi       5.4Gi       5.7Gi
+Swap:         8.0Gi       3.2Gi       4.8Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 9  0 3314020 307456      0 5714048    3    7   169   814   21   23 19  0 81  0  0
+10  0 3314276  85360      0 5717560    0  172   348   300 7481 22199 100  0  0  0  0
+12  0 3316900    216      0 5674588    0 2676   348 59880 9872 25249 97  0  3  0  0
+17075 R     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+commit: 7173a2c85f50cab6269e14b6f7cfd91bbbb5c662 dirty: true
+untracked: DMDS-Email-Drafts-2026-08-08.md
+untracked: tests/failures/m4-governor-20260809T164116.177687086-93212.log
+== suite: m4-governor ==
+  ok   gov:ladder-rungs-first [{"rung":1,"sizeIdx":1,"pending":null,"post":true,"demoted":false},{"rung":2,"sizeIdx":1,"pending":null,"post":true,"demoted":false},{"rung":3,"sizeIdx":1,"pending":null,"post":true,"demoted":false}]
+  ok   gov:ladder-then-size-request {"rung":3,"sizeIdx":1,"pending":{"idx":0,"dir":"degrade","forced":false},"post":true,"demoted":false}
+  ok   gov:sustained-bad-forces-downsize {"rung":3,"sizeIdx":1,"pending":{"idx":0,"dir":"degrade","forced":true},"post":true,"demoted":false}
+  ok   gov:floor-actually-applied count=1024
+  ok   gov:ladder-post-off-at-floor {"rung":5,"sizeIdx":0,"pending":null,"post":false,"demoted":false}
+  ok   gov:ladder-ends-in-demotion demote calls=1
+  ok   gov:demote-evidence-at-floor {"seq":15,"t":3.5,"event":"demote","rung":5,"n":32,"post":false}
+  ok   gov:degraded-flag-honest 
+  ok   gov:no-errors 
+  ok   gov:first-bad-degrades {"a1":"degrade","a2":"cooldown","a3":"invalid","r1":1,"r2":1,"r3":1,"cooling":true}
+  ok   gov:cooldown-blocks {"a1":"degrade","a2":"cooldown","a3":"invalid","r1":1,"r2":1,"r3":1,"cooling":true}
+  ok   gov:invalid-window-no-action 
+  ok   gov:one-good-not-enough {"one":"good","midRung":1,"afterHoldReset":1,"two":"improve","recovered":0,"promo":"improve","pending":{"idx":2,"dir":"promote","forced":false},"sizeIdx":1,"sizes":[32,64,128],"trialFailed":[]}
+  ok   gov:hold-resets-streak 
+  ok   gov:two-good-recovers rung=0
+  ok   gov:promotion-requested-above-baseline {"idx":2,"dir":"promote","forced":false}
+  ok   gov:trial-alloc-passed []
+  ok   gov:emergency-skips-rungs {"a":"emergency","rung":2,"b":"cooldown","rung2":2}
+  ok   gov:emergency-respects-cooldown 
+  ok   resize:requested pending=2
+  ok   resize:deferred-while-grabbed {"beforeCount":4096,"pendingDuringGrab":2,"stillPending":2,"countDuringGrab":4096,"afterCount":16384,"formation":"logo","sizeIdx":2,"running":true,"degradedAfterPromo":false}
+  ok   resize:executes-when-idle count=16384
+  ok   resize:formation-survives logo
+  ok   resize:engine-running-after 
+  ok   resize:promotion-not-degraded degraded=false
+  ok   resize:no-page-errors 
+  ok   gov:demotion-boots-tier2 {"tier":"gl1","post":true,"count":10500,"max":42000,"running":true}
+  ok   rm:stops-after-settle {"running":false,"sleeping":true,"excite":0}
+  ok   rm:sleep-is-crisp {"nearOut":0,"finalOut":0,"bad":0,"maxDist":0,"maxV":0,"count":4096}
+  ok   rm:sleep-mostly-snapped outside-snap-eps=0/4096
+  ok   rm:command-wakes {"running":true,"formation":"grid"}
+  ok   rm:sleeps-again {"running":false,"sleeping":true}
+  ok   rm:no-page-errors 
+  ok   honest:rung-degradation-flagged RENDER DEGRADED · CORE NOMINAL
+  ok   honest:recovery-clears ALL SYSTEMS NOMINAL
+  ok   txn:failed-promotion-rolls-back {"count":4096,"sizeIdx":1}
+  ok   txn:phase-observable {"phase":"idle","last":"rolled-back","from":64,"to":128}
+  ok   txn:failed-size-marked ["128"]
+  ok   txn:no-demotion-on-rollback 
+  ok   txn:formation-survives-and-converges {"f":"logo","conv":true}
+  ok   txn:pending-cleared 
+  ok   txn:no-listener-or-raf-leak ln±0 raf 2→2
+  ok   txn:poisoned-size-never-retried null
+  ok   txn:machinery-healthy-after count=1024
+  ok   txn:no-page-errors 
+  ok   txn:rollback-failure-demotes {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   stale:promotion-queued 
+  ok   stale:bad-window-cancels-AND-degrades {"queuedPromo":"promote","promoCancelled":true,"rungAfterBad":1,"queuedDown":"degrade","downCancelled":true,"finalCount":4096,"cancels":["performance-dropped","recovery"]}
+  ok   stale:downsize-queued degrade
+  ok   stale:recovery-cancels-downsize 
+  ok   stale:no-spurious-resize count=4096
+  ok   stale:cancels-logged-with-reasons ["performance-dropped","recovery"]
+  ok   collector:warms-up 
+  ok   collector:fast-path-degrades rung=1
+  ok   collector:invalid-window-no-action rung=1
+  ok   collector:hold-streak-counted mid=1
+  ok   collector:sustained-hold-degrades rung=2
+  ok   collector:emergency-via-rolling-mean rung 2→3
+  ok   observe:baseline-full-quality {"rung":0,"trail":[1440,900],"glow":[360,225],"ab":1,"post":true}
+  ok   observe:rung1-bloom-eighth-aberr-off {"rung":1,"trail":[1440,900],"glow":[180,112],"ab":0,"post":true}
+  ok   observe:rung2-trail-half {"rung":2,"trail":[720,450],"glow":[90,56],"ab":0,"post":true}
+  ok   observe:post-off-real {"rung":5,"trail":null,"glow":null,"ab":null,"post":false}
+  ok   observe:recovery-restores {"rung":0,"trail":[1440,900],"glow":[360,225],"ab":1,"post":true}
+  ok   observe:duress-marked-size-stays {"sizeIdx":0,"trialFailed":["64"]}
+  ok   status:honest-fields {"count":4096,"baseline":4096,"ceiling":16384,"hasMax":false,"degraded":false}
+  ok   dpr:baseline-caps-at-1.75 dpr=1.75 px=2520,1575
+  ok   dpr:rung3-caps-at-1.0 dpr=1 px=1440,900 css=1440
+  ok   dpr:post-realloc-tracks-backing trail=720,450 (rung3 keeps half-res trail)
+  ok   dpr:css-size-unchanged 1440 vs 1440
+  ok   dpr:recovery-restores dpr=1.75
+  ok   invalidate:resize-event-window-inert rung=0
+  ok   invalidate:clean-window-acts rung=1
+  ok   invalidate:resume-window-inert rung=1
+  ok   invalidate:clean-window-acts-again rung=2
+  ok   live:demotes-cleanly-to-tier2 {"tier":"gl1","post":true,"count":10500,"max":42000,"running":true}
+  ok   live:no-mid-frame-lifecycle-crash 
+  ok   live:no-page-errors-at-all 
+  ok   live:history-survives-demotion 14 entries, events=emergency,rung,window,resize-request,resize-forced,resize-commit,demote
+  ok   live:history-ends-at-demotion last=demote
+  ok   live:history-seq-strict 
+  ok   live:history-immutable-after-demotion len 14→14, lastSeq 14→14
+  ok   live:history-byte-identical-after-demotion 
+  ok   lock:transient-no-lock {"drawCount":21000,"locked":false,"suspect":null,"good":0}
+  ok   lock:first-reversal-suspect-only {"drawCount":21000,"locked":false,"suspect":42000,"good":0}
+  ok   lock:same-pair-repeat-locks {"drawCount":21000,"locked":true,"suspect":42000,"good":0}
+  ok   lock:suspicion-decays-no-false-lock {"drawCount":21000,"locked":false,"suspect":42000,"good":0}
+  ok   lock:locks-on-true-repeat 
+  ok   lock:resume-unlocks-without-promotion {"drawCount":21000,"locked":false,"suspect":null,"good":1}
+  ok   lock:fresh-evidence-then-restores {"drawCount":42000,"locked":false,"suspect":null,"good":0}
+  ok   lock:resume-clears-stale-restore-credential {"drawCount":21000,"locked":false,"suspect":null,"good":0}
+  ok   lock:post-resume-suspicion-freshly-earned {"drawCount":21000,"locked":false,"suspect":42000,"good":0}
+  ok   history:records-trajectory {"len":5,"events":["window","rung","window","window","rung"],"hasWindow":true,"hasRung":true}
+  ok   lock:monotonic-degradation-mints-no-strike {"drawCount":10500,"locked":false,"suspect":42000,"good":0}
+  ok   lock:new-pair-first-own-cycle-suspect-only {"drawCount":10500,"locked":false,"suspect":21000,"good":0}
+  ok   lock:new-pair-locks-on-own-second-cycle {"drawCount":10500,"locked":true,"suspect":21000,"good":0}
+  ok   history:window-fields-faithful 
+  ok   history:rung-fields-faithful 
+  ok   history:returns-a-copy len=2
+  ok   history:entries-are-clones-not-references 
+  ok   history:seq-strictly-monotonic-where-t-repeats {"seqStrict":true,"equalTDistinctSeq":true}
+  ok   history:caps-at-120-evicting-oldest {"capped":true,"evictedOldest":true}
+  ok   history:survives-managed-reinit 
+  ok   history:seq-survives-reinit-uninterrupted 
+  ok   runglock:first-bounce-no-lock {"afterPromo1":1,"strike1rung":2,"strike1lock":0,"lockAt":2,"lockedRung":2,"afterGoodWhileLocked":2,"afterBadWhileLocked":3,"lockLogged":true}
+  ok   runglock:second-bounce-locks {"afterPromo1":1,"strike1rung":2,"strike1lock":0,"lockAt":2,"lockedRung":2,"afterGoodWhileLocked":2,"afterBadWhileLocked":3,"lockLogged":true}
+  ok   runglock:good-evidence-cannot-repromote rung=2
+  ok   runglock:bad-still-degrades-while-locked rung=3
+  ok   runglock:cleared-on-viewport-change lockAt=0
+  ok   strike:clean-bad-counts-one-strike-no-lock lockAt=0
+  ok   strike:contaminated-bad-voids-trial lockAt=0
+  ok   strike:contaminated-hold-voids-trial lockAt=0
+  ok   strike:second-clean-failure-locks lockAt=2
+  ok   strike:contamination-recorded-in-history 
+  ok   collector:grab-contaminates-window {"seq":2,"t":1015.1,"event":"window","rung":0,"n":64,"post":true,"p90":16,"action":"good","int":true}
+  ok   collector:contamination-clears-at-boundary {"seq":4,"t":1025.2,"event":"window","rung":0,"n":64,"post":true,"p90":16,"action":"good"}
+  ok   skip:request-targets-deeper-viable-size {"idx":0,"dir":"degrade","forced":false}
+  ok   skip:poisoned-384-never-requested-or-committed 
+  ok   skip:commits-512-to-256-directly count=65536
+  ok   allocskip:exhausted-axis-goes-post-off {"rung":5,"post":false}
+  ok   allocskip:poisoned-size-never-requested 
+  ok   allocskip:demotes-at-baseline {"seq":10,"t":2.2,"event":"demote","rung":5,"n":64,"post":false}
+  ok   forcegrab:grab-held-before-resize held=876
+  ok   forcegrab:resize-applies-during-grab count=1024
+  ok   forcegrab:no-stuck-clump-after-reinit held=0
+  ok   forcegrab:released-via-standard-path-exactly-once {"before":0,"after":1,"afterUp":1}
+  ok   forcegrab:fresh-grab-works-after-reinit held=283
+  ok   forcegrab:no-page-errors 
+  FAIL force:unforced-pending-starves-while-non-idle {"count":4096,"pending":{"idx":0,"dir":"degrade","forced":false},"mix":0}
+  ok   force:sustained-bad-overrides-idle-deferral count=1024
+  ok   force:duress-is-perf-rejection-not-alloc {"perf":["64"],"alloc":[]}
+  ok   force:perf-rejection-clears-on-revisit []
+  FAIL force:mid-morph-duress-policy-defined formation=null
+  ok   force:mix-below-half-reseeds-at-source formation=logo
+  ok   force:mix-above-half-reseeds-at-destination formation=device
+  ok   collector:contaminated-bad-degrades-without-strike {"rung":2,"lockAt":0}
+  ok   collector:one-clean-bounce-later-still-no-lock lockAt=0
+  ok   collector:second-clean-bounce-locks lockAt=2
+  ok   telemetry:config-identical-to-production {"plain":{"count":262144,"baseline":262144,"ceiling":1048576,"degraded":false,"sleeping":false,"cw":1440,"ch":900},"telem":{"count":262144,"baseline":262144,"ceiling":1048576,"degraded":false,"sleeping":false,"cw":1440,"ch":900}}
+  ok   telemetry:plain-page-fully-gated {"gov":"closed","hist":"closed","step":"closed","poke":"closed","inject":"closed","readback":"closed","liveOff":"n/a"}
+  ok   telemetry:read-paths-open {"gov":"open","hist":"open","step":"closed","poke":"closed","inject":"closed","readback":"closed","liveOff":false}
+  ok   telemetry:write-and-instrument-paths-closed {"gov":"open","hist":"open","step":"closed","poke":"closed","inject":"closed","readback":"closed","liveOff":false}
+  ok   telemetry:live-governor-armed false
+M4 GOVERNOR: FAIL
+exit=1

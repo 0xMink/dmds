@@ -465,7 +465,8 @@ nothing else on the page curves.
 - **Privacy**: stated on the form — one inbox, no third-party analytics,
   no tracking, no list. **MUST** stay true as long as it's printed.
 - **Mid-page shortcut CTA** after Capabilities; **plain-English
-  translations** in the Proof table; the **signal band** carries the
+  translations** in the Proof table and every work dossier; the
+  **signal band** carries the
   four headline stats (registry-wired) as the section's exclamation
   point; nav becomes a solid blurred bar past the hero.
 
@@ -473,7 +474,8 @@ nothing else on the page curves.
 
 Work rows are `h3 > button` disclosures (`aria-expanded`,
 `aria-controls`) opening labelled `role="region"` dossiers: case header,
-4-up stat grid (registry-wired), summary, status-tagged ledger
+4-up stat grid (registry-wired), summary with a plain-English
+translation line, status-tagged ledger
 (`MERGED` / `UPSTREAM` / `PROVEN` / `CHECKED` / `SHIPPED`), proof links.
 An open row suppresses the hover flood so evidence stays readable.
 **MUST**: dossier facts are registry entries — public ones link out;

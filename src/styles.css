@@ -567,6 +567,7 @@ html.engine-grab, html.engine-grab * {
 .dstat b { font-size: clamp(1.4rem, 2.4vw, 2.1rem); font-weight: 700; font-variant-numeric: tabular-nums; }
 .dstat span { color: var(--bone-dim); font-size: 0.625rem; }
 .dossier__sum { color: var(--bone-dim); max-width: 44rem; margin-bottom: 1.6rem; }
+.dossier__plain { display: block; margin-top: 0.7rem; color: var(--bone-dim); font-size: 0.625rem; }
 .dossier__log { list-style: none; border-top: 1px solid var(--line); margin-bottom: 1.8rem; }
 .dossier__log li {
   display: flex; gap: 1.2rem; align-items: baseline;
