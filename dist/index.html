@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-NQSkvDCzba/S5qBBW29Jm8s6v023xkS0kiEs+s9jCwo='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-6m89SVLhFEbnNoi/IGJ60RlmkRrmfBPhpVEeFylATgg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-wJsd9WmrkhCRgG2jpOX3hcEesc2vf55JzTdx8BbbA9Y='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-6m89SVLhFEbnNoi/IGJ60RlmkRrmfBPhpVEeFylATgg='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS™ — Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a digital studio on Long Island, NY building websites, apps, AI systems and marketing engines with the discipline of flight software and the taste of a design house.">
@@ -433,7 +433,34 @@ html.engine-grab, html.engine-grab * {
 }
 .manifesto__text .w { opacity: 0.14; transition: opacity 0.3s linear; }
 .manifesto__text .w.lit { opacity: 1; }
+.manifesto__fit { margin-top: 3rem; color: var(--bone-dim); max-width: 58ch; }
 .manifesto__foot { margin-top: 4rem; color: var(--signal); }
+
+/* ═══ Evidence strip — dossier headline numbers surfaced right after
+   the thesis so proof precedes the capability taxonomy; cells anchor
+   to the full dossiers in SEC.05 ═══ */
+.estrip { padding: 0 var(--pad); border-top: 1px solid var(--line); }
+.estrip__tag { color: var(--signal); padding: 2rem 0 1.4rem; }
+.estrip__grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line);
+  margin-bottom: 2.6rem;
+}
+.estrip__item {
+  background: var(--ink-2); padding: 1.4rem 1.2rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+  text-decoration: none;
+}
+.estrip__meta { color: var(--bone-dim); font-size: 0.625rem; }
+.estrip__name {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(1.15rem, 2.2vw, 1.6rem); color: var(--bone);
+  transition: color 0.3s;
+}
+.estrip__stat { color: var(--bone-dim); font-size: 0.625rem; }
+.estrip__stat b { color: var(--bone); font-weight: 700; font-variant-numeric: tabular-nums; }
+.estrip__item:hover .estrip__name, .estrip__item:focus-visible .estrip__name { color: var(--signal); }
+@media (max-width: 860px) { .estrip__grid { grid-template-columns: 1fr; } }
 
 /* ═══ Capabilities ═══ */
 .cap {
@@ -802,7 +829,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="987bc9e 2026-08-09T17:41:06Z">
+<meta name="dmds-build" content="668a76d 2026-08-09T19:54:34Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -888,8 +915,32 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
       and the marketing engine that feeds them — built with the same rigor aerospace
       teams bring to code, and none of the beige.
     </p>
+    <p class="manifesto__fit mono reveal">BUILT FOR OWNER-RUN BUSINESSES AND LEAN TEAMS WHOSE SITE, APP, OR PIPELINE HAS TO PULL ITS WEIGHT — IF THAT'S YOU, THE PROOF IS BELOW.</p>
     <div class="manifesto__foot mono reveal">EVERY&nbsp;CLAIM&nbsp;ON&nbsp;THIS&nbsp;PAGE&nbsp;IS&nbsp;LOAD-BEARING.</div>
   </section>
+
+  <!-- evidence strip — dossier headline numbers surfaced before the
+       capability taxonomy; every stat is a registry-wired reuse -->
+  <nav class="estrip" aria-label="Selected work — evidence preview">
+    <div class="estrip__tag mono">[ EVIDENCE — SELECTED WORK · FULL DOSSIERS IN SEC.05 ]</div>
+    <div class="estrip__grid">
+      <a class="estrip__item reveal" href="#work" data-cursor data-cursor-label="VIEW">
+        <span class="estrip__meta mono">W-01 · AI PLATFORM</span>
+        <span class="estrip__name">ZOO CODE</span>
+        <span class="estrip__stat mono"><b data-claim="zoo-stars">1,266</b> GITHUB STARS</span>
+      </a>
+      <a class="estrip__item reveal" href="#work" data-cursor data-cursor-label="VIEW">
+        <span class="estrip__meta mono">W-02 · GROWTH ENGINE</span>
+        <span class="estrip__name">INSURE WITH MINK</span>
+        <span class="estrip__stat mono"><b data-claim="iwm-compliance">100%</b> COMPLIANCE-GATED CONTENT</span>
+      </a>
+      <a class="estrip__item reveal" href="#work" data-cursor data-cursor-label="VIEW">
+        <span class="estrip__meta mono">W-03 · FIELD SERVICE</span>
+        <span class="estrip__name">COMFORT AIRZ</span>
+        <span class="estrip__stat mono"><b data-claim="airz-commits">412</b> COMMITS, SOLE ENGINEER</span>
+      </a>
+    </div>
+  </nav>
 
   <!-- 02 · CAPABILITIES -->
   <div id="capabilities">
@@ -5708,4 +5759,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 987bc9e 2026-08-09T17:41:06Z -->
+<!-- dmds build 668a76d 2026-08-09T19:54:34Z -->
