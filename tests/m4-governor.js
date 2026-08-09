@@ -1070,14 +1070,23 @@ async function readyPage(browser, query, opts) {
       E.setFormation = function () {}; // stop choreography; keep real setMorphPair
       // hold the field permanently non-idle: scrub-park a morph at mix 0.5
       E.setMorphPair('logo', 'device', 0.5);
+      // then pin it — a scroll re-scrub firing late under host load would
+      // reset mix to 0 mid-starvation (observed: starved.mix === 0)
+      E.setMorphPair = function () {};
       E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD); // rungs 1..3
       E.debugGovInject(BAD);                                              // request floor size
-      // an UNFORCED pending must starve while the field is non-idle
+      // an UNFORCED pending must starve while the field is non-idle —
+      // the 3s here is the starvation duration under test (the timing IS
+      // the semantics), not a settle guess
       await new Promise(r2 => setTimeout(r2, 3000));
       const starved = { count: E.status().count, pending: E.debugGov().pending, mix: E.status().mix };
       E.debugGovInject(BAD);                                              // sustained bad → force
+      // condition-based: poll for the forced resize with a generous
+      // ceiling — SwiftShader under load may take minutes, and speed is
+      // not what this check asserts
       let executed = null;
-      for (let i = 0; i < 40; i++) {
+      const tExec = performance.now();
+      while (performance.now() - tExec < 60000) {
         await new Promise(r2 => setTimeout(r2, 250));
         if (E.status().count === 1024) { executed = 1024; break; }
       }
@@ -1085,7 +1094,8 @@ async function readyPage(browser, query, opts) {
       // reseeds at the CURRENT formation side and completes normally —
       // formation defined, mix reaches 1, no limbo state
       let settledFormation = null;
-      for (let i = 0; i < 40; i++) {
+      const tSettle = performance.now();
+      while (performance.now() - tSettle < 120000) {
         await new Promise(r2 => setTimeout(r2, 500));
         const s = E.status();
         if (s.mix === 1) { settledFormation = s.formation; break; }
@@ -1123,10 +1133,13 @@ async function readyPage(browser, query, opts) {
       const E = window.DMDS_GL2;
       E.setFormation = function () {};
       E.setMorphPair('logo', 'device', 0.25);              // source side
+      E.setMorphPair = function () {};                     // pin (same as 23)
       E.debugGovInject(BAD); E.debugGovInject(BAD); E.debugGovInject(BAD);
       E.debugGovInject(BAD); E.debugGovInject(BAD);        // request + force
+      // condition-based with a generous ceiling (same rationale as 23)
       let settled = null;
-      for (let i = 0; i < 40; i++) {
+      const tSettle = performance.now();
+      while (performance.now() - tSettle < 120000) {
         await new Promise(r2 => setTimeout(r2, 500));
         const s = E.status();
         if (s.count === 1024 && s.mix === 1) { settled = s.formation; break; }

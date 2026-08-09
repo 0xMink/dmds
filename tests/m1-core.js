@@ -193,23 +193,34 @@ const LIFECYCLE_INSTRUMENTS = () => {
     check('num:reset-velocity-exactly-zero', exact.dv === 0, 'dv=' + exact.dv);
     check('num:reset-stable-next-step', exact.drift2 < 0.1, 'drift2=' + exact.drift2);
 
-    // morph: setFormation must actually move the population
+    // morph: setFormation must actually move the population.
+    // Condition-based: poll until >50% have moved rather than sampling at
+    // a fixed 2.5s — under host load the live loop may run at ~1 FPS and
+    // the choreography's hero re-assert can arrive before the population
+    // crosses the threshold, so the real call is made once and the morph
+    // is then pinned for the measurement.
     const morph = await page.evaluate(async () => {
       const before = Array.from(window.DMDS_GL2.debugReadState().positions);
       window.DMDS_GL2.setFormation('grid', 0.6);
-      // the page's scroll choreography re-asserts the hero formation on
-      // later frames (by design) — the engine-level name change is sync
+      // the engine-level name change is sync; pin the morph so the page's
+      // scroll choreography can't re-assert the hero formation mid-measure
       const nameRightAfter = window.DMDS_GL2.status().formation;
-      await new Promise(r => setTimeout(r, 2500));
-      const after = window.DMDS_GL2.debugReadState().positions;
-      let moved = 0, maxR = 0, finite = true;
-      for (let i = 0; i < after.length; i += 4) {
-        const d = Math.hypot(after[i] - before[i], after[i + 1] - before[i + 1], after[i + 2] - before[i + 2]);
-        if (d > 0.5) moved++;
-        maxR = Math.max(maxR, Math.hypot(after[i], after[i + 1], after[i + 2]));
-        for (let k = 0; k < 3; k++) if (!Number.isFinite(after[i + k])) finite = false;
-      }
-      return { moved, total: after.length / 4, maxR, finite, nameRightAfter };
+      window.DMDS_GL2.setFormation = function () {};
+      window.DMDS_GL2.setMorphPair = function () {};
+      let moved = 0, maxR = 0, finite = true, total = before.length / 4;
+      const t0 = performance.now();
+      do {
+        await new Promise(r => setTimeout(r, 500));
+        const after = window.DMDS_GL2.debugReadState().positions;
+        moved = 0;
+        for (let i = 0; i < after.length; i += 4) {
+          const d = Math.hypot(after[i] - before[i], after[i + 1] - before[i + 1], after[i + 2] - before[i + 2]);
+          if (d > 0.5) moved++;
+          maxR = Math.max(maxR, Math.hypot(after[i], after[i + 1], after[i + 2]));
+          for (let k = 0; k < 3; k++) if (!Number.isFinite(after[i + k])) finite = false;
+        }
+      } while (moved <= total * 0.5 && performance.now() - t0 < 90000);
+      return { moved, total, maxR, finite, nameRightAfter };
     });
     check('morph:population-moved', morph.moved > morph.total * 0.5, morph.moved + '/' + morph.total);
     check('morph:formation-name', morph.nameRightAfter === 'grid', morph.nameRightAfter);

@@ -231,6 +231,12 @@ const CX = 720, CY = 396;
     const page = await settledPage(browser);
     const r = await page.evaluate(async ([CX, CY, dt]) => {
       const { E, grabSet, centroidOf, down, move, up } = window.H;
+      // pin the morph: choreography callbacks (scroll re-scrub, reveals)
+      // firing late under host load must not retarget the paused field
+      // mid-measurement — positions would converge to the OLD targets
+      // while debugReadTargets returns the NEW ones (observed as 0/4096)
+      E.setFormation = function () {};
+      E.setMorphPair = function () {};
       E.pause();
       const oob = E.debugGLHealth().oob;
       down(CX, CY);
@@ -420,6 +426,9 @@ const CX = 720, CY = 396;
     await page.evaluate(INSTALL_HELPERS);
     const r = await page.evaluate(async ([CX, CY]) => {
       const { E, down, move, up } = window.H;
+      // same morph pin as the two-tier convergence block above
+      E.setFormation = function () {};
+      E.setMorphPair = function () {};
       E.pause();
       down(CX, CY);
       E.debugStep(1);
