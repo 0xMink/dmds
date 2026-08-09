@@ -1,0 +1,76 @@
+== env preamble ==
+Sun Aug  9 19:23:26 UTC 2026
+ 19:23:26 up 1 day, 18:09,  2 users,  load average: 3.88, 3.70, 5.37
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi       4.0Gi       9.3Gi       425Mi       2.7Gi        12Gi
+Swap:         8.0Gi       3.8Gi       4.2Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 3  0 3997248 9760448      0 2828596    3    8   169   844   13   26 21  0 79  0  0
+ 1  0 3997248 9772700      0 2828728    0    0     0    36 11572 42793 22  0 78  0  0
+ 6  0 3997248 9763320      0 2836252    0    0  7464    80 11790 50005 17  0 83  0  0
+89182 S     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+commit: 24c8376490d44d973825065bad750ae9c1f4b268 dirty: false
+== suite: m1-core ==
+  ok   prod:count-262144 {"tier":"gl2","post":true,"count":262144,"baseline":262144,"ceiling":1048576,"degraded":false,"running":true,"sleeping":false,"formation":"logo","mix":1,"excite":0.61}
+  ok   prod:seed-line ["COMPILE sim + render :: OK","PIPELINE post-fx :: ON","VERIFY claims↔DOM (20) :: PASS","MOUNT /typefaces (6/6) :: OK","SEED particles :: 262,144","BOOT dmds.sys :: READY","LINK render loop :: OK"]
+  ok   prod:running 
+  ok   prod:no-gl-error glError=0
+  ok   prod:fbos-complete [36053,36053]
+  ok   prod:morph-at-512 1024/1024
+  ok   prod:morph-finite-at-512 
+  ok   prod:no-page-errors 
+  ok   num:all-finite 
+  ok   num:inside-reset-bound maxR=16.1 bound=60.9
+  ok   num:legit-motion-far-inside maxR=16.1
+  ok   num:sentinel-free 
+  ok   num:oob-recovers-via-reset r=7.6
+  ok   num:nan-recovers-via-reset r=7.7
+  ok   num:reset-same-step-onto-target dp=0
+  ok   num:reset-velocity-exactly-zero dv=0
+  ok   num:reset-stable-next-step drift2=0.00008977209508086234
+  FAIL morph:population-moved 2026/4096
+  ok   morph:formation-name grid
+  ok   morph:stays-finite-in-bounds maxR=11.9
+  ok   num:no-page-errors 
+  ok   aspect:ultrawide-32x9:bound-covers-envelope oob=73.7 maxR=26.7
+  ok   aspect:ultrawide-32x9:finite-in-bounds maxR=26.7
+  ok   aspect:ultrawide-32x9:recovery-works rec=15.1
+  ok   aspect:portrait:bound-covers-envelope oob=60.0 maxR=10.6
+  ok   aspect:portrait:finite-in-bounds maxR=10.6
+  ok   aspect:portrait:recovery-works rec=2.4
+  ok   fb:no-webgl2 → gl1 {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   fb:no-float-ext → gl1 {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   fb:fbo-incomplete → gl1 {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   fb:late-failure → canvas replaced {"tier":"gl1","running":true,"identityChanged":true,"origHadWebgl2":true,"newHasWebgl1":true}
+  ok   fb:old-canvas-held-webgl2 
+  ok   fb:new-canvas-runs-gl1 {"tier":"gl1","running":true,"identityChanged":true,"origHadWebgl2":true,"newHasWebgl1":true}
+  ok   fb:loss-pauses 
+  ok   fb:restore-resumes-gl2 {"tier":"gl2","post":true,"count":4096,"baseline":4096,"ceiling":16384,"degraded":false,"running":true,"sleeping":false,"formation":"logo","mix":1,"excite":0.38}
+  ok   fb:restore-gl-healthy {"error":0,"oob":60.93490325609245,"grabActive":false,"freezeDegraded":0,"fbo":[36053,36053]}
+  ok   fb:restore-sim-alive-finite drift=5.287610054016113
+  ok   fb:restore-formation-kept 
+  ok   fb:restore-target-texture-preserved maxDiff=0
+  ok   fb:restore-converges-to-target dist=0.050
+  ok   fb:restore-timer-cancelled {"late":{"tier":"gl2","post":true,"count":4096,"baseline":4096,"ceiling":16384,"degraded":false,"running":true,"sleeping":false,"formation":"logo","mix":1,"excite":0.01},"demoted":false}
+  ok   fb:shader-compile-failure → gl1 {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   fb:partial-build-failure → gl1 {"tier":"gl1","post":true,"count":42000,"max":42000,"running":true}
+  ok   fb:partial-build-all-objects-deleted created=24 leaked=0
+  ok   fb:restore-timeout → demoted-gl1-fresh-canvas {"tier":"gl1","running":true,"identityChanged":true}
+  ok   fb:no-gl-at-all → css-tier dimmed=true loaded=true
+  ok   fb:css-tier-honest-log 
+  ok   life:gl2:destroy-stops-engine 
+  ok   life:gl2:3-cycles-listener-balanced 
+  ok   life:gl2:raf-ownership rafs=2,1,1,2
+  ok   life:gl2:reinit-ready-running 
+  ok   life:gl2:no-errors 
+  ok   life:gl1:destroy-stops-engine 
+  ok   life:gl1:3-cycles-listener-balanced 
+  ok   life:gl1:raf-ownership rafs=2,1,1,2
+  ok   life:gl1:reinit-ready-running 
+  ok   life:gl1:no-errors 
+  ok   life:destroy-releases-state 
+  ok   visual:settled-capture excite=0
+M1 CORE: FAIL
+exit=1
