@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-kSoX2pOVX/eVf9wOgyjyyKXzQIou67qJoufXLrFdrA0='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-gBoyMtNDT3/+m/Rju5sVhJk44VqT1o1OHcm2Q0pSe6I='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-02Npm1e+3zCfiI0N2zuCT2q5Z7bKBFjgnkL0Xf7xWfg=' 'sha256-cE03hlqcd7J3fXpTFvD5rp2XESnwYT238wg5Rnku5Zk='; script-src 'sha256-xF2mAyt8sF2eS2tC0licAPTCrkR0boKbAcpVFMhfGbw=' 'sha256-02zO+MTaXq8ImEa5B+x70++XwjwsS20Q2CEyuSbAKw8=' 'sha256-23ge/Jl4LyOr9fchSxlsJOBrq4dzhtsrHwmSjzaVdN0=' 'sha256-H8qvbKOt4j3ePuBBAoek8ykVR+ie6TTpp5vWoJyE2tQ=' 'sha256-gBoyMtNDT3/+m/Rju5sVhJk44VqT1o1OHcm2Q0pSe6I='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DMDS™ — Tampa Bay Digital Studio · Websites, Apps, AI &amp; Marketing, Engineered</title>
 <meta name="description" content="DMDS is a Tampa Bay studio for web design, app development, AI automation and digital marketing — engineered with the discipline of flight software.">
@@ -391,6 +391,17 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
 .hero__label { position: absolute; top: 6.4rem; left: var(--pad); color: var(--bone-dim); }
 .hero__tag { position: absolute; bottom: 4.6rem; left: var(--pad); max-width: 34rem; }
+/* mobile-only hero CTA: on small screens the particle field carries less
+   of the fold, so the first screen gets an explicit next step. Desktop
+   hero CTAs are a separately-dated treatment (post-instrumentation). */
+.hero__cta { display: none; }
+@media (max-width: 720px) {
+  .hero__cta {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    margin-top: 1.5rem; padding: 0.9rem 1.35rem;
+    background: var(--signal); color: var(--ink); text-decoration: none;
+  }
+}
 .hero__tagline {
   font-family: var(--font-display); font-weight: 500;
   font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.18; letter-spacing: 0.005em;
@@ -847,7 +858,10 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
 }
 
 </style>
-<meta name="dmds-build" content="9c802ab 2026-08-10T13:55:57Z">
+<!-- no-JS: the loader is a JS-driven enhancement; without scripts it must
+     never gate the content underneath (DESIGN.md: content is never hostage) -->
+<noscript><style>.loader{display:none}</style></noscript>
+<meta name="dmds-build" content="614afa9 2026-08-10T14:07:27Z">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -910,6 +924,7 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
         <span class="line">outcomes — not impressions<span class="sig">.</span></span>
       </p>
       <p class="hero__sub mono reveal">WEBSITES&nbsp;&nbsp;APPS&nbsp;&nbsp;AI&nbsp;&nbsp;MARKETING</p>
+      <a class="hero__cta mono reveal" href="#contact" data-cursor data-cursor-label="TRANSMIT">START&nbsp;A&nbsp;PROJECT&nbsp;<span aria-hidden="true">↘</span></a>
       <p class="hero__engine mono reveal" id="hero-engine">
         <span id="engine-hint">[ KEYBOARD LIVE ]&nbsp;&nbsp;TYPE ANYTHING — THE ENGINE WILL SET IT</span>
         <span id="engine-input" hidden>&gt;&nbsp;<span id="engine-buffer"></span><i class="engine-caret"></i></span>
@@ -5780,4 +5795,4 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
 </script>
 </body>
 </html>
-<!-- dmds build 9c802ab 2026-08-10T13:55:57Z -->
+<!-- dmds build 614afa9 2026-08-10T14:07:27Z -->

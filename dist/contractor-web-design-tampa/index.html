@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-kSoX2pOVX/eVf9wOgyjyyKXzQIou67qJoufXLrFdrA0=' 'sha256-UjzVHkXT8ZD8c8NZ6T00t5mMmjpf3wc8a3qZrAW4kus='; script-src 'sha256-C4vefnFEutgB3xXBWYqao7mr4rdDnm3NTVGRBkKumko='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-02Npm1e+3zCfiI0N2zuCT2q5Z7bKBFjgnkL0Xf7xWfg=' 'sha256-UjzVHkXT8ZD8c8NZ6T00t5mMmjpf3wc8a3qZrAW4kus='; script-src 'sha256-C4vefnFEutgB3xXBWYqao7mr4rdDnm3NTVGRBkKumko='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web Design for Contractors in Tampa Bay | DMDS</title>
 <meta name="description" content="Web design for contractors in Tampa Bay — sites built to win the jobs you actually want, from a Palm Harbor studio. Published pricing. Proof you can verify.">
@@ -434,6 +434,17 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
 .hero__label { position: absolute; top: 6.4rem; left: var(--pad); color: var(--bone-dim); }
 .hero__tag { position: absolute; bottom: 4.6rem; left: var(--pad); max-width: 34rem; }
+/* mobile-only hero CTA: on small screens the particle field carries less
+   of the fold, so the first screen gets an explicit next step. Desktop
+   hero CTAs are a separately-dated treatment (post-instrumentation). */
+.hero__cta { display: none; }
+@media (max-width: 720px) {
+  .hero__cta {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    margin-top: 1.5rem; padding: 0.9rem 1.35rem;
+    background: var(--signal); color: var(--ink); text-decoration: none;
+  }
+}
 .hero__tagline {
   font-family: var(--font-display); font-weight: 500;
   font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.18; letter-spacing: 0.005em;
@@ -1038,7 +1049,7 @@ body.page .nav { opacity: 1; transform: none; }
 .pfoot-links a:hover, .pfoot-links a:focus-visible { color: var(--bone); }
 
 </style>
-<meta name="dmds-build" content="9c802ab 2026-08-10T13:55:57Z">
+<meta name="dmds-build" content="614afa9 2026-08-10T14:07:27Z">
 </head>
 <body class="page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1533,4 +1544,4 @@ body.page .nav { opacity: 1; transform: none; }
 </script>
 </body>
 </html>
-<!-- dmds build 9c802ab 2026-08-10T13:55:57Z -->
+<!-- dmds build 614afa9 2026-08-10T14:07:27Z -->
