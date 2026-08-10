@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://dmds.studio/sitemap.xml
+LLMs-Txt: https://dmds.studio/llms.txt
