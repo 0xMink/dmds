@@ -58,9 +58,16 @@ def build_page(page_path, out_path):
     html = re.sub(r'<script src="([^"]+)"></script>', inline_js, html)
 
     # ── Content-Security-Policy: hash-allowlisted inline blocks only ──
+    # Hashes are computed from the FINAL html by scanning every bare
+    # <style>/<script> block — the same scan check.py verifies with — so
+    # literal blocks authored in the page (e.g. the no-JS loader style)
+    # are first-class, not just the blocks this script inlined. Typed
+    # scripts (application/ld+json) are data blocks outside CSP scope.
     # connect-src is derived from the form's data-endpoint: 'none' while no
     # endpoint is configured (the page then *cannot* make a network request),
     # or exactly that endpoint's origin once one is set.
+    styles = re.findall(r"<style>(.*?)</style>", html, re.S)
+    scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
     ep = re.search(r'data-endpoint="([^"]*)"', html)
     endpoint = ep.group(1).strip() if ep else ""
     if endpoint:

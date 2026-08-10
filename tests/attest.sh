@@ -66,7 +66,7 @@ def sha_file(p):
 def refuse(msg):
     print("ATTESTATION REFUSED: " + msg)
     sys.exit(1)
-EXPECTED = [("m1-core", 59), ("m2-grab", 55), ("m3-depth", 35), ("m4-governor", 142), ("m5-terminal", 86)]
+EXPECTED = [("m1-core", 59), ("m2-grab", 55), ("m3-depth", 35), ("m4-governor", 142), ("m5-terminal", 87)]
 # parse + shape validation BEFORE the semantic predicates: everything
 # below indexes into these entries, so malformed input must be refused
 # here, in-band, rather than surfacing as JSONDecodeError/KeyError

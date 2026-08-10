@@ -410,10 +410,14 @@ async function readyPage(browser, query, opts) {
       toggleHidden: document.getElementById('term-toggle').hidden,
       open: document.getElementById('term').open,
       contactVisible: !!document.querySelector('#contact'),
+      loaderDisplay: getComputedStyle(document.getElementById('loader')).display,
     }));
     check('nojs:toggle-stays-hidden', nojs.toggleHidden === true);
     check('nojs:dialog-closed', nojs.open === false);
     check('nojs:content-unaffected', nojs.contactVisible);
+    // the loader is JS-driven chrome; without JS it must not sit over the
+    // content forever (regression guard for the fixed-overlay-hostage bug)
+    check('nojs:loader-hidden', nojs.loaderDisplay === 'none', 'display=' + nojs.loaderDisplay);
     await ctx2.close();
   }
 
