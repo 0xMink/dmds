@@ -36,7 +36,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
     "platforms-production": {
       "page": "2", "dom": true,
       "text": "2 PLATFORMS IN PRODUCTION",
-      "definition": "Zoo Code and insurewithmink.com — live or in active production use. Comfort Airz is deliberately excluded: engineering/prototype work, not a completed production delivery (its dossier carries implementation metrics only). Restore to 3 only with owner verification of production use.",
+      "definition": "Zoo Code and insurewithmink.com — live or in active production use. The W-03 field-service platform (private engagement) is deliberately excluded: engineering/prototype work, not a completed production delivery (its dossier carries implementation metrics only). Restore to 3 only with owner verification of production use.",
       "source": "Live URLs",
       "verify": "Zoo Code and insurewithmink.com are publicly reachable.",
       "verified": "2026-08-03", "review_by": "2026-11-01", "visibility": "public"
@@ -169,23 +169,23 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       "verify": "Spec on request.",
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
     },
-    "airz-commits": {
+    "w03-commits": {
       "page": "412", "dom": true,
       "text": "412 COMMITS, SOLE ENGINEER",
-      "definition": "Commits in the Comfort Airz platform repository, all authored by the operator, at the verification date.",
+      "definition": "Commits in the W-03 field-service platform repository (private engagement), all authored by the operator, at the verification date.",
       "source": "Private repository",
       "verify": "References on request — private engagement.",
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
     },
-    "airz-proverif": {
+    "w03-proverif": {
       "page": "4", "dom": true,
       "text": "4 PROVERIF MODELS",
-      "definition": "ProVerif models with machine-checked results in the Comfort Airz repo (ratchet forward secrecy, capability chain, and supporting models).",
+      "definition": "ProVerif models with machine-checked results in the W-03 platform repo (ratchet forward secrecy, capability chain, and supporting models).",
       "source": "Private repository",
       "verify": "Model files and prover output on request.",
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
     },
-    "airz-tla": {
+    "w03-tla": {
       "page": "3", "dom": true,
       "text": "3 TLA+ SPECS, MODEL-CHECKED",
       "definition": "TLA+ specifications with TLC traces on file (ForwardSecretRatchet, CellMigration, SchemaCoordinator).",
@@ -193,7 +193,7 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       "verify": "Specs and TLC output on request.",
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
     },
-    "airz-platforms": {
+    "w03-platforms": {
       "page": "2", "dom": true,
       "text": "2 PLATFORMS — RUST + REACT NATIVE",
       "definition": "Rust backend plus a React Native customer app.",
