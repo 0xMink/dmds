@@ -349,6 +349,17 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
 .hero__label { position: absolute; top: 6.4rem; left: var(--pad); color: var(--bone-dim); }
 .hero__tag { position: absolute; bottom: 4.6rem; left: var(--pad); max-width: 34rem; }
+/* mobile-only hero CTA: on small screens the particle field carries less
+   of the fold, so the first screen gets an explicit next step. Desktop
+   hero CTAs are a separately-dated treatment (post-instrumentation). */
+.hero__cta { display: none; }
+@media (max-width: 720px) {
+  .hero__cta {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    margin-top: 1.5rem; padding: 0.9rem 1.35rem;
+    background: var(--signal); color: var(--ink); text-decoration: none;
+  }
+}
 .hero__tagline {
   font-family: var(--font-display); font-weight: 500;
   font-size: clamp(1.35rem, 2.6vw, 2rem); line-height: 1.18; letter-spacing: 0.005em;
