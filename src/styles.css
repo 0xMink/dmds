@@ -349,6 +349,15 @@ html.js .reveal-lines.is-in .line:nth-child(3) { transition-delay: 0.18s; }
 
 .hero__label { position: absolute; top: 6.4rem; left: var(--pad); color: var(--bone-dim); }
 .hero__tag { position: absolute; bottom: 4.6rem; left: var(--pad); max-width: 34rem; }
+/* hero routing readout: intent traffic gets routed to its page from the
+   first screen (routing, not rhetoric — exempt from the copy freeze) */
+.hero__route { margin-top: 1rem; }
+.hero__route a {
+  color: var(--bone-dim); text-decoration: none;
+  border-bottom: 1px solid var(--line-strong); padding-bottom: 2px;
+  transition: color 0.25s, border-color 0.25s;
+}
+.hero__route a:hover, .hero__route a:focus-visible { color: var(--signal); border-color: var(--signal); }
 /* mobile-only hero CTA: on small screens the particle field carries less
    of the fold, so the first screen gets an explicit next step. Desktop
    hero CTAs are a separately-dated treatment (post-instrumentation). */

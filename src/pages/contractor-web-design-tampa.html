@@ -24,9 +24,22 @@
   "provider": {
     "@type": "ProfessionalService",
     "name": "DMDS",
+    "alternateName": ["DMDS Digital Studio", "DM Digital Solutions"],
     "url": "https://dmds.studio/",
     "email": "dennis@dmds.studio",
     "address": { "@type": "PostalAddress", "addressLocality": "Palm Harbor", "addressRegion": "FL", "addressCountry": "US" }
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Contractor Web Design — Published Pricing",
+    "itemListElement": [
+      { "@type": "Offer", "name": "Website Build",
+        "priceSpecification": { "@type": "PriceSpecification", "minPrice": 3500, "maxPrice": 8500, "priceCurrency": "USD" } },
+      { "@type": "Offer", "name": "BASE — hosting, uptime, updates, analytics, minor edits",
+        "priceSpecification": { "@type": "UnitPriceSpecification", "price": 95, "priceCurrency": "USD", "unitText": "MONTH" } },
+      { "@type": "Offer", "name": "GROWTH — Base plus GBP work, Search Console, call tracking, service/town content, conversion improvements, monthly summary",
+        "priceSpecification": { "@type": "UnitPriceSpecification", "price": 495, "priceCurrency": "USD", "unitText": "MONTH" } }
+    ]
   },
   "areaServed": [
     { "@type": "City", "name": "Tampa" },
@@ -402,6 +415,7 @@
     <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;STATIC&nbsp;PAGE&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span>
     <span>PALM&nbsp;HARBOR&nbsp;·&nbsp;TAMPA&nbsp;BAY,&nbsp;FL&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
     <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
+    <span>BUILD&nbsp;%%DMDS_BUILD%%</span>
     <span><a href="https://github.com/0xMink/dmds" target="_blank" rel="noopener">SOURCE&nbsp;ON&nbsp;GITHUB&nbsp;↗</a></span>
   </footer>
 

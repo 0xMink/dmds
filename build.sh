@@ -90,6 +90,10 @@ def build_page(page_path, out_path):
 
     # ── provenance: the artifact says which commit built it, and when ──
     html = html.replace("</head>", '<meta name="dmds-build" content="' + stamp + '">\n</head>')
+    # visible freshness stamp (footer): same provenance, human-readable —
+    # the stamp is build-generated, so the readout is true by construction
+    html = html.replace("%%DMDS_BUILD%%",
+                        os.environ["DMDS_GIT_SHA"] + " · " + os.environ["DMDS_BUILD_TS"][:10])
     html += "<!-- dmds build " + stamp + " -->\n"
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -111,9 +115,12 @@ for page in sorted(glob.glob(os.path.join(src, "pages", "*.html"))):
     urls.append(f"https://dmds.studio/{slug}/")
     if gates: all_gates[f"dist/{slug}/index.html"] = gates
 
-# ── robots.txt + sitemap.xml — the crawl surface ships with the site ──
+# ── robots.txt + sitemap.xml + llms.txt — the crawl surface ships with the site ──
 open("dist/robots.txt", "w").write(
-    "User-agent: *\nAllow: /\n\nSitemap: https://dmds.studio/sitemap.xml\n")
+    "User-agent: *\nAllow: /\n\nSitemap: https://dmds.studio/sitemap.xml\n"
+    "LLMs-Txt: https://dmds.studio/llms.txt\n")
+import shutil
+shutil.copy(os.path.join(src, "llms.txt"), "dist/llms.txt")
 lastmod = os.environ["DMDS_BUILD_TS"][:10]
 sm = ['<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
