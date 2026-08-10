@@ -779,6 +779,8 @@ button.work__line:focus-visible { outline: 2px solid var(--signal); outline-offs
   padding: 1.4rem var(--pad); border-top: 1px solid var(--line);
   color: var(--bone-dim);
 }
+.footer a { color: var(--bone-dim); text-decoration: none; border-bottom: 1px solid var(--signal); padding-bottom: 1px; }
+.footer a:hover { color: var(--signal); }
 
 /* ═══ Reduced motion ═══ */
 @media (prefers-reduced-motion: reduce) {

@@ -693,6 +693,9 @@ no-JS reading path is the floor.
   the registry; qualitative claims ("every claim is load-bearing") are
   backed by the verification machinery that makes them checkable.
 - HUD/system language stays in character everywhere — and stays *true*
-  everywhere (see Truthful instrumentation).
+  everywhere (see Truthful instrumentation). The footer links the
+  attestation trail ("claims test-attested · verify the bytes") — the
+  qualitative claim is backed by the release-attestation machinery and
+  must be removed if that machinery ever stops gating releases.
 - Plain-English translation lines accompany engineering claims for
   non-technical buyers.
