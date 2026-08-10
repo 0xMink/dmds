@@ -458,5 +458,9 @@ const CX = 720, CY = 396;
   const pass = results.every(r => r.ok);
   results.forEach(r => console.log((r.ok ? '  ok  ' : '  FAIL'), r.name, r.detail));
   console.log(pass ? 'M2 GRAB: PASS (' + results.length + ' checks)' : 'M2 GRAB: FAIL');
-  process.exit(pass ? 0 : 1);
-})().catch(e => { console.error('M2 RUN FAILED', e); process.exit(2); });
+  // flush stdout before exiting: console.log to a pipe is async and
+  // process.exit() drops unflushed writes — under host load that
+  // truncated a PASSING suite's tail and its '(N checks)' summary
+  // (batch run 102), which attest.sh then refused as inventory drift
+  process.stdout.write('', () => process.exit(pass ? 0 : 1));
+})().catch(e => { console.error('M2 RUN FAILED', e); process.stderr.write('', () => process.exit(2)); });
