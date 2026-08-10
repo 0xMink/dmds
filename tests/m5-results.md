@@ -29,7 +29,7 @@ The first cut drew a review that was right about most of what it
 challenged; the notable items, each now closed with evidence:
 
 1. **`platforms-production` corrected 3 → 2** (the substantive one):
-   Comfort Airz removed from the "in production" definition — it is
+   The W-03 field-service platform removed from the "in production" definition — it is
    engineering/prototype work and its dossier carries implementation
    metrics only. The registry definition states the exclusion and the
    restore condition (owner verification of production use).

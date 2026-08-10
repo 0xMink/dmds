@@ -191,13 +191,14 @@ by category:
       Workspace, external delivery verified) replaced
       `dennis@shorevapesli.com` in `src/index.html` and `src/main.js`.
 - [x] `platforms-production` (2026-08-03): registry dropped the claim
-      to "2 PLATFORMS IN PRODUCTION" — Comfort Airz deliberately
-      excluded as engineering/prototype work. Restore to 3 only with
-      owner verification of production use.
+      to "2 PLATFORMS IN PRODUCTION" — the W-03 field-service platform
+      (private engagement) deliberately excluded as
+      engineering/prototype work. Restore to 3 only with owner
+      verification of production use.
 
 **Open — blocked on owner-supplied facts**
 - [ ] Verified outcome numbers for **Zoo Code and Insure With Mink
-      only**. Comfort Airz stays framed as engineering/prototype work
+      only**. The W-03 platform stays framed as engineering/prototype work
       with implementation metrics (commits, models, specs — as its
       dossier already does); it must not acquire business-outcome
       claims (revenue, conversion, users, delivery) unless
@@ -218,5 +219,7 @@ by category:
 - [ ] If analytics ever accompany the domain, update the form's "no
       third-party analytics" promise first or don't add them
 - [ ] dmdsbuild.com as a plain-language trades-facing landing page
-      (phone-forward, Comfort Airz-led, service-area copy) instead of
-      a bare redirect — the two-site strategy; separate build
+      (phone-forward, led by the anonymized W-03 field-service
+      dossier, service-area copy) instead of a bare redirect — the
+      two-site strategy; separate build. The client name cannot be
+      used in any copy (2026-08-10).
