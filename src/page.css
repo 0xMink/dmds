@@ -1,0 +1,145 @@
+/* DMDS™ — subpage layer. Loaded AFTER styles.css; reuses its tokens,
+   type, form grammar and reveal system. Subpages carry no engine —
+   the atmosphere is a static CSS field (degradation-ladder rung 3 as
+   the design, not the fallback). No new z-index layers, no rounded
+   corners, one accent. */
+
+/* static atmosphere — a fixed gradient field standing in for the canvas */
+.page body,
+body.page {
+  background:
+    radial-gradient(120vw 80vh at 82% -10%, rgba(255, 74, 0, 0.05), transparent 60%),
+    radial-gradient(90vw 70vh at 8% 110%, rgba(237, 234, 227, 0.04), transparent 55%),
+    var(--ink);
+}
+
+/* subpages have no custom cursor component — restore native cursors
+   that styles.css hides under html.js (the cursor MUST exist) */
+html.js body.page, html.js body.page a, html.js body.page [data-cursor], html.js body.page button,
+html.js body.page summary, html.js body.page input, html.js body.page textarea, html.js body.page label {
+  cursor: auto;
+}
+html.js body.page a, html.js body.page button, html.js body.page summary,
+html.js body.page label, html.js body.page [data-cursor] { cursor: pointer; }
+html.js body.page input, html.js body.page textarea { cursor: text; }
+
+/* nav: reuse .nav wholesale — but subpages have no loader, so the nav
+   is visible by default (content is never hostage to a script) */
+body.page .nav { opacity: 1; transform: none; }
+/* nav: subpage home link */
+.nav__home { color: var(--bone-dim); text-decoration: none; }
+.nav__home:hover, .nav__home:focus-visible { color: var(--bone); }
+
+/* ── page hero (typeset, not particle-set) ── */
+.phero { padding: 11rem var(--pad) 6rem; position: relative; }
+.phero__label { color: var(--signal); margin-bottom: 2.2rem; }
+.phero__title {
+  font-family: "Clash Display", sans-serif;
+  font-weight: 600;
+  font-size: clamp(2.2rem, 6.2vw, 5.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  max-width: 24ch;
+}
+.phero__dek { margin-top: 2rem; color: var(--signal); }
+.phero__lede { margin-top: 1.6rem; color: var(--bone-dim); max-width: 44rem; font-size: clamp(1rem, 1.35vw, 1.15rem); }
+.phero__ctas { margin-top: 2.8rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+.phero__cta {
+  display: inline-flex; align-items: center; gap: 0.7rem;
+  border: 1px solid var(--line-strong); color: var(--bone);
+  padding: 0.95rem 1.6rem; text-decoration: none;
+}
+.phero__cta:hover, .phero__cta:focus-visible { border-color: var(--signal); color: var(--signal); }
+.phero__cta--solid { background: var(--signal); border-color: var(--signal); color: var(--ink); }
+.phero__cta--solid:hover, .phero__cta--solid:focus-visible { background: var(--signal-hot); border-color: var(--signal-hot); color: var(--ink); }
+
+/* ── generic page section shell ── */
+.psec { padding: 5.5rem var(--pad); border-top: 1px solid var(--line); }
+.psec__title {
+  font-family: "Clash Display", sans-serif;
+  font-weight: 600;
+  font-size: clamp(1.7rem, 3.6vw, 3rem);
+  line-height: 1.02;
+  text-transform: uppercase;
+  margin: 2.6rem 0 1.6rem;
+  max-width: 26ch;
+}
+.psec__note { color: var(--bone-dim); max-width: 44rem; }
+
+/* ── diagnosis: spec-sheet grid, 1px gaps ── */
+.diag { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 2.4rem; }
+.diag__cell { background: var(--ink); padding: 1.8rem 1.6rem 2rem; }
+.diag__tag { color: var(--signal); display: block; margin-bottom: 0.9rem; }
+.diag__head {
+  font-family: "Clash Display", sans-serif; font-weight: 600;
+  font-size: clamp(1.15rem, 1.9vw, 1.5rem); text-transform: uppercase; line-height: 1.05;
+}
+.diag__cell p { margin-top: 0.8rem; color: var(--bone-dim); font-size: 0.98rem; }
+.diag__cell a { color: var(--bone); text-decoration-color: var(--signal); }
+@media (max-width: 720px) { .diag { grid-template-columns: 1fr; } }
+
+/* ── the math box ── */
+.mathbox {
+  border: 1px solid var(--line-strong);
+  padding: 1.8rem 1.6rem;
+  margin: 2.2rem 0 1.6rem;
+  max-width: 44rem;
+  font-variant-numeric: tabular-nums;
+}
+.mathbox .mono { color: var(--signal); }
+.mathbox__f { font-family: "Clash Display", sans-serif; font-weight: 500; font-size: clamp(1.1rem, 2vw, 1.5rem); margin-top: 0.7rem; }
+
+/* ── prescription rows ── */
+.rx { margin-top: 2.4rem; border-top: 1px solid var(--line); }
+.rx__row { border-bottom: 1px solid var(--line); padding: 1.7rem 0; display: grid; grid-template-columns: 8rem 1fr; gap: 1.2rem; }
+.rx__fig { color: var(--signal); }
+.rx__row h3 { font-family: "Clash Display", sans-serif; font-weight: 600; text-transform: uppercase; font-size: 1.1rem; margin-bottom: 0.5rem; }
+.rx__row p { color: var(--bone-dim); max-width: 40rem; }
+@media (max-width: 720px) { .rx__row { grid-template-columns: 1fr; gap: 0.4rem; } }
+
+/* ── price tiers: spec-sheet grid ── */
+.tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 2.4rem; max-width: 52rem; }
+.tier { background: var(--ink); padding: 1.8rem 1.6rem 2rem; }
+.tier__name { color: var(--signal); display: block; margin-bottom: 0.8rem; }
+.tier__price { font-family: "Clash Display", sans-serif; font-weight: 600; font-size: clamp(1.5rem, 3vw, 2.2rem); font-variant-numeric: tabular-nums; }
+.tier__list { list-style: none; margin-top: 1.2rem; }
+.tier__list li { color: var(--bone-dim); padding: 0.35rem 0; border-top: 1px solid var(--line); font-size: 0.95rem; }
+@media (max-width: 720px) { .tiers { grid-template-columns: 1fr; } }
+
+/* ── FAQ: native details, mono summaries ── */
+.faq { margin-top: 2.2rem; border-top: 1px solid var(--line); max-width: 52rem; }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary {
+  list-style: none; padding: 1.15rem 0; color: var(--bone);
+  display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--signal); font-family: "Space Mono", monospace; }
+.faq details[open] summary::after { content: "-"; }
+.faq details[open] summary { color: var(--signal); }
+.faq details p { color: var(--bone-dim); padding: 0 0 1.3rem; max-width: 42rem; }
+.faq summary:focus-visible { outline: 1px solid var(--line-strong); outline-offset: 3px; }
+
+/* ── not-for block ── */
+.notfor { border: 1px solid var(--line-strong); padding: 1.8rem 1.6rem; max-width: 44rem; margin-top: 2.2rem; }
+.notfor p { color: var(--bone-dim); }
+.notfor p + p { margin-top: 1rem; }
+.notfor b { color: var(--bone); font-weight: 500; }
+
+/* proof links row */
+.prooflinks { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; }
+.prooflinks a {
+  border: 1px solid var(--line-strong); padding: 0.8rem 1.2rem;
+  color: var(--bone); text-decoration: none;
+}
+.prooflinks a:hover, .prooflinks a:focus-visible { border-color: var(--signal); color: var(--signal); }
+
+/* transmit section shell on subpage */
+.ptransmit { display: flex; flex-direction: column; align-items: flex-start; }
+.ptransmit .transmit { align-items: flex-start; }
+
+/* footer nav line */
+.pfoot-links { display: flex; gap: 1.6rem; flex-wrap: wrap; padding: 0 var(--pad) 2rem; }
+.pfoot-links a { color: var(--bone-dim); text-decoration: none; }
+.pfoot-links a:hover, .pfoot-links a:focus-visible { color: var(--bone); }

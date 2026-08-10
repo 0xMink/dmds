@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# DMDS® build — inlines fonts, styles and scripts into a single
-# self-contained dist/index.html (zero external requests on load),
-# stamps provenance, generates a hash-based CSP, then verifies the
-# artifact (claims registry, glyph coverage, CSP, size budgets).
+# DMDS® build — inlines fonts, styles and scripts into self-contained
+# HTML artifacts (zero external requests on load), stamps provenance,
+# generates a hash-based CSP per page, emits robots.txt + sitemap.xml,
+# then verifies the artifacts (claims registry, glyph coverage, CSP,
+# size budgets).
+#
+# Pages: src/index.html → dist/index.html (the studio page), plus
+# src/pages/<slug>.html → dist/<slug>/index.html (subpages — same
+# pipeline, same discipline, no engine).
 set -euo pipefail
 cd "$(dirname "$0")"
 
 SRC=src
-OUT=dist/index.html
 mkdir -p dist
 
 # provenance inputs: commit (marked -dirty if the SOURCE tree isn't clean)
@@ -23,63 +27,98 @@ fi
 export DMDS_GIT_SHA
 export DMDS_BUILD_TS="$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)"
 
-python3 - "$SRC" "$OUT" << 'EOF'
-import sys, os, re, hashlib, base64
+python3 - "$SRC" << 'EOF'
+import sys, os, re, glob, hashlib, base64
 
-src, out = sys.argv[1], sys.argv[2]
-html = open(os.path.join(src, "index.html")).read()
+src = sys.argv[1]
+stamp = os.environ["DMDS_GIT_SHA"] + " " + os.environ["DMDS_BUILD_TS"]
 
-styles, scripts = [], []
-
-def inline_css(m):
-    css = open(os.path.join(src, m.group(1))).read()
-    body = "\n" + css + "\n"
-    styles.append(body)
-    return "<style>" + body + "</style>"
-
-def inline_js(m):
-    js = open(os.path.join(src, m.group(1))).read()
-    body = "\n" + js + "\n"
-    scripts.append(body)
-    return "<script>" + body + "</script>"
-
-html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', inline_css, html)
-html = re.sub(r'<script src="([^"]+)"></script>', inline_js, html)
-
-# ── Content-Security-Policy: hash-allowlisted inline blocks only ──
-# connect-src is derived from the form's data-endpoint: 'none' while no
-# endpoint is configured (the page then *cannot* make a network request),
-# or exactly that endpoint's origin once one is set.
 def sha(s):
     return "'sha256-" + base64.b64encode(hashlib.sha256(s.encode()).digest()).decode() + "'"
 
-ep = re.search(r'data-endpoint="([^"]*)"', html)
-endpoint = ep.group(1).strip() if ep else ""
-if endpoint:
-    om = re.match(r"https://[^/]+", endpoint)
-    assert om, f"data-endpoint must be an absolute https:// URL, got {endpoint!r}"
-    connect = om.group(0)
-else:
-    connect = "'none'"
+def build_page(page_path, out_path):
+    html = open(page_path).read()
+    styles, scripts = [], []
 
-csp = (
-    "default-src 'none'; "
-    "style-src " + " ".join(sha(s) for s in styles) + "; "
-    "script-src " + " ".join(sha(s) for s in scripts) + "; "
-    "img-src data:; font-src data:; connect-src " + connect + "; "
-    "base-uri 'none'; form-action 'self'"
-)
-csp_tag = '<meta http-equiv="Content-Security-Policy" content="' + csp + '">'
-html, n = re.subn(r'<!-- build:csp[^>]*-->', csp_tag, html)
-assert n == 1, "build:csp placeholder missing from src/index.html"
+    def inline_css(m):
+        css = open(os.path.join(src, m.group(1))).read()
+        body = "\n" + css + "\n"
+        styles.append(body)
+        return "<style>" + body + "</style>"
 
-# ── provenance: the artifact says which commit built it, and when ──
-stamp = os.environ["DMDS_GIT_SHA"] + " " + os.environ["DMDS_BUILD_TS"]
-html = html.replace("</head>", '<meta name="dmds-build" content="' + stamp + '">\n</head>')
-html += "<!-- dmds build " + stamp + " -->\n"
+    def inline_js(m):
+        js = open(os.path.join(src, m.group(1))).read()
+        body = "\n" + js + "\n"
+        scripts.append(body)
+        return "<script>" + body + "</script>"
 
-open(out, "w").write(html)
-print(f"built {out}: {os.path.getsize(out)/1024:.0f} KB  (commit {os.environ['DMDS_GIT_SHA']})")
+    # asset hrefs resolve against src/ regardless of the page's folder —
+    # subpages reference the same shared fonts.css/styles.css by name
+    html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', inline_css, html)
+    html = re.sub(r'<script src="([^"]+)"></script>', inline_js, html)
+
+    # ── Content-Security-Policy: hash-allowlisted inline blocks only ──
+    # connect-src is derived from the form's data-endpoint: 'none' while no
+    # endpoint is configured (the page then *cannot* make a network request),
+    # or exactly that endpoint's origin once one is set.
+    ep = re.search(r'data-endpoint="([^"]*)"', html)
+    endpoint = ep.group(1).strip() if ep else ""
+    if endpoint:
+        om = re.match(r"https://[^/]+", endpoint)
+        assert om, f"data-endpoint must be an absolute https:// URL, got {endpoint!r}"
+        connect = om.group(0)
+    else:
+        connect = "'none'"
+
+    csp = (
+        "default-src 'none'; "
+        "style-src " + " ".join(sha(s) for s in styles) + "; "
+        "script-src " + " ".join(sha(s) for s in scripts) + "; "
+        "img-src data:; font-src data:; connect-src " + connect + "; "
+        "base-uri 'none'; form-action 'self'"
+    )
+    csp_tag = '<meta http-equiv="Content-Security-Policy" content="' + csp + '">'
+    html, n = re.subn(r'<!-- build:csp[^>]*-->', csp_tag, html)
+    assert n == 1, f"build:csp placeholder missing from {page_path}"
+
+    # ── provenance: the artifact says which commit built it, and when ──
+    html = html.replace("</head>", '<meta name="dmds-build" content="' + stamp + '">\n</head>')
+    html += "<!-- dmds build " + stamp + " -->\n"
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    open(out_path, "w").write(html)
+    gates = sorted(set(re.findall(r'data-owner-gate="([^"]+)"', html)))
+    print(f"built {out_path}: {os.path.getsize(out_path)/1024:.0f} KB  (commit {os.environ['DMDS_GIT_SHA']})")
+    return gates
+
+urls = []
+all_gates = {}
+
+gates = build_page(os.path.join(src, "index.html"), os.path.join("dist", "index.html"))
+urls.append("https://dmds.studio/")
+if gates: all_gates["dist/index.html"] = gates
+
+for page in sorted(glob.glob(os.path.join(src, "pages", "*.html"))):
+    slug = os.path.splitext(os.path.basename(page))[0]
+    gates = build_page(page, os.path.join("dist", slug, "index.html"))
+    urls.append(f"https://dmds.studio/{slug}/")
+    if gates: all_gates[f"dist/{slug}/index.html"] = gates
+
+# ── robots.txt + sitemap.xml — the crawl surface ships with the site ──
+open("dist/robots.txt", "w").write(
+    "User-agent: *\nAllow: /\n\nSitemap: https://dmds.studio/sitemap.xml\n")
+lastmod = os.environ["DMDS_BUILD_TS"][:10]
+sm = ['<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+for u in urls:
+    sm.append(f"  <url><loc>{u}</loc><lastmod>{lastmod}</lastmod></url>")
+sm.append("</urlset>")
+open("dist/sitemap.xml", "w").write("\n".join(sm) + "\n")
+print(f"built dist/robots.txt + dist/sitemap.xml ({len(urls)} URLs)")
+
+# ── owner-gate tripwire: a page with unresolved gates must not ship ──
+for path, gates in all_gates.items():
+    print(f"WARNING: {path} carries UNRESOLVED OWNER GATES: {', '.join(gates)} — DO NOT DEPLOY until the owner fills them")
 EOF
 
 python3 scripts/check.py

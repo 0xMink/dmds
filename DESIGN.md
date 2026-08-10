@@ -699,3 +699,30 @@ no-JS reading path is the floor.
   must be removed if that machinery ever stops gating releases.
 - Plain-English translation lines accompany engineering claims for
   non-technical buyers.
+
+## Subpages (v7.1)
+
+`src/pages/<slug>.html` → `dist/<slug>/index.html` — same pipeline
+(inline, per-page hash CSP, provenance stamp), same tokens, type, form
+grammar and reveal system, shared via `styles.css` + `page.css`/`page.js`.
+The contract deltas from the studio page:
+
+- **No engine.** Subpages ship the static tier as the design (rung 3 of
+  the degradation ladder): CSS atmosphere, no canvas, no loader, no
+  sound, native cursor (`page.css` restores cursors that `html.js`
+  styling hides). The nav is visible by default — subpages have no
+  loader to gate it, and content is never hostage to a script.
+- **No `data-claim`.** The runtime claims↔DOM verify only runs on the
+  studio page; a subpage must not imply that tier. `check.py` fails the
+  build if a subpage carries `data-claim` — quantitative claims link to
+  the studio page instead. Subpage footers say `SOURCE ON GITHUB`, not
+  `CLAIMS TEST-ATTESTED`: the attestation certificate binds the studio
+  page's bytes, and a subpage must not borrow it.
+- **Owner gates.** Copy awaiting an owner decision (pricing bands)
+  carries `data-owner-gate="<name>"`; the build and `check.py` warn
+  loudly on every unresolved gate. A page with open gates MUST NOT
+  deploy.
+- **Truthful status strings** hold: subpage footers report
+  `STATIC PAGE · CONTENT NOMINAL` (there is no renderer to report on).
+- `build.sh` emits `dist/robots.txt` + `dist/sitemap.xml` covering the
+  studio page and every subpage.

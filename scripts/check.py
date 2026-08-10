@@ -13,6 +13,7 @@ Fails the build when:
 """
 import base64
 import datetime
+import glob
 import gzip
 import hashlib
 import io
@@ -42,7 +43,7 @@ WARN_GZIP = 160 * 1024    # explained, not silently absorbed by the ceiling
 # mark beats shipping an ® the mark doesn't legally carry).
 # Present in every mainstream OS font stack; worst case they degrade
 # to a different arrow/block shape, never to meaning loss.
-SYSTEM_FALLBACK_OK = set("↗↘→↔█▓▒░™")
+SYSTEM_FALLBACK_OK = set("↗↘→←↔█▓▒░™")
 
 errors = []
 warnings = []
@@ -109,46 +110,66 @@ try:
             text = re.sub(r"(?:^|(?<=\s))//.*$", "", text, flags=re.M)
         return text
 
-    for fname, kind in (("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js"), ("term.js", "js")):
-        body = strip_comments(read(os.path.join(SRC, fname)), kind)
+    glyph_files = [("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js"), ("term.js", "js"), ("page.css", "css"), ("page.js", "js")]
+    glyph_files += [(os.path.join("pages", os.path.basename(p)), "html")
+                    for p in sorted(glob.glob(os.path.join(SRC, "pages", "*.html")))]
+    for fname, kind in glyph_files:
+        path = os.path.join(SRC, fname)
+        if not os.path.exists(path):
+            continue
+        body = strip_comments(read(path), kind)
         for ch in sorted({c for c in body if ord(c) > 127}):
             if ch not in covered and ch not in SYSTEM_FALLBACK_OK:
                 errors.append(f"{fname}: glyph {ch!r} (U+{ord(ch):04X}) not in font subsets or fallback allowlist")
 except ImportError:
     warnings.append("fontTools unavailable — glyph coverage not checked")
 
-# ── 5–7: the built artifact ─────────────────────────────────────
-if os.path.exists(DIST):
-    dist = read(DIST)
+# ── subpage discipline: no data-claim outside the studio page — the
+# runtime claims↔DOM verify only runs there; a subpage claim would be
+# build-checked at best and the page must not imply the stronger tier ──
+for p in sorted(glob.glob(os.path.join(SRC, "pages", "*.html"))):
+    if "data-claim" in read(p):
+        errors.append(f"{os.path.relpath(p, ROOT)}: data-claim on a subpage — quantitative claims live on the studio page (or wire subpage runtime verification first)")
 
+# ── 5–7: the built artifacts (studio page + every subpage) ──────
+artifacts = ([DIST] if os.path.exists(DIST) else []) + \
+    sorted(glob.glob(os.path.join(ROOT, "dist", "*", "index.html")))
+if artifacts:
     def sha(s):
         return "sha256-" + base64.b64encode(hashlib.sha256(s.encode()).digest()).decode()
 
-    cm = re.search(r'Content-Security-Policy" content="([^"]+)"', dist)
-    if not cm:
-        errors.append("dist: CSP meta missing")
-    else:
-        declared = set(re.findall(r"sha256-[A-Za-z0-9+/=]+", cm.group(1)))
-        actual = {sha(b.group(1)) for b in re.finditer(r"<style>(.*?)</style>", dist, re.S)}
-        actual |= {sha(b.group(1)) for b in re.finditer(r"<script>(.*?)</script>", dist, re.S)}
-        if declared != actual:
-            errors.append(f"dist: CSP hash mismatch (declared {len(declared)}, actual {len(actual)})")
+    for apath in artifacts:
+        rel = os.path.relpath(apath, ROOT)
+        dist = read(apath)
 
-    if "dmds-build" not in dist:
-        errors.append("dist: provenance stamp missing")
+        cm = re.search(r'Content-Security-Policy" content="([^"]+)"', dist)
+        if not cm:
+            errors.append(f"{rel}: CSP meta missing")
+        else:
+            declared = set(re.findall(r"sha256-[A-Za-z0-9+/=]+", cm.group(1)))
+            actual = {sha(b.group(1)) for b in re.finditer(r"<style>(.*?)</style>", dist, re.S)}
+            actual |= {sha(b.group(1)) for b in re.finditer(r"<script>(.*?)</script>", dist, re.S)}
+            if declared != actual:
+                errors.append(f"{rel}: CSP hash mismatch (declared {len(declared)}, actual {len(actual)})")
 
-    raw = os.path.getsize(DIST)
-    gz = len(gzip.compress(dist.encode()))
-    print(f"check: dist {raw/1024:.0f} KB raw / {gz/1024:.0f} KB gzip "
-          f"(budget {BUDGET_RAW//1024}/{BUDGET_GZIP//1024})")
-    if raw > BUDGET_RAW:
-        errors.append(f"dist: {raw/1024:.0f} KB raw exceeds {BUDGET_RAW//1024} KB budget")
-    elif raw > WARN_RAW:
-        warnings.append(f"dist: {raw/1024:.0f} KB raw past the {WARN_RAW//1024} KB warning line")
-    if gz > BUDGET_GZIP:
-        errors.append(f"dist: {gz/1024:.0f} KB gzip exceeds {BUDGET_GZIP//1024} KB budget")
-    elif gz > WARN_GZIP:
-        warnings.append(f"dist: {gz/1024:.0f} KB gzip past the {WARN_GZIP//1024} KB warning line")
+        if "dmds-build" not in dist:
+            errors.append(f"{rel}: provenance stamp missing")
+
+        for gate in sorted(set(re.findall(r'data-owner-gate="([^"]+)"', dist))):
+            warnings.append(f"{rel}: unresolved owner gate {gate!r} — must be filled before deploy")
+
+        raw = os.path.getsize(apath)
+        gz = len(gzip.compress(dist.encode()))
+        print(f"check: {rel} {raw/1024:.0f} KB raw / {gz/1024:.0f} KB gzip "
+              f"(budget {BUDGET_RAW//1024}/{BUDGET_GZIP//1024})")
+        if raw > BUDGET_RAW:
+            errors.append(f"{rel}: {raw/1024:.0f} KB raw exceeds {BUDGET_RAW//1024} KB budget")
+        elif raw > WARN_RAW:
+            warnings.append(f"{rel}: {raw/1024:.0f} KB raw past the {WARN_RAW//1024} KB warning line")
+        if gz > BUDGET_GZIP:
+            errors.append(f"{rel}: {gz/1024:.0f} KB gzip exceeds {BUDGET_GZIP//1024} KB budget")
+        elif gz > WARN_GZIP:
+            warnings.append(f"{rel}: {gz/1024:.0f} KB gzip past the {WARN_GZIP//1024} KB warning line")
 else:
     warnings.append("dist/index.html not built yet — artifact checks skipped")
 
