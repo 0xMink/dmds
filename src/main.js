@@ -676,8 +676,8 @@
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nBuilding: " + data.project + "\n\nBrief:\n" + data.brief;
-        lastComposed = "To: dennis@shorevapesli.com\nSubject: Project inquiry — DMDS (" + data.project + ")\n\n" + body;
-        window.location.href = "mailto:dennis@shorevapesli.com?subject=" +
+        lastComposed = "To: dennis@dmds.studio\nSubject: Project inquiry — DMDS (" + data.project + ")\n\n" + body;
+        window.location.href = "mailto:dennis@dmds.studio?subject=" +
           encodeURIComponent("Project inquiry — DMDS (" + data.project + ")") +
           "&body=" + encodeURIComponent(body);
         label.textContent = "OPENING YOUR MAIL CLIENT…";
@@ -853,7 +853,7 @@
     console.log(
       "%c DMDS™ %c ENGINEERED, NOT DECORATED. \n" +
       "%c " + count + " · 0 external requests on load.\n" +
-      " We audit our console too. → dennis@shorevapesli.com",
+      " We audit our console too. → dennis@dmds.studio",
       "background:#ff4a00;color:#0b0b0c;font-weight:bold;padding:4px 8px;",
       "background:#0b0b0c;color:#edeae3;padding:4px 8px;",
       "color:#8a8781;"

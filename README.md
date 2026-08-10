@@ -5,7 +5,7 @@ Fully self-contained: **zero external requests** — fonts, styles, and
 two hand-rolled WebGL particle engines are embedded in one HTML file
 (~334 KB raw, ~136 KB gzipped).
 
-**Live**: https://0xmink.github.io/dmds/ · **Design system**:
+**Live**: https://dmds.studio/ (origin: https://0xmink.github.io/dmds/) · **Design system**:
 [DESIGN.md](DESIGN.md) — concept, tokens, contracts (MUST/SHOULD),
 state machines, budgets, the verification regime.
 
@@ -136,7 +136,7 @@ deploys `dist/` **verbatim** — the workflow has no build step, so the
 public serving boundary carries the attested bytes. Check it yourself:
 
 ```bash
-curl -s https://0xmink.github.io/dmds/ | sha256sum
+curl -s https://dmds.studio/ | sha256sum
 # equals .dist_sha256 in tests/attestation.json
 ```
 
@@ -182,16 +182,18 @@ by category:
       performed, and ™ is no shield if the mark conflicts with
       someone's prior rights.
 - [x] OG card (2026-08-03): `og:image` / `og:url` / `twitter:card`
-      point at the deployed Pages URLs. A custom domain means updating
-      all three and rebuilding.
-
-**Open — launch-quality, blocked on owner action**
-- [ ] Studio email: `dennis@shorevapesli.com` on a DMDS site reads as
-      provisional and cross-brands an unrelated business. Fix = a DMDS
-      domain (or any forwarding alias) → then swap in `src/index.html`
-      **and** `src/main.js` and rebuild. Kept live only because no
-      alternative exists yet — this is an active issue, not a resolved
-      one.
+      point at the deployed URLs. Moved to the custom domain 2026-08-10.
+- [x] Custom domain (2026-08-10): `dmds.studio` is canonical — Pages
+      custom domain set, HTTPS enforced, served bytes hash-verified
+      against the attestation; `dmdsbuild.com` redirects. Canonical
+      link + JSON-LD added.
+- [x] Studio email (2026-08-10): `dennis@dmds.studio` (Google
+      Workspace, external delivery verified) replaced
+      `dennis@shorevapesli.com` in `src/index.html` and `src/main.js`.
+- [x] `platforms-production` (2026-08-03): registry dropped the claim
+      to "2 PLATFORMS IN PRODUCTION" — Comfort Airz deliberately
+      excluded as engineering/prototype work. Restore to 3 only with
+      owner verification of production use.
 
 **Open — blocked on owner-supplied facts**
 - [ ] Verified outcome numbers for **Zoo Code and Insure With Mink
@@ -199,12 +201,12 @@ by category:
       with implementation metrics (commits, models, specs — as its
       dossier already does); it must not acquire business-outcome
       claims (revenue, conversion, users, delivery) unless
-      independently verified.
-- [ ] Confirm or correct `platforms-production` ("3 PLATFORMS IN
-      PRODUCTION" — its definition counts Comfort Airz as "live or in
-      active production use", owner-verified 2026-07-08). If Comfort
-      Airz is not in production use, the claim must drop to 2 or be
-      redefined before its 2026-10-08 review date.
+      independently verified. When real numbers exist they should also
+      replace the two absence-stats in the signal band ("0 TEMPLATES
+      USED", "100% BUILT IN-HOUSE").
+- [ ] Optional conversion adds, owner-gated: a published phone number
+      (trades buyers call, they don't fill out briefs), a permissioned
+      client quote, a pricing/engagement anchor.
 
 **Deferred (needs infrastructure that doesn't exist yet)**
 - [ ] Lead API: set `data-endpoint` on `#transmit` and rebuild
@@ -213,6 +215,8 @@ by category:
       system)
 
 **Optional**
-- [ ] Custom domain — if analytics ever accompany it, update the
-      form's "no third-party analytics" promise first or don't add
-      them
+- [ ] If analytics ever accompany the domain, update the form's "no
+      third-party analytics" promise first or don't add them
+- [ ] dmdsbuild.com as a plain-language trades-facing landing page
+      (phone-forward, Comfort Airz-led, service-area copy) instead of
+      a bare redirect — the two-site strategy; separate build
