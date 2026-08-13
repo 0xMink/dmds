@@ -112,7 +112,7 @@
       if (els.namedItem("_gotcha").value) return;
       if (!formT0 || performance.now() - formT0 < 2000) {
         formT0 = performance.now() - 2000;
-        label.textContent = "QUICK CHECK — PRESS TRANSMIT AGAIN TO SEND";
+        label.textContent = "QUICK CHECK — HIT THE BUTTON AGAIN TO SEND";
         setTimeout(function () { label.textContent = CTA_TEXT; }, 3000);
         return;
       }
@@ -142,7 +142,7 @@
         setTimeout(function () { label.textContent = CTA_TEXT; }, 2500);
       }
       if (endpoint) {
-        label.textContent = "TRANSMITTING…";
+        label.textContent = "SENDING…";
         fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
