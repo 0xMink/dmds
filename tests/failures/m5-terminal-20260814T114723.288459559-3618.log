@@ -1,0 +1,112 @@
+== env preamble ==
+Fri Aug 14 11:47:23 UTC 2026
+ 11:47:23 up 25 min,  1 user,  load average: 6.91, 5.76, 3.58
+cores: 8  (Intel(R) Xeon(R) CPU E5-4620 0 @ 2.20GHz)
+              total        used        free      shared  buff/cache   available
+Mem:           16Gi       1.2Gi        12Gi       8.0Mi       1.9Gi        14Gi
+Swap:         8.0Gi          0B       8.0Gi
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 1  0      0 13577960      0 1970944    0    0   502   433 1047 1780 19  0 81  0  0
+ 1  0      0 13577444      0 1970944    0    0   128    48 5459 10436  2  0 98  0  0
+ 2  0      0 13577828      0 1970944    0    0   128   504 6015 12994  4  0 96  0  0
+ 3432 S     0.0  0.0 /bin/bash -c source /root/.claude/shell-snapshots/snapshot-bash-1786707505345-i31qqz.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && { \builtin unalias -- 'unsetenv'; \builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --porcelain | head; curl -s -o /dev/null -w "server: %{http_code}\n" http://127.0.0.1:8144/ || (cd /root/dmds/dist && nohup python3 -m http.server 8144 --bind 127.0.0.1 >/dev/null 2>&1 & sleep 1; echo restarted); mkdir -p /tmp/claude-0/-root-dmds/5b6b8863-6312-44bb-9ee2-0f336fbfc750/scratchpad && node -e " const { chromium } = require('"'"'/root/dmds/tests/node_modules/playwright-core'"'"'); const OUT='"'"'/tmp/claude-0/-root-dmds/5b6b8863-6312-44bb-9ee2-0f336fbfc750/scratchpad/'"'"'; (async()=>{ const b=await chromium.launch(); let p=await b.newPage({viewport:{width:1440,height:900}}); await p.goto('"'"'http://127.0.0.1:8144/contractor-web-design-tampa/'"'"',{waitUntil:'"'"'networkidle'"'"'}); await p.evaluate(async()=>{for(let y=0;y<document.body.scrollHeight;y+=600){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,50));}}); await p.evaluate(()=>{const el=document.querySelector('"'"'.pquote'"'"');window.scrollTo(0,el.getBoundingClientRect().top+window.scrollY-350);}); await p.waitForTimeout(500); await p.screenshot({path:OUT+'"'"'v2-quote.png'"'"'}); await p.evaluate(()=>window.scrollTo(0,0)); await p.waitForTimeout(400); await p.screenshot({path:OUT+'"'"'v2-fold2.png'"'"'}); await p.close(); p=await b.newPage({viewport:{width:390,height:844}}); await p.goto('"'"'http://127.0.0.1:8144/contractor-web-design-tampa/'"'"',{waitUntil:'"'"'networkidle'"'"'}); await p.evaluate(async()=>{for(let y=0;y<document.body.scrollHeight;y+=600){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,50));}}); await p.evaluate(()=>{const el=document.getElementById('"'"'math'"'"');window.scrollTo(0,el.getBoundingClientRect().top+window.scrollY-60);}); await p.waitForTimeout(500); await p.screenshot({path:OUT+'"'"'v2-mobile-math.png'"'"'}); await p.close(); await b.close(); console.log('"'"'done'"'"');})();"' < /dev/null && pwd -P >| /tmp/claude-1ade-cwd
+ 7118 S     0.0  0.0 grep -E [c]hrom(e|ium)|node tests/
+commit: 2ccaf63f9d985f8d32d52347c52441fea4fc19fc dirty: false
+== suite: m5-terminal ==
+  ok   api:object 
+  ok   api:functions function,function,function
+  ok   api:bridge-consumed _connect=undefined
+  ok   api:no-mutation-channel-in-prod debugSetContext=undefined
+  ok   markup:toggle-revealed hidden=false
+  ok   markup:aria-expanded-false 
+  ok   markup:aria-controls 
+  ok   markup:dialog-labelled 
+  ok   markup:output-role-log 
+  ok   markup:input-labelled 
+  ok   markup:closed-at-boot 
+  ok   exec:help-lists-all DMDS/OS commands — every line below reads live state:
+  help    list commands
+  status  engine + render state, live
+  boot    replay the boot log (real events)
+  build   artifact provenance + how to verify it
+  clear   clear scrollback
+  exit    close the terminal
+  ESC closes · UP/DOWN history · TAB completes
+  ok   exec:help-aligned-all-rows [10,10,10,10,10,10]
+  ok   exec:status-tier-truthful TIER 1 · WEBGL2 GPGPU SIM · RUNNING
+  ok   exec:status-count-matches-engine PARTICLES 262,144 · BASELINE 262,144 · CEILING 1,048,576
+  ok   exec:boot-equals-buffer ["COMPILE sim + render :: OK","PIPELINE post-fx :: ON","VERIFY claims↔DOM (23) :: PASS","MOUNT /typefaces (6/6) :: OK","SEED particles :: 262,144","BOOT dmds.sys :: READY","LINK render loop :: OK"]
+  ok   exec:boot-has-seed-line ["COMPILE sim + render :: OK","PIPELINE post-fx :: ON","VERIFY claims↔DOM (23) :: PASS","MOUNT /typefaces (6/6) :: OK","SEED particles :: 262,144","BOOT dmds.sys :: READY","LINK render loop :: OK"]
+  ok   exec:build-carries-stamp BUILD 30629eb 2026-08-14T11:39:30Z (commit · UTC build time, stamped at build) vs 30629eb 2026-08-14T11:39:30Z
+  ok   exec:build-names-attestation 
+  ok   exec:unknown-honest ["unknown command: warpdrive — 'help' lists what exists"]
+  ok   exec:empty-line-silent 
+  ok   kbd:backtick-opens 
+  ok   a11y:initial-focus-input 
+  ok   a11y:aria-expanded-syncs-open 
+  ok   kbd:backtick-literal-in-terminal {"v":"`","open":true}
+  ok   shell:typed-command-executes 
+  ok   shell:command-echoed 
+  ok   shell:history-up 
+  ok   shell:tab-completes 
+  ok   shell:clear-empties 
+  ok   shell:close-button-closes 
+  ok   a11y:aria-expanded-syncs-close 
+  ok   shell:exit-closes 
+  ok   shell:toggle-launches 
+  ok   kbd:escape-closes 
+  ok   a11y:focus-restored-to-opener 
+  ok   kbd:guard-ime-synthetic 
+  FAIL kbd:guard-form-field {"open":false,"v":""}
+  ok   kbd:guard-modifier 
+  ok   kbd:guard-link-focus 
+  ok   kbd:guard-other-keys 
+  ok   shell:scrollback-persists 
+  ok   page:no-exceptions 
+  ok   context:debug-seam-present function
+  ok   context:static-honest ["RENDER: STATIC · CONTENT NOMINAL — no engine active"]
+  ok   context:tier2-honest ["TIER 2 · WEBGL1 BUFFER ENGINE · STOPPED","PARTICLES 0 OF 42,000 · POST-FX OFF","(two-axis governor history is a tier-1 instrument; tier 2 keeps a simpler halve/restore budget)"]
+  ok   integration:real-static-status ["RENDER: STATIC · CONTENT NOMINAL — no engine active"]
+  ok   integration:real-static-boot-honest ["VERIFY claims↔DOM (23) :: PASS","COMPILE render engine :: FAIL","FALLBACK static field :: ACTIVE","BOOT dmds.sys :: READY","MOUNT /typefaces (6/6) :: OK"]
+  ok   integration:terminal-survives-no-gl 
+  ok   integration:static-bridge-consumed 
+  ok   integration:real-tier2-status ["TIER 2 · WEBGL1 BUFFER ENGINE · RUNNING","PARTICLES 21,000 OF 42,000 · POST-FX ON","(two-axis governor history is a tier-1 instrument; tier 2 keeps a simpler halve/restore budget)","FPS 10 (measured)"]
+  ok   integration:real-tier2-count-live PARTICLES 21,000 OF 42,000 · POST-FX ON
+  ok   integration:tier2-bridge-consumed undefined
+  ok   rm:opens-and-reads 
+  ok   rm:no-transition 0s
+  ok   rm:no-animation none
+  ok   rm:no-exceptions 
+  ok   fc:panel-boundary 1px solid
+  ok   fc:focus-visible-indicator {"borderTop":"1px solid","outlineStyle":"solid","outlineWidth":"1px","closeVisible":true,"promptVisible":true,"errVisible":true,"outVisible":true}
+  ok   fc:close-button-visible 
+  ok   fc:prompt-visible 
+  ok   fc:error-text-visible 
+  ok   fc:output-visible 
+  ok   mobile:320x568:launcher-visible block
+  ok   mobile:320x568:launcher-tap-target h=44.3 w=42.2
+  ok   mobile:320x568:tap-opens 
+  ok   mobile:320x568:opens-full-width panel=320 inner=320
+  ok   mobile:320x568:no-horizontal-overflow scrollW=320
+  ok   mobile:320x568:input-on-screen-base-pad padBottom=22.4
+  ok   mobile:320x568:input-no-ios-zoom font=16
+  ok   mobile:375x667:launcher-visible block
+  ok   mobile:375x667:launcher-tap-target h=44.3 w=42.2
+  ok   mobile:375x667:tap-opens 
+  ok   mobile:375x667:opens-full-width panel=375 inner=375
+  ok   mobile:375x667:no-horizontal-overflow scrollW=375
+  ok   mobile:375x667:input-on-screen-base-pad padBottom=22.4
+  ok   mobile:375x667:input-no-ios-zoom font=16
+  ok   mobile:667x375:launcher-visible block
+  ok   mobile:667x375:tap-opens 
+  ok   mobile:667x375:opens-full-width panel=667 inner=667
+  ok   mobile:667x375:no-horizontal-overflow scrollW=667
+  ok   mobile:667x375:input-on-screen-base-pad padBottom=22.4
+  ok   mobile:667x375:input-no-ios-zoom font=16
+  ok   nojs:toggle-stays-hidden 
+  ok   nojs:dialog-closed 
+  ok   nojs:content-unaffected 
+  ok   nojs:loader-hidden display=none
+M5 TERMINAL: FAIL
+exit=1
