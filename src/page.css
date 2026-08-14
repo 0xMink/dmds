@@ -195,6 +195,13 @@ html:not(.js) .notfor__copy { display: none; }
 .rxsheet__list li span { color: var(--signal); }
 @media (max-width: 720px) { .rxsheet__list { columns: 1; } }
 
+/* custom-systems rung: quoted after diagnosis, never promised before */
+.tiers__custom {
+  border: 1px solid var(--line-strong); padding: 1rem 1.2rem; margin-top: 1.4rem;
+  max-width: 58rem; color: var(--bone-dim); font-size: 0.72rem; letter-spacing: 0.12em;
+}
+.tiers__custom span { color: var(--signal); margin-right: 0.6rem; }
+
 /* ── how it works: the clock drawn as a track ── */
 .ptrack { margin-top: 2.8rem; max-width: 58rem; }
 .ptrack__tag { color: var(--signal); font-size: 0.72rem; letter-spacing: 0.14em; }
