@@ -7,7 +7,7 @@ Contact: dennis@dmds.studio
 ## Pages
 
 - [Studio](https://dmds.studio/): identity, capabilities (web design, web development, app development, AI automation, digital marketing), proof-of-work dossiers (Zoo Code AI platform, Insure With Mink growth engine, a private-engagement HVAC field-service platform), claims registry and release-attestation trail
-- [Contractor Web Design — Tampa Bay](https://dmds.studio/contractor-web-design-tampa/): web design for contractors and trade businesses (marine, tree, HVAC) across Tampa Bay — diagnosis-first structure, published pricing (builds $3,500–$8,500; BASE $95/month, GROWTH $495/month), objection FAQ, and an honest "who this is not for" section
+- [Contractor Web Design — Tampa Bay](https://dmds.studio/contractor-web-design-tampa/): web design for contractors and trade businesses (marine, tree, HVAC) across Tampa Bay. Diagnosis-first structure with a free website diagnosis as the entry step, published pricing (builds $3,500–$8,500; BASE $95/month, GROWTH $495/month), an objection FAQ, an honest "who this is not for" section, and client ownership of the site, domain, and content
 
 ## Facts
 

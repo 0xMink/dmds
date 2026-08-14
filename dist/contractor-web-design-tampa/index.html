@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-MCtJcZKxJNPHzMnXYHluUWJMcRkcEOA9DN6JFzMVx9Q='; script-src 'sha256-RwB3Pi9FbCbXD9xjO2cXAG8GkCliZhChh0AxZl9kXqs='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-MCtJcZKxJNPHzMnXYHluUWJMcRkcEOA9DN6JFzMVx9Q='; script-src 'sha256-/KjCiEU0xpQw8yrIw+NWOoPZKMmjTiPVUVQBcH/UtYc='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web Design for Contractors in Tampa Bay | DMDS</title>
 <meta name="description" content="Web design for contractors in Tampa Bay: sites built to win the jobs you actually want, from a Palm Harbor studio. Published pricing. Proof you can verify.">
@@ -1107,7 +1107,7 @@ html:not(.js) .notfor__copy { display: none; }
 .pfoot-links a:hover, .pfoot-links a:focus-visible { color: var(--bone); }
 
 </style>
-<meta name="dmds-build" content="0c06344 2026-08-14T03:30:08Z">
+<meta name="dmds-build" content="ec23bbe 2026-08-14T03:42:33Z">
 </head>
 <body class="page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1162,14 +1162,14 @@ html:not(.js) .notfor__copy { display: none; }
         <h3 class="diag__head">The phone stops.</h3>
         <p>Referrals are the best work, right up until the month they dry up. A slow week isn't
         zero revenue, it's crew sitting while payroll goes out the door.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Slow phone">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Slow phone" aria-label="This one's me: the phone stops">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-02 / SELECTION</span>
         <h3 class="diag__head">Wrong jobs call.</h3>
         <p>Price shoppers, tiny jobs, work you take because the phone rang. Volume was
         never the problem. Selection is.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Wrong jobs">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Wrong jobs" aria-label="This one's me: wrong jobs call">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-03 / RESPONSE</span>
@@ -1177,14 +1177,14 @@ html:not(.js) .notfor__copy { display: none; }
         <p>You're under a house or up a tree, and the homeowner who called went down the
         list to the next name. Demand isn't your leak. Response is. That's a different
         build, and I do that one too: <a href="#contact" data-pick="Missed calls">tell me and I'll say so</a>.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Missed calls">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Missed calls" aria-label="This one's me: calls get missed">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-04 / DECAY</span>
         <h3 class="diag__head">The site's been "on the list" for two years.</h3>
         <p>A guy did it, or a nephew, and nobody's touched it since. When somebody
         searches your trade and your town at 9pm, it's not competing.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Old site">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Old site" aria-label="This one's me: the site's been on the list for two years">THIS ONE'S ME ↘</a>
       </div>
     </div>
     <p class="psec__note reveal" style="margin-top:1.6rem">
@@ -1420,6 +1420,10 @@ html:not(.js) .notfor__copy { display: none; }
           <span class="mono">EMAIL</span>
           <input name="email" type="email" required placeholder="Where do I reply?" autocomplete="email">
         </label>
+        <label class="transmit__field">
+          <span class="mono">PHONE&nbsp;·&nbsp;OPTIONAL</span>
+          <input name="phone" type="tel" placeholder="If you'd rather talk" autocomplete="tel">
+        </label>
       </div>
       <fieldset class="transmit__chips">
         <legend class="mono">WHAT'S BROKEN?</legend>
@@ -1465,7 +1469,7 @@ html:not(.js) .notfor__copy { display: none; }
     <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;STATIC&nbsp;PAGE&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span>
     <span>PALM&nbsp;HARBOR&nbsp;·&nbsp;TAMPA&nbsp;BAY,&nbsp;FL&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
     <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
-    <span>BUILD&nbsp;0c06344 · 2026-08-14</span>
+    <span>BUILD&nbsp;ec23bbe · 2026-08-14</span>
     <span><a href="https://github.com/0xMink/dmds" target="_blank" rel="noopener">SOURCE&nbsp;ON&nbsp;GITHUB&nbsp;↗</a></span>
   </footer>
 
@@ -1567,6 +1571,7 @@ html:not(.js) .notfor__copy { display: none; }
       if (draft) {
         if (draft.name) els.namedItem("name").value = draft.name;
         if (draft.email) els.namedItem("email").value = draft.email;
+        if (draft.phone) els.namedItem("phone").value = draft.phone;
         if (draft.brief) els.namedItem("brief").value = draft.brief;
         if (draft.project) {
           var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
@@ -1584,6 +1589,7 @@ html:not(.js) .notfor__copy { display: none; }
             t: Date.now(),
             name: els.namedItem("name").value,
             email: els.namedItem("email").value,
+            phone: els.namedItem("phone").value,
             project: (form.querySelector("input[name=project]:checked") || {}).value,
             brief: els.namedItem("brief").value
           }));
@@ -1623,6 +1629,7 @@ html:not(.js) .notfor__copy { display: none; }
       var data = {
         name: els.namedItem("name").value.trim(),
         email: els.namedItem("email").value.trim(),
+        phone: els.namedItem("phone").value.trim(),
         project: (form.querySelector("input[name=project]:checked") || {}).value || "Unspecified",
         brief: els.namedItem("brief").value.trim(),
         source: "dmds-contractor-page"
@@ -1635,10 +1642,11 @@ html:not(.js) .notfor__copy { display: none; }
       }
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
+          "\nPhone: " + (data.phone || "not given") +
           "\nWhat's broken: " + data.project + "\n\nBrief:\n" + data.brief;
-        lastComposed = "To: dennis@dmds.studio\nSubject: Contractor site inquiry — DMDS (" + data.project + ")\n\n" + body;
+        lastComposed = "To: dennis@dmds.studio\nSubject: Contractor site inquiry - DMDS (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@dmds.studio?subject=" +
-          encodeURIComponent("Contractor site inquiry — DMDS (" + data.project + ")") +
+          encodeURIComponent("Contractor site inquiry - DMDS (" + data.project + ")") +
           "&body=" + encodeURIComponent(body);
         label.textContent = "OPENING YOUR MAIL CLIENT…";
         if (recover) recover.hidden = false;
@@ -1663,4 +1671,4 @@ html:not(.js) .notfor__copy { display: none; }
 </script>
 </body>
 </html>
-<!-- dmds build 0c06344 2026-08-14T03:30:08Z -->
+<!-- dmds build ec23bbe 2026-08-14T03:42:33Z -->
