@@ -145,14 +145,14 @@
         <h3 class="diag__head">The phone stops.</h3>
         <p>Referrals are the best work, right up until the month they dry up. A slow week isn't
         zero revenue, it's crew sitting while payroll goes out the door.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Slow phone">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Slow phone" aria-label="This one's me: the phone stops">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-02 / SELECTION</span>
         <h3 class="diag__head">Wrong jobs call.</h3>
         <p>Price shoppers, tiny jobs, work you take because the phone rang. Volume was
         never the problem. Selection is.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Wrong jobs">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Wrong jobs" aria-label="This one's me: wrong jobs call">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-03 / RESPONSE</span>
@@ -160,14 +160,14 @@
         <p>You're under a house or up a tree, and the homeowner who called went down the
         list to the next name. Demand isn't your leak. Response is. That's a different
         build, and I do that one too: <a href="#contact" data-pick="Missed calls">tell me and I'll say so</a>.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Missed calls">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Missed calls" aria-label="This one's me: calls get missed">THIS ONE'S ME ↘</a>
       </div>
       <div class="diag__cell reveal">
         <span class="diag__tag mono">D-04 / DECAY</span>
         <h3 class="diag__head">The site's been "on the list" for two years.</h3>
         <p>A guy did it, or a nephew, and nobody's touched it since. When somebody
         searches your trade and your town at 9pm, it's not competing.</p>
-        <a class="diag__go mono" href="#contact" data-pick="Old site">THIS ONE'S ME ↘</a>
+        <a class="diag__go mono" href="#contact" data-pick="Old site" aria-label="This one's me: the site's been on the list for two years">THIS ONE'S ME ↘</a>
       </div>
     </div>
     <p class="psec__note reveal" style="margin-top:1.6rem">
@@ -402,6 +402,10 @@
         <label class="transmit__field">
           <span class="mono">EMAIL</span>
           <input name="email" type="email" required placeholder="Where do I reply?" autocomplete="email">
+        </label>
+        <label class="transmit__field">
+          <span class="mono">PHONE&nbsp;·&nbsp;OPTIONAL</span>
+          <input name="phone" type="tel" placeholder="If you'd rather talk" autocomplete="tel">
         </label>
       </div>
       <fieldset class="transmit__chips">
