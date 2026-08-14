@@ -115,6 +115,8 @@
 
   <!-- 00 · SITE -->
   <section class="phero" id="top">
+   <div class="phero__grid">
+   <div class="phero__main">
     <p class="phero__label mono reveal">[ SEC.00 / SITE · CONTRACTOR WEB DESIGN ]</p>
     <h1 class="phero__title reveal-lines"><span class="line">Web design for contractors</span>
 <span class="line">in Tampa Bay<span class="sig">.</span></span></h1>
@@ -133,6 +135,16 @@
     <div class="phero__ctas reveal">
       <a class="phero__cta phero__cta--solid mono" href="#contact">GET A FREE WEBSITE DIAGNOSIS <span aria-hidden="true">↗</span></a>
     </div>
+   </div>
+   <aside class="phero__panel mono reveal" aria-label="Quick diagnosis index">
+     <span class="phero__panel-tag">[ QUICK DIAGNOSIS ]</span>
+     <a href="#d-01">D-01 · THE PHONE STOPS <span aria-hidden="true">↘</span></a>
+     <a href="#d-02">D-02 · WRONG JOBS CALL <span aria-hidden="true">↘</span></a>
+     <a href="#d-03">D-03 · CALLS GET MISSED <span aria-hidden="true">↘</span></a>
+     <a href="#d-04">D-04 · THE SITE'S "ON THE LIST" <span aria-hidden="true">↘</span></a>
+     <span class="phero__panel-foot">BUILDS $3,500 TO $8,500 · PRICED BELOW</span>
+   </aside>
+   </div>
   </section>
 
   <!-- 01 · DIAGNOSIS -->
@@ -140,21 +152,21 @@
     <div class="section-head mono"><span>[ SEC.01 / DIAGNOSIS ]</span><span class="section-head__rule"></span></div>
     <h2 class="psec__title reveal-lines"><span class="line">Which one is you<span class="sig">?</span></span></h2>
     <div class="diag">
-      <div class="diag__cell reveal">
+      <div class="diag__cell reveal" id="d-01">
         <span class="diag__tag mono">D-01 / DEMAND</span>
         <h3 class="diag__head">The phone stops.</h3>
         <p>Referrals are the best work, right up until the month they dry up. A slow week isn't
         zero revenue, it's crew sitting while payroll goes out the door.</p>
         <a class="diag__go mono" href="#contact" data-pick="Slow phone" aria-label="This one's me: the phone stops">THIS ONE'S ME ↘</a>
       </div>
-      <div class="diag__cell reveal">
+      <div class="diag__cell reveal" id="d-02">
         <span class="diag__tag mono">D-02 / SELECTION</span>
         <h3 class="diag__head">Wrong jobs call.</h3>
         <p>Price shoppers, tiny jobs, work you take because the phone rang. Volume was
         never the problem. Selection is.</p>
         <a class="diag__go mono" href="#contact" data-pick="Wrong jobs" aria-label="This one's me: wrong jobs call">THIS ONE'S ME ↘</a>
       </div>
-      <div class="diag__cell reveal">
+      <div class="diag__cell reveal" id="d-03">
         <span class="diag__tag mono">D-03 / RESPONSE</span>
         <h3 class="diag__head">Calls get missed.</h3>
         <p>You're under a house or up a tree, and the homeowner who called went down the
@@ -162,7 +174,7 @@
         build, and I do that one too: <a href="#contact" data-pick="Missed calls">tell me and I'll say so</a>.</p>
         <a class="diag__go mono" href="#contact" data-pick="Missed calls" aria-label="This one's me: calls get missed">THIS ONE'S ME ↘</a>
       </div>
-      <div class="diag__cell reveal">
+      <div class="diag__cell reveal" id="d-04">
         <span class="diag__tag mono">D-04 / DECAY</span>
         <h3 class="diag__head">The site's been "on the list" for two years.</h3>
         <p>A guy did it, or a nephew, and nobody's touched it since. When somebody
@@ -186,7 +198,13 @@
     </p>
     <div class="mathbox reveal">
       <span class="mono">GAP ARITHMETIC</span>
-      <p class="mathbox__f">jobs you could take but aren't getting × your average ticket = the monthly gap</p>
+      <div class="mathbox__eq">
+        <div class="mathbox__cell"><b>JOBS YOU COULD TAKE BUT AREN'T GETTING</b><span class="mono">PER MONTH</span></div>
+        <b class="mathbox__op">×</b>
+        <div class="mathbox__cell"><b>YOUR AVERAGE TICKET</b><span class="mono">YOU KNOW IT. I DON'T.</span></div>
+        <b class="mathbox__op">=</b>
+        <div class="mathbox__cell mathbox__cell--result"><b>THE MONTHLY GAP</b><span class="mono">RUN YOUR NUMBER</span></div>
+      </div>
     </div>
     <p class="psec__note reveal">
       Say it's two jobs a month you're not getting, at $4,000 a job. That's $96,000 a
@@ -247,12 +265,12 @@
         </div>
       </div>
     </div>
-    <p class="psec__note reveal" style="margin-top:1.8rem">
-      <b class="mono" style="color:var(--signal)">THE REPORTING PROMISE&nbsp;·&nbsp;</b>
-      I report actual calls and leads that came through the site, not traffic charts.
-      The call tracking that proves it line by line comes with the GROWTH plan. If it's
-      not producing, you'll know, and so will I.
-    </p>
+    <blockquote class="pquote reveal">
+      <p>I report actual calls and leads that came through the site, not traffic
+      charts. The call tracking that proves it line by line comes with the GROWTH
+      plan. If it's not producing, you'll know, and so will I.</p>
+      <cite class="mono">DENNIS MINK · THE REPORTING PROMISE</cite>
+    </blockquote>
   </section>
 
   <!-- 04 · PROOF -->
@@ -322,8 +340,10 @@
           <li>UPDATES + MINOR EDITS</li>
           <li>ANALYTICS</li>
         </ul>
+        <p class="tier__best"><span class="mono">BEST FOR</span>You run on referrals and want the site solid, current, and yours.</p>
       </div>
-      <div class="tier reveal">
+      <div class="tier tier--flag reveal">
+        <span class="tier__flag mono">THE REPORTING PROMISE LIVES HERE</span>
         <span class="tier__name mono">GROWTH</span>
         <div class="tier__price">$495&nbsp;/&nbsp;MO</div>
         <ul class="tier__list mono">
@@ -334,6 +354,7 @@
           <li>CONVERSION IMPROVEMENTS</li>
           <li>MONTHLY SUMMARY, TIED TO CALLS + LEADS</li>
         </ul>
+        <p class="tier__best"><span class="mono">BEST FOR</span>You have room for more jobs and want the searches, the tracking, and the monthly proof working for you.</p>
       </div>
     </div>
     <p class="psec__note reveal" style="margin-top:1.8rem">
