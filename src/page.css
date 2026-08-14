@@ -91,6 +91,26 @@ body.page .nav { opacity: 1; transform: none; }
   font-size: 0.72rem; letter-spacing: 0.14em;
 }
 .diag__go:hover, .diag__go:focus-visible { text-decoration: underline; }
+
+/* hero identity badges: the facts the lede used to carry, scannable */
+.phero__badges {
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+  margin-top: 1.6rem; font-size: 0.68rem; letter-spacing: 0.12em;
+}
+.phero__badges span { border: 1px solid var(--line-strong); padding: 0.55rem 0.9rem; color: var(--bone-dim); }
+
+/* not-for harvest callout: the section's one action, quietly elevated —
+   a signal rule inside the existing box, not a second banner */
+.notfor__ask { border-left: 2px solid var(--signal); padding-left: 1.3rem; margin-top: 1.4rem; }
+.notfor__tag { color: var(--signal); display: block; margin-bottom: 0.7rem; font-size: 0.72rem; letter-spacing: 0.14em; }
+.notfor__copy {
+  margin-top: 1rem; background: none; border: 1px solid var(--line-strong);
+  color: var(--bone); padding: 0.6rem 1.1rem; cursor: pointer;
+  font-family: inherit; font-size: 0.72rem; letter-spacing: 0.14em;
+}
+.notfor__copy:hover, .notfor__copy:focus-visible { border-color: var(--signal); color: var(--signal); }
+/* clipboard is a JS affordance: no dead button on the no-JS tier */
+html:not(.js) .notfor__copy { display: none; }
 @media (max-width: 720px) { .diag { grid-template-columns: 1fr; } }
 
 /* ── the math box ── */

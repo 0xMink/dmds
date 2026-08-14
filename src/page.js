@@ -22,6 +22,23 @@
     });
   });
 
+  /* "Send them this page" is the not-for reader's one action; the copy
+     button makes it one tap. Same clipboard contract as the brief-recovery
+     copy: confirm on success, point at the address bar on failure. */
+  var copyLink = $("#copy-page-link");
+  if (copyLink) {
+    copyLink.addEventListener("click", function () {
+      var url = location.origin + location.pathname;
+      var done = function (ok) {
+        copyLink.textContent = ok ? "LINK COPIED" : "COPY FROM THE ADDRESS BAR";
+        setTimeout(function () { copyLink.textContent = "COPY LINK"; }, 2200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); });
+      } else { done(false); }
+    });
+  }
+
   /* ═══ Reveals — one-shot IntersectionObserver (styles gate on html.js,
      so no-JS readers see everything) ═══ */
   if ("IntersectionObserver" in window) {
@@ -63,7 +80,7 @@
     var lastComposed = "";
     var DRAFT_KEY = "dmds-draft-contractor";
     var DRAFT_TTL = 7 * 86400000;
-    var CTA_TEXT = label ? label.textContent : "GET MY FREE WEBSITE DIAGNOSIS";
+    var CTA_TEXT = label ? label.textContent : "GET A FREE WEBSITE DIAGNOSIS";
 
     form.addEventListener("focusin", function () { if (!formT0) formT0 = performance.now(); });
 
@@ -124,7 +141,7 @@
       if (els.namedItem("_gotcha").value) return;
       if (!formT0 || performance.now() - formT0 < 2000) {
         formT0 = performance.now() - 2000;
-        label.textContent = "QUICK CHECK — HIT THE BUTTON AGAIN TO SEND";
+        label.textContent = "QUICK CHECK: HIT THE BUTTON AGAIN TO SEND";
         setTimeout(function () { label.textContent = CTA_TEXT; }, 3000);
         return;
       }
