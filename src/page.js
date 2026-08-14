@@ -94,6 +94,7 @@
         if (draft.name) els.namedItem("name").value = draft.name;
         if (draft.email) els.namedItem("email").value = draft.email;
         if (draft.phone) els.namedItem("phone").value = draft.phone;
+        if (draft.website) els.namedItem("website").value = draft.website;
         if (draft.brief) els.namedItem("brief").value = draft.brief;
         if (draft.project) {
           var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
@@ -112,6 +113,7 @@
             name: els.namedItem("name").value,
             email: els.namedItem("email").value,
             phone: els.namedItem("phone").value,
+            website: els.namedItem("website").value,
             project: (form.querySelector("input[name=project]:checked") || {}).value,
             brief: els.namedItem("brief").value
           }));
@@ -152,6 +154,7 @@
         name: els.namedItem("name").value.trim(),
         email: els.namedItem("email").value.trim(),
         phone: els.namedItem("phone").value.trim(),
+        website: els.namedItem("website").value.trim(),
         project: (form.querySelector("input[name=project]:checked") || {}).value || "Unspecified",
         brief: els.namedItem("brief").value.trim(),
         source: "dmds-contractor-page"
@@ -165,6 +168,7 @@
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nPhone: " + (data.phone || "not given") +
+          "\nWebsite: " + (data.website || "none") +
           "\nWhat's broken: " + data.project + "\n\nBrief:\n" + data.brief;
         lastComposed = "To: dennis@dmds.studio\nSubject: Contractor site inquiry - DMDS (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@dmds.studio?subject=" +
