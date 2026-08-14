@@ -85,6 +85,12 @@ body.page .nav { opacity: 1; transform: none; }
 }
 .diag__cell p { margin-top: 0.8rem; color: var(--bone-dim); font-size: 0.98rem; }
 .diag__cell a { color: var(--bone); text-decoration-color: var(--signal); }
+.diag__go {
+  display: inline-block; margin-top: 1.1rem; padding: 0.35rem 0;
+  color: var(--signal) !important; text-decoration: none;
+  font-size: 0.72rem; letter-spacing: 0.14em;
+}
+.diag__go:hover, .diag__go:focus-visible { text-decoration: underline; }
 @media (max-width: 720px) { .diag { grid-template-columns: 1fr; } }
 
 /* ── the math box ── */

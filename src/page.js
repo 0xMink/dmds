@@ -10,6 +10,18 @@
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
+  /* Diagnosis cards hand their thread to the form: a [data-pick] link
+     checks the matching chip before the jump, so the reader who already
+     said "this one's me" isn't asked the same question twice. */
+  $$("[data-pick]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      var pick = a.getAttribute("data-pick");
+      $$('input[name="project"]').forEach(function (r) {
+        if (r.value === pick) r.checked = true;
+      });
+    });
+  });
+
   /* ═══ Reveals — one-shot IntersectionObserver (styles gate on html.js,
      so no-JS readers see everything) ═══ */
   if ("IntersectionObserver" in window) {
