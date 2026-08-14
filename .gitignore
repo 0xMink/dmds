@@ -1,6 +1,5 @@
-# personal working files — not site source
-DMDS-Call-List.csv
-DMDS-Call-Tracker-v3.xlsx
-DMDS-Lead-Research-Report.md
-DMDS-Email-Drafts-2026-08-08.md
+# personal working files — not site source. Pattern, not exact names:
+# the release flow stages with `git add -A`, so any new lead/call/draft
+# file must be caught by prefix or it ships to the public repo.
+DMDS-*
 seo-evidence/

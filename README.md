@@ -9,6 +9,10 @@ two hand-rolled WebGL particle engines are embedded in one HTML file
 [DESIGN.md](DESIGN.md) — concept, tokens, contracts (MUST/SHOULD),
 state machines, budgets, the verification regime.
 
+**Rights**: this source is published so the site's claims can be
+verified against the exact bytes it serves — not as open source. No
+license is granted; all rights reserved. © 2026 Dennis Mink / DMDS.
+
 The site's concept is *proof of work*: every quantitative claim on the
 page lives in a versioned registry with a definition, source, and
 review date; the boot log reports only events that actually happened;
