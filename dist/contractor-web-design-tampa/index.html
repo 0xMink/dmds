@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-ESYM1YPUj02zWswx/sCmeBWL8C2GgaKYzwRiOg6fqFg='; script-src 'sha256-/KjCiEU0xpQw8yrIw+NWOoPZKMmjTiPVUVQBcH/UtYc='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-7KcYsGQtM271q+LOUaNhOmZOypVDMn3gq4jdGdGobkc='; script-src 'sha256-rd8NBcuWJ3MsvGKUvI6UgnCtYFRrAwifKq8tZdnNY+o='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web Design for Contractors in Tampa Bay | DMDS</title>
 <meta name="description" content="Web design for contractors in Tampa Bay: sites built to win the jobs you actually want, from a Palm Harbor studio. Published pricing. Proof you can verify.">
@@ -1112,6 +1112,33 @@ html:not(.js) .notfor__copy { display: none; }
 .tier__best span { display: block; color: var(--signal); font-size: 0.62rem; letter-spacing: 0.14em; margin-bottom: 0.45rem; }
 @media (max-width: 720px) { .tiers { grid-template-columns: 1fr; } }
 
+/* ── the build sheet: the deliverables, countable ── */
+.rxsheet { border: 1px solid var(--line-strong); padding: 1.6rem; margin-top: 1.8rem; max-width: 60rem; }
+.rxsheet__tag { color: var(--signal); font-size: 0.7rem; letter-spacing: 0.14em; }
+.rxsheet__list { list-style: none; margin-top: 1rem; columns: 2; column-gap: 3rem; }
+.rxsheet__list li {
+  break-inside: avoid; display: flex; gap: 0.9rem; padding: 0.6rem 0;
+  border-top: 1px solid var(--line); color: var(--bone); font-size: 0.76rem; letter-spacing: 0.08em;
+}
+.rxsheet__list li span { color: var(--signal); }
+@media (max-width: 720px) { .rxsheet__list { columns: 1; } }
+
+/* ── how it works: the clock drawn as a track ── */
+.ptrack { margin-top: 2.8rem; max-width: 58rem; }
+.ptrack__tag { color: var(--signal); font-size: 0.72rem; letter-spacing: 0.14em; }
+.ptrack__list {
+  list-style: none; margin-top: 1.2rem; display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--line); border: 1px solid var(--line-strong);
+}
+.ptrack__list li { background: var(--ink); padding: 1.5rem 1.3rem 1.7rem; }
+.ptrack__list li > span { color: var(--signal); font-size: 0.68rem; letter-spacing: 0.12em; display: block; }
+.ptrack__list li b {
+  font-family: "Clash Display", sans-serif; font-weight: 600; text-transform: uppercase;
+  display: block; margin-top: 0.9rem; font-size: 1.05rem;
+}
+.ptrack__list li p { color: var(--bone-dim); margin-top: 0.6rem; font-size: 0.93rem; }
+@media (max-width: 720px) { .ptrack__list { grid-template-columns: 1fr; } }
+
 /* ── the reporting promise, signed ── */
 .pquote { margin: 3rem 0 0; max-width: 46rem; border-left: 3px solid var(--signal); padding: 0.3rem 0 0.3rem 1.7rem; }
 .pquote p {
@@ -1158,7 +1185,7 @@ html:not(.js) .notfor__copy { display: none; }
 .pfoot-links a:hover, .pfoot-links a:focus-visible { color: var(--bone); }
 
 </style>
-<meta name="dmds-build" content="30629eb 2026-08-14T11:39:30Z">
+<meta name="dmds-build" content="56a845d 2026-08-14T11:51:07Z">
 </head>
 <body class="page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1262,7 +1289,8 @@ html:not(.js) .notfor__copy { display: none; }
     <h2 class="psec__title reveal-lines"><span class="line">Run your own numbers<span class="sig">.</span></span></h2>
     <p class="psec__note reveal">
       Most big tree removals around Tampa Bay run somewhere in the low thousands. Seawall
-      and marine jobs, tens of thousands. You know your ticket; I don't. So run it yourself:
+      and marine jobs, tens of thousands. You know your ticket; I don't. Run it yourself,
+      and use profit, not the gross, for the honest number:
     </p>
     <div class="mathbox reveal">
       <span class="mono">GAP ARITHMETIC</span>
@@ -1333,6 +1361,20 @@ html:not(.js) .notfor__copy { display: none; }
         </div>
       </div>
     </div>
+    <div class="rxsheet reveal">
+      <span class="rxsheet__tag mono">[ THE BUILD SHEET · WHAT A FULL BUILD INCLUDES ]</span>
+      <ul class="rxsheet__list mono">
+        <li><span>01</span>POSITIONING AROUND THE WORK YOU WANT MORE OF</li>
+        <li><span>02</span>ALL COPY WRITTEN FOR YOU</li>
+        <li><span>03</span>A PAGE PER SERVICE YOU WANT</li>
+        <li><span>04</span>A PAGE PER TOWN WORTH WINNING</li>
+        <li><span>05</span>TAP-TO-CALL + ESTIMATE FORM</li>
+        <li><span>06</span>TRUST: LICENSE, INSURANCE, REVIEWS, JOB PHOTOS</li>
+        <li><span>07</span>HOSTING + UPKEEP · BASE PLAN</li>
+        <li><span>08</span>GBP WORK + CALL TRACKING · GROWTH PLAN</li>
+        <li><span>09</span>MONTHLY REPORT TIED TO CALLS + LEADS · GROWTH PLAN</li>
+      </ul>
+    </div>
     <blockquote class="pquote reveal">
       <p>I report actual calls and leads that came through the site, not traffic
       charts. The call tracking that proves it line by line comes with the GROWTH
@@ -1376,8 +1418,10 @@ html:not(.js) .notfor__copy { display: none; }
       <p>If you're booked out past the season, your margins are where you want them, and
       referrals keep compounding, I'll tell you here what I'd tell you on the phone:
       <b>don't spend money generating demand you can't serve.</b> A website won't make
-      your crew bigger. Bookmark the page for the year that changes, and take the free
-      advice.</p>
+      your crew bigger. It also won't fix a reputation problem, answer calls you're not
+      picking up, or choose your profitable services for you; if one of those is the
+      real constraint, I'll say so. Bookmark the page for the year that changes, and
+      take the free advice.</p>
       <div class="notfor__ask reveal">
         <span class="notfor__tag mono">[ BOOKED SOLID? ONE ASK ]</span>
         <p>But you probably know somebody around here whose phone stopped ringing.
@@ -1425,13 +1469,29 @@ html:not(.js) .notfor__copy { display: none; }
         <p class="tier__best"><span class="mono">BEST FOR</span>You have room for more jobs and want the searches, the tracking, and the monthly proof working for you.</p>
       </div>
     </div>
-    <p class="psec__note reveal" style="margin-top:1.8rem">
-      <b class="mono" style="color:var(--signal)">THE CLOCK, STATED UP FRONT&nbsp;·&nbsp;</b>
-      The site goes live fast, and some things move in the first weeks: the Google
-      listing, tracking, the site itself. Real movement on the competitive searches builds
-      over months. That's the timeline; you'll see exactly what's happening in the
-      monthly summary either way.
-    </p>
+    <div class="ptrack reveal">
+      <span class="ptrack__tag mono">[ HOW IT WORKS · THE CLOCK, STATED UP FRONT ]</span>
+      <ol class="ptrack__list">
+        <li>
+          <span class="mono">01 · WEEK ONE</span>
+          <b>Diagnose + plan</b>
+          <p>Your site, your searches, your best jobs. You get a fixed scope and price
+          before you owe me anything.</p>
+        </li>
+        <li>
+          <span class="mono">02 · ABOUT 30 DAYS</span>
+          <b>Build + launch</b>
+          <p>I write it and build it; you provide photos, facts, and approvals. Live in
+          about 30 days once I have them, with tracking ready to measure.</p>
+        </li>
+        <li>
+          <span class="mono">03 · MONTHS</span>
+          <b>Real movement</b>
+          <p>The listing and the site move fast; competitive searches build over months.
+          The monthly summary shows exactly what's happening either way.</p>
+        </li>
+      </ol>
+    </div>
   </section>
 
   <!-- 07 · OBJECTIONS -->
@@ -1496,6 +1556,10 @@ html:not(.js) .notfor__copy { display: none; }
           <span class="mono">PHONE&nbsp;·&nbsp;OPTIONAL</span>
           <input name="phone" type="tel" placeholder="If you'd rather talk" autocomplete="tel">
         </label>
+        <label class="transmit__field">
+          <span class="mono">WEBSITE&nbsp;·&nbsp;IF&nbsp;YOU&nbsp;HAVE&nbsp;ONE</span>
+          <input name="website" type="text" inputmode="url" placeholder="So I can look before we talk" autocomplete="url">
+        </label>
       </div>
       <fieldset class="transmit__chips">
         <legend class="mono">WHAT'S BROKEN?</legend>
@@ -1504,6 +1568,7 @@ html:not(.js) .notfor__copy { display: none; }
         <label><input type="radio" name="project" value="Missed calls"><span class="mono">MISSED CALLS</span></label>
         <label><input type="radio" name="project" value="Old site"><span class="mono">OLD SITE</span></label>
         <label><input type="radio" name="project" value="Something else"><span class="mono">SOMETHING ELSE</span></label>
+        <label><input type="radio" name="project" value="Not sure"><span class="mono">NOT SURE</span></label>
       </fieldset>
       <label class="transmit__field">
         <span class="mono">MESSAGE</span>
@@ -1541,7 +1606,7 @@ html:not(.js) .notfor__copy { display: none; }
     <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;STATIC&nbsp;PAGE&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span>
     <span>PALM&nbsp;HARBOR&nbsp;·&nbsp;TAMPA&nbsp;BAY,&nbsp;FL&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
     <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
-    <span>BUILD&nbsp;30629eb · 2026-08-14</span>
+    <span>BUILD&nbsp;56a845d · 2026-08-14</span>
     <span><a href="https://github.com/0xMink/dmds" target="_blank" rel="noopener">SOURCE&nbsp;ON&nbsp;GITHUB&nbsp;↗</a></span>
   </footer>
 
@@ -1644,6 +1709,7 @@ html:not(.js) .notfor__copy { display: none; }
         if (draft.name) els.namedItem("name").value = draft.name;
         if (draft.email) els.namedItem("email").value = draft.email;
         if (draft.phone) els.namedItem("phone").value = draft.phone;
+        if (draft.website) els.namedItem("website").value = draft.website;
         if (draft.brief) els.namedItem("brief").value = draft.brief;
         if (draft.project) {
           var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
@@ -1662,6 +1728,7 @@ html:not(.js) .notfor__copy { display: none; }
             name: els.namedItem("name").value,
             email: els.namedItem("email").value,
             phone: els.namedItem("phone").value,
+            website: els.namedItem("website").value,
             project: (form.querySelector("input[name=project]:checked") || {}).value,
             brief: els.namedItem("brief").value
           }));
@@ -1702,6 +1769,7 @@ html:not(.js) .notfor__copy { display: none; }
         name: els.namedItem("name").value.trim(),
         email: els.namedItem("email").value.trim(),
         phone: els.namedItem("phone").value.trim(),
+        website: els.namedItem("website").value.trim(),
         project: (form.querySelector("input[name=project]:checked") || {}).value || "Unspecified",
         brief: els.namedItem("brief").value.trim(),
         source: "dmds-contractor-page"
@@ -1715,6 +1783,7 @@ html:not(.js) .notfor__copy { display: none; }
       function fallbackMail() {
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nPhone: " + (data.phone || "not given") +
+          "\nWebsite: " + (data.website || "none") +
           "\nWhat's broken: " + data.project + "\n\nBrief:\n" + data.brief;
         lastComposed = "To: dennis@dmds.studio\nSubject: Contractor site inquiry - DMDS (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@dmds.studio?subject=" +
@@ -1743,4 +1812,4 @@ html:not(.js) .notfor__copy { display: none; }
 </script>
 </body>
 </html>
-<!-- dmds build 30629eb 2026-08-14T11:39:30Z -->
+<!-- dmds build 56a845d 2026-08-14T11:51:07Z -->
