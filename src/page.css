@@ -26,6 +26,14 @@ html.js body.page input, html.js body.page textarea { cursor: text; }
 /* nav: reuse .nav wholesale — but subpages have no loader, so the nav
    is visible by default (content is never hostage to a script) */
 body.page .nav { opacity: 1; transform: none; }
+/* five jump links on subpages (vs four on the studio page): on narrow
+   phones the row scrolls sideways instead of clipping — every link stays
+   reachable, no effect at widths where it already fits */
+@media (max-width: 560px) {
+  body.page .nav__links { overflow-x: auto; scrollbar-width: none; }
+  body.page .nav__links::-webkit-scrollbar { display: none; }
+  body.page .nav__links a { white-space: nowrap; }
+}
 /* nav: subpage home link */
 .nav__home { color: var(--bone-dim); text-decoration: none; }
 .nav__home:hover, .nav__home:focus-visible { color: var(--bone); }
