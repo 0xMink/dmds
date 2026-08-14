@@ -5,7 +5,7 @@
 | **Date** | 2026-07-17 |
 | **Status** | **Approved for implementation** (rev 3) — M0 capability gate passed under headless SwiftShader 2026-07-17 (36/36; `tests/m0-results.md`, artifact `tests/results/m0-swiftshader-2026-07-17.json`, gate commit `d0654c8`); real-GPU performance and interaction validation remain pending |
 | **Owner** | Dennis Mink (@0xMink) |
-| **Scope** | Phase 1 of the staged plan (physical engine → DMDS/OS terminal → playable layer). This spec covers Phase 1 only. |
+| **Scope** | Phase 1 of the staged plan (physical engine → DMDS/OS terminal → Phase 3). This spec covers Phase 1 only. |
 | **Parent docs** | `DESIGN.md` v2.1 (this work bumps it to v2.2), `README.md` |
 | **Freeze rule** | After rev 3, the spec changes only on findings produced by implementation evidence (M0+), not further prose review. |
 
@@ -26,7 +26,7 @@ watching it recover is the site's resilience thesis made tactile.**
 
 ## Non-goals (Phase 1)
 
-- Terminal / DMDS-OS layer (Phase 2). Game layer (Phase 3).
+- Terminal / DMDS-OS layer (Phase 2). Everything in Phase 3.
 - Photogrammetry operator portrait (separate; needs a scan from Dennis).
 - Sound redesign beyond driving existing sfx intensity from excitement.
 - External assets. Phase 1 stays fully self-contained.

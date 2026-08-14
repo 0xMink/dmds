@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Date** | 2026-08-03 (rev 2 — external review incorporated: keyboard precedence model, state-restoration rule, unavailable-state outputs, a11y test enumeration, commercial hierarchy, no-game-abstractions; implementation begins with slice 1) |
+| **Date** | 2026-08-03 (rev 2 — external review incorporated: keyboard precedence model, state-restoration rule, unavailable-state outputs, a11y test enumeration, commercial hierarchy, no-premature-phase-3-abstractions; implementation begins with slice 1) |
 | **Status** | Accepted |
-| **Phase** | 2 of the staged-fusion roadmap (1: GPGPU engine ✓ · 2: terminal · 3: hidden game) |
+| **Phase** | 2 of the staged-fusion roadmap (1: GPGPU engine ✓ · 2: terminal · 3: reserved) |
 | **Owner** | Dennis Mink (@0xMink) |
 | **Governing docs** | DESIGN.md v2.2 (all MUSTs apply); this spec adds terminal-specific contracts |
 
@@ -17,8 +17,8 @@ real page — the engine, the claim registry, the boot log, the governor —
 through commands. Phase 1 made the field physical; Phase 2 makes the
 *site* operable. It is the credibility artifact for the developer
 audience (the visitor who opens a terminal is exactly the visitor who
-will judge whether it's real), and it is the discovery surface Phase 3's
-hidden game will live behind.
+will judge whether it's real), and it is the discovery surface Phase 3
+will live behind.
 
 **The load-bearing rule carries over unchanged**: the terminal never
 simulates. Every command reads live state or build-embedded data
@@ -126,9 +126,9 @@ injection powers. The governor history read is the one telemetry-tier
 item promoted to production — it is read-only, always-recorded, and
 opening a terminal is a stronger explicit act than adding a query param.
 
-**Phase 3 reservation**: no stub, no teaser command — a hint at a game
-that doesn't exist yet would be the site's first lie. Phase 3 adds its
-entry when there is something real behind it.
+**Phase 3 reservation**: no stub, no teaser command — hinting at
+something that doesn't exist yet would be the site's first lie. Phase 3
+adds its entry when there is something real behind it.
 
 ## Keyboard precedence (deterministic, not aspirational)
 
@@ -198,7 +198,7 @@ puzzle gates anything a prospective client needs. The `contact`
 command exists precisely so the terminal's most engaged users are one
 word from the form.
 
-## No premature game architecture
+## No premature Phase-3 architecture
 
 The command table is a flat object. No plugin system, no command
 registration API, no event bus, no state machine beyond the dialog's
