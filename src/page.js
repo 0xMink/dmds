@@ -51,7 +51,7 @@
     var lastComposed = "";
     var DRAFT_KEY = "dmds-draft-contractor";
     var DRAFT_TTL = 7 * 86400000;
-    var CTA_TEXT = label ? label.textContent : "GET YOUR FREE DIAGNOSIS";
+    var CTA_TEXT = label ? label.textContent : "GET MY FREE WEBSITE DIAGNOSIS";
 
     form.addEventListener("focusin", function () { if (!formT0) formT0 = performance.now(); });
 
