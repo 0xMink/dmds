@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-7KcYsGQtM271q+LOUaNhOmZOypVDMn3gq4jdGdGobkc='; script-src 'sha256-rd8NBcuWJ3MsvGKUvI6UgnCtYFRrAwifKq8tZdnNY+o='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-ZovupCRnNpT14ESecxZSWVqsv6seGvoLDKHY9YKOm+E=' 'sha256-ZBridREpHzmsIQTvCCm7Yjl3oERV/XVcOo8KQIa5dYw=' 'sha256-pFNW9BvWrphAbRXIaqWiXfAHmBlRu+j26QgtCqTrCb8='; script-src 'sha256-rd8NBcuWJ3MsvGKUvI6UgnCtYFRrAwifKq8tZdnNY+o='; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web Design for Contractors in Tampa Bay | DMDS</title>
 <meta name="description" content="Web design for contractors in Tampa Bay: sites built to win the jobs you actually want, from a Palm Harbor studio. Published pricing. Proof you can verify.">
@@ -1123,6 +1123,13 @@ html:not(.js) .notfor__copy { display: none; }
 .rxsheet__list li span { color: var(--signal); }
 @media (max-width: 720px) { .rxsheet__list { columns: 1; } }
 
+/* custom-systems rung: quoted after diagnosis, never promised before */
+.tiers__custom {
+  border: 1px solid var(--line-strong); padding: 1rem 1.2rem; margin-top: 1.4rem;
+  max-width: 58rem; color: var(--bone-dim); font-size: 0.72rem; letter-spacing: 0.12em;
+}
+.tiers__custom span { color: var(--signal); margin-right: 0.6rem; }
+
 /* ── how it works: the clock drawn as a track ── */
 .ptrack { margin-top: 2.8rem; max-width: 58rem; }
 .ptrack__tag { color: var(--signal); font-size: 0.72rem; letter-spacing: 0.14em; }
@@ -1185,7 +1192,7 @@ html:not(.js) .notfor__copy { display: none; }
 .pfoot-links a:hover, .pfoot-links a:focus-visible { color: var(--bone); }
 
 </style>
-<meta name="dmds-build" content="56a845d 2026-08-14T11:51:07Z">
+<meta name="dmds-build" content="4be4e1d 2026-08-14T11:56:22Z">
 </head>
 <body class="page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -1246,6 +1253,10 @@ html:not(.js) .notfor__copy { display: none; }
   <section class="psec" id="diagnosis">
     <div class="section-head mono"><span>[ SEC.01 / DIAGNOSIS ]</span><span class="section-head__rule"></span></div>
     <h2 class="psec__title reveal-lines"><span class="line">Which one is you<span class="sig">?</span></span></h2>
+    <p class="psec__note reveal">
+      Four different leaks, four different fixes. The diagnosis comes before the
+      recommendation.
+    </p>
     <div class="diag">
       <div class="diag__cell reveal" id="d-01">
         <span class="diag__tag mono">D-01 / DEMAND</span>
@@ -1396,7 +1407,7 @@ html:not(.js) .notfor__copy { display: none; }
       live, and the receipts are public on the studio page if you want to look.
     </p>
     <div class="prooflinks reveal">
-      <a class="mono" href="/#work">HVAC FIELD-SERVICE PLATFORM ↗</a>
+      <a class="mono" href="/#work">HVAC FIELD-SERVICE PLATFORM · CLOSEST TO YOUR WORLD ↗</a>
       <a class="mono" href="/#work">INSURANCE GROWTH ENGINE · INSURE WITH MINK ↗</a>
       <a class="mono" href="/#work">AI PLATFORM · ZOO CODE ↗</a>
     </div>
@@ -1406,7 +1417,8 @@ html:not(.js) .notfor__copy { display: none; }
       first handful of trades clients are founding engagements: the band on this page is
       set low on purpose while I build that proof around here. No countdown, no "rates
       going up soon," no invisible regular price it's discounted from. This is just
-      what the early work costs.
+      what the early work costs. And the proof I intend to add right here as it
+      verifies: before-and-after searches, calls, estimate requests, and won jobs.
     </p>
   </section>
 
@@ -1469,6 +1481,7 @@ html:not(.js) .notfor__copy { display: none; }
         <p class="tier__best"><span class="mono">BEST FOR</span>You have room for more jobs and want the searches, the tracking, and the monthly proof working for you.</p>
       </div>
     </div>
+    <p class="tiers__custom mono reveal"><span>CUSTOM SYSTEMS</span> MISSED-CALL AUTOMATION, INTAKE, JOB TRACKING: SCOPED AND QUOTED AFTER THE DIAGNOSIS.</p>
     <div class="ptrack reveal">
       <span class="ptrack__tag mono">[ HOW IT WORKS · THE CLOCK, STATED UP FRONT ]</span>
       <ol class="ptrack__list">
@@ -1606,7 +1619,7 @@ html:not(.js) .notfor__copy { display: none; }
     <span>©&nbsp;2026&nbsp;DMDS&nbsp;·&nbsp;STATIC&nbsp;PAGE&nbsp;·&nbsp;CONTENT&nbsp;NOMINAL</span>
     <span>PALM&nbsp;HARBOR&nbsp;·&nbsp;TAMPA&nbsp;BAY,&nbsp;FL&nbsp;·&nbsp;<span id="clock-2">ET</span></span>
     <span>BUILT&nbsp;IN-HOUSE&nbsp;·&nbsp;ZERO&nbsp;EXTERNAL&nbsp;REQUESTS&nbsp;ON&nbsp;LOAD</span>
-    <span>BUILD&nbsp;56a845d · 2026-08-14</span>
+    <span>BUILD&nbsp;4be4e1d · 2026-08-14</span>
     <span><a href="https://github.com/0xMink/dmds" target="_blank" rel="noopener">SOURCE&nbsp;ON&nbsp;GITHUB&nbsp;↗</a></span>
   </footer>
 
@@ -1812,4 +1825,4 @@ html:not(.js) .notfor__copy { display: none; }
 </script>
 </body>
 </html>
-<!-- dmds build 56a845d 2026-08-14T11:51:07Z -->
+<!-- dmds build 4be4e1d 2026-08-14T11:56:22Z -->
