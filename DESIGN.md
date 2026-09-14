@@ -726,3 +726,16 @@ The contract deltas from the studio page:
   `STATIC PAGE · CONTENT NOMINAL` (there is no renderer to report on).
 - `build.sh` emits `dist/robots.txt` + `dist/sitemap.xml` covering the
   studio page and every subpage.
+- **Partials.** Chrome that must be byte-identical across subpages
+  (nav meta, the transmit privacy/recovery tail, the footer) lives in
+  `src/partials/<name>.html` and is expanded at build time by
+  `<!-- partial:name key="value" -->` (`{{key}}` substitution, unset
+  keys empty). Source stops duplicating it; the artifact is still one
+  self-contained file. Partials are glyph-scanned like pages.
+- **Structural checks.** `check.py` fails a subpage that has anything but
+  one `<h1>`, an in-page link with no matching `id`, a `data-pick` that
+  names no form chip, or a FAQPage JSON-LD block that does not mirror the
+  rendered FAQ 1:1; it warns on an em dash in rendered prose.
+- **One shared runtime.** `page.js` is configured per page through
+  `data-*` attributes on `#transmit` (draft key, mail subject, chip
+  label, source tag, extra fields) — no per-page script forks.

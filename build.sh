@@ -36,8 +36,19 @@ stamp = os.environ["DMDS_GIT_SHA"] + " " + os.environ["DMDS_BUILD_TS"]
 def sha(s):
     return "'sha256-" + base64.b64encode(hashlib.sha256(s.encode()).digest()).decode() + "'"
 
+def expand_partials(html):
+    """<!-- partial:name key="value" ... --> → src/partials/name.html with
+    {{key}} substituted; unset keys become empty. Build-time only: the
+    artifact stays one self-contained file, the source stops duplicating
+    chrome that must be byte-identical across subpages."""
+    def sub(m):
+        name, attrs = m.group(1), dict(re.findall(r'(\w+)="([^"]*)"', m.group(2)))
+        body = open(os.path.join(src, "partials", name + ".html")).read().rstrip("\n")
+        return re.sub(r"\{\{(\w+)\}\}", lambda k: attrs.get(k.group(1), ""), body)
+    return re.sub(r"<!-- partial:(\w[\w-]*)((?:\s+\w+=\"[^\"]*\")*)\s*-->", sub, html)
+
 def build_page(page_path, out_path):
-    html = open(page_path).read()
+    html = expand_partials(open(page_path).read())
     styles, scripts = [], []
 
     def inline_css(m):

@@ -90,12 +90,12 @@ window.DMDS_CLAIMS = /* claims-json-start */ {
       "verified": "2026-07-08", "review_by": "2026-10-08", "visibility": "attestable"
     },
     "zoo-stars": {
-      "page": "1,266", "dom": true,
-      "text": "1,266 GITHUB STARS",
+      "page": "1,841", "dom": true,
+      "text": "1,841 GITHUB STARS",
       "definition": "Star count of Zoo-Code-Org/Zoo-Code at the verification date. Drifts daily; short review window on purpose.",
       "source": "https://github.com/Zoo-Code-Org/Zoo-Code",
       "verify": "Open the repo.",
-      "verified": "2026-07-08", "review_by": "2026-09-08", "visibility": "public"
+      "verified": "2026-09-14", "review_by": "2026-11-14", "visibility": "public"
     },
     "zoo-prs-merged": {
       "page": "7", "dom": true,

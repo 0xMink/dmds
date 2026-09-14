@@ -112,7 +112,9 @@ try:
 
     glyph_files = [("index.html", "html"), ("main.js", "js"), ("styles.css", "css"), ("gl.js", "js"), ("gl2.js", "js"), ("claims.js", "js"), ("term.js", "js"), ("page.css", "css"), ("page.js", "js")]
     glyph_files += [(os.path.join("pages", os.path.basename(p)), "html")
-                    for p in sorted(glob.glob(os.path.join(SRC, "pages", "*.html")))]
+                    for p in sorted(glob.glob(os.path.join(SRC, "pages", "*.html")))] + \
+                   [(os.path.relpath(p, SRC), "html")
+                    for p in sorted(glob.glob(os.path.join(SRC, "partials", "*.html")))]
     for fname, kind in glyph_files:
         path = os.path.join(SRC, fname)
         if not os.path.exists(path):
@@ -128,8 +130,38 @@ except ImportError:
 # runtime claims↔DOM verify only runs there; a subpage claim would be
 # build-checked at best and the page must not imply the stronger tier ──
 for p in sorted(glob.glob(os.path.join(SRC, "pages", "*.html"))):
-    if "data-claim" in read(p):
-        errors.append(f"{os.path.relpath(p, ROOT)}: data-claim on a subpage — quantitative claims live on the studio page (or wire subpage runtime verification first)")
+    rel, page = os.path.relpath(p, ROOT), read(p)
+    if "data-claim" in page:
+        errors.append(f"{rel}: data-claim on a subpage — quantitative claims live on the studio page (or wire subpage runtime verification first)")
+    # structural contract: one H1; every in-page anchor resolves; every
+    # diagnosis link preselects a chip that exists; FAQPage JSON-LD mirrors
+    # the rendered FAQ 1:1 (the copy contract's mirror rule, enforced)
+    if len(re.findall(r"<h1\b", page)) != 1:
+        errors.append(f"{rel}: expected exactly one <h1>")
+    ids = set(re.findall(r'\bid="([^"]+)"', page))
+    for target in sorted(set(re.findall(r'href="#([^"]+)"', page))):
+        if target not in ids:
+            errors.append(f"{rel}: in-page link #{target} has no matching id")
+    chips = set(re.findall(r'name="project"\s+value="([^"]+)"', page))
+    for pick in sorted(set(re.findall(r'data-pick="([^"]+)"', page))):
+        if chips and pick not in chips:
+            errors.append(f"{rel}: data-pick {pick!r} matches no form chip")
+    for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, re.S):
+        if '"FAQPage"' not in block:
+            continue
+        try:
+            entries = json.loads(block)["mainEntity"]
+        except Exception as exc:
+            errors.append(f"{rel}: FAQPage JSON-LD unparseable ({exc})"); continue
+        rendered = re.findall(r'<details[^>]*>\s*<summary[^>]*>"(.*?)"</summary>\s*<p[^>]*>(.*?)</p>', page, re.S)
+        if len(rendered) != len(entries):
+            errors.append(f"{rel}: FAQPage has {len(entries)} entries, page renders {len(rendered)}")
+        for (q, a), e in zip(rendered, entries):
+            if q != e.get("name") or re.sub(r"\s+", " ", a).strip() != e.get("acceptedAnswer", {}).get("text"):
+                errors.append(f"{rel}: FAQPage entry {q[:40]!r} does not mirror the rendered answer")
+    prose = re.sub(r"<(style|script)[^>]*>.*?</\1>|<!--.*?-->|<meta[^>]*>", "", page, flags=re.S)
+    if "\u2014" in prose:
+        warnings.append(f"{rel}: em dash in rendered prose (copy contract: periods, commas, colons)")
 
 # ── 5–7: the built artifacts (studio page + every subpage) ──────
 artifacts = ([DIST] if os.path.exists(DIST) else []) + \

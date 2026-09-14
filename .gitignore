@@ -3,3 +3,7 @@
 # file must be caught by prefix or it ships to the public repo.
 DMDS-*
 seo-evidence/
+# lowercase and archives too (the pattern above is case-sensitive; an uploaded
+# dmds-*.zip in this directory would otherwise be swept in by git add -A)
+dmds-*
+*.zip

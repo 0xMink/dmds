@@ -78,7 +78,11 @@
     var els = form.elements;
     var formT0 = 0;
     var lastComposed = "";
-    var DRAFT_KEY = "dmds-draft-contractor";
+    var DRAFT_KEY = form.dataset.draftKey || "dmds-draft-contractor";
+    var SUBJECT = form.dataset.subject || "Contractor site inquiry - DMDS";
+    var PICK_LABEL = form.dataset.pickLabel || "What's broken";
+    var SOURCE = form.dataset.source || "dmds-contractor-page";
+    var EXTRA = (form.dataset.extra || "").split(",").filter(Boolean);
     var DRAFT_TTL = 7 * 86400000;
     var CTA_TEXT = label ? label.textContent : "GET A FREE WEBSITE DIAGNOSIS";
 
@@ -95,6 +99,7 @@
         if (draft.email) els.namedItem("email").value = draft.email;
         if (draft.phone) els.namedItem("phone").value = draft.phone;
         if (draft.website) els.namedItem("website").value = draft.website;
+        EXTRA.forEach(function (k) { if (draft.extra && draft.extra[k] && els.namedItem(k)) els.namedItem(k).value = draft.extra[k]; });
         if (draft.brief) els.namedItem("brief").value = draft.brief;
         if (draft.project) {
           var radio = form.querySelector("input[name=project][value='" + draft.project + "']");
@@ -114,6 +119,7 @@
             email: els.namedItem("email").value,
             phone: els.namedItem("phone").value,
             website: els.namedItem("website").value,
+            extra: EXTRA.reduce(function (o, k) { if (els.namedItem(k)) o[k] = els.namedItem(k).value; return o; }, {}),
             project: (form.querySelector("input[name=project]:checked") || {}).value,
             brief: els.namedItem("brief").value
           }));
@@ -155,9 +161,10 @@
         email: els.namedItem("email").value.trim(),
         phone: els.namedItem("phone").value.trim(),
         website: els.namedItem("website").value.trim(),
+        extra: EXTRA.reduce(function (o, k) { if (els.namedItem(k)) o[k] = els.namedItem(k).value.trim(); return o; }, {}),
         project: (form.querySelector("input[name=project]:checked") || {}).value || "Unspecified",
         brief: els.namedItem("brief").value.trim(),
-        source: "dmds-contractor-page"
+        source: SOURCE
       };
       var endpoint = form.dataset.endpoint;
       function succeed() {
@@ -169,10 +176,11 @@
         var body = "Name: " + data.name + "\nEmail: " + data.email +
           "\nPhone: " + (data.phone || "not given") +
           "\nWebsite: " + (data.website || "none") +
-          "\nWhat's broken: " + data.project + "\n\nBrief:\n" + data.brief;
-        lastComposed = "To: dennis@dmds.studio\nSubject: Contractor site inquiry - DMDS (" + data.project + ")\n\n" + body;
+          EXTRA.map(function (k) { return "\n" + k.charAt(0).toUpperCase() + k.slice(1) + ": " + (data.extra[k] || "not given"); }).join("") +
+          "\n" + PICK_LABEL + ": " + data.project + "\n\nBrief:\n" + data.brief;
+        lastComposed = "To: dennis@dmds.studio\nSubject: " + SUBJECT + " (" + data.project + ")\n\n" + body;
         window.location.href = "mailto:dennis@dmds.studio?subject=" +
-          encodeURIComponent("Contractor site inquiry - DMDS (" + data.project + ")") +
+          encodeURIComponent(SUBJECT + " (" + data.project + ")") +
           "&body=" + encodeURIComponent(body);
         label.textContent = "OPENING YOUR MAIL CLIENT…";
         if (recover) recover.hidden = false;
