@@ -7,3 +7,7 @@ seo-evidence/
 # dmds-*.zip in this directory would otherwise be swept in by git add -A)
 dmds-*
 *.zip
+# spreadsheets and data exports are never site source; they are working files
+# that land here from the owner's tools and must never reach the public repo
+*.csv
+*.xlsx
