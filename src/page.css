@@ -103,6 +103,9 @@ body.page .nav { opacity: 1; transform: none; }
 }
 .diag__cell p { margin-top: 0.8rem; color: var(--bone-dim); font-size: 0.98rem; }
 .diag__cell a { color: var(--bone); text-decoration-color: var(--signal); }
+/* best-of: partner logos on their cards — light marks sit on a white chip */
+.diag__logo { display: block; height: 56px; width: auto; max-width: 200px; margin-bottom: 0.9rem; background: #fff; padding: 0.4rem 0.6rem; box-sizing: content-box; }
+.diag__logo--mark { background: none; padding: 0; height: 48px; }
 .diag__go {
   display: inline-block; margin-top: 1.1rem; padding: 0.35rem 0;
   color: var(--signal) !important; text-decoration: none;
