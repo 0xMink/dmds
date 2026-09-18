@@ -112,6 +112,8 @@ body.page .nav { opacity: 1; transform: none; }
   font-size: 0.72rem; letter-spacing: 0.14em;
 }
 .diag__go:hover, .diag__go:focus-visible { text-decoration: underline; }
+.diag__go + .diag__go { margin-left: 1.4rem; }
+.prooflinks span { color: var(--bone-dim); margin-right: 1.4rem; }
 
 /* hero identity badges: the facts the lede used to carry, scannable */
 .phero__badges {
