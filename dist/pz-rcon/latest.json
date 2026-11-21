@@ -1,7 +1,7 @@
 {
-  "version": "0.8.2",
+  "version": "0.8.1",
   "target": "windows-x86_64",
-  "url": "https://dmds.studio/pz-rcon/pz-rcon-0.8.2.exe",
-  "size": 10078720,
-  "sha256": "d35f4a402d2419a20fc4c9bb1d9bd02520dd4f1fd57e30a163e0a16a36fef453"
+  "url": "https://dmds.studio/pz-rcon/pz-rcon-0.8.1.exe",
+  "size": 9934848,
+  "sha256": "1c68979f18697b1ce20d7255c470d957d7a75f8292b641e135c86882641125b7"
 }
